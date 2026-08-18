@@ -43,3 +43,16 @@ export type {
   ReplayResult,
   RefusableEffect,
 } from "./engine.ts";
+export {
+  createMemoryRewindStore,
+  backtrackCandidates,
+  memoryForCheckpoint,
+  recommendedCheckpoint,
+  shouldCheckpoint,
+} from "./recovery/recovery.ts";
+export type {
+  AttemptRecord,
+  Outcome,
+  RewindMemoryStore,
+  BacktrackCandidate,
+} from "./recovery/recovery.ts";
