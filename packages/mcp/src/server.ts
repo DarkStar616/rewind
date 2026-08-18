@@ -187,6 +187,8 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
           actorId: z.string().optional(),
           objectId: z.string().optional(),
           detail: z.string().optional(),
+          // Provider-native per-call id, recorded for correlation only — never part of effect identity.
+          toolUseId: z.string().optional(),
         }),
       },
       outputSchema: {

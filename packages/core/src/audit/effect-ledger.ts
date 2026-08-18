@@ -24,6 +24,14 @@ export interface ExternalEffect {
   actorId?: string;
   objectId?: string;
   detail?: string;
+  /**
+   * The provider-native `tool_use_id` (e.g. Anthropic `toolu_...`), a cheap per-call identity recorded
+   * ALONGSIDE the authoritative effectKey for correlation/diagnostics. NEVER part of identity or the
+   * dedup/refusal decision — it is client-supplied and unique only within a conversation, so trusting
+   * it as sole identity would let a re-labelled effect slip the barrier. The SHA-256 canonical effectKey
+   * stays the sole identity for the chain and the spent-check.
+   */
+  toolUseId?: string;
 }
 
 export interface EffectRefusal {
@@ -108,7 +116,13 @@ export function createEffectLedger(ledger: EvidenceLedger, _opts: EffectLedgerOp
           // The (scope, effectKey) uniqueness guarantee: the evidence ledger already dedupes on
           // idempotencyKey, so a future durable backend enforces one spent entry per effect too.
           idempotencyKey: `${effect.scopeLabel}:${effect.effectKey}`,
-          detail: { effectKey: effect.effectKey, kind: effect.kind, detail: effect.detail ?? null },
+          // toolUseId is recorded for correlation only; it is deliberately NOT in idempotencyKey/identity.
+          detail: {
+            effectKey: effect.effectKey,
+            kind: effect.kind,
+            detail: effect.detail ?? null,
+            ...(effect.toolUseId ? { toolUseId: effect.toolUseId } : {}),
+          },
         });
         return { refused: false, effectKey: effect.effectKey };
       });
