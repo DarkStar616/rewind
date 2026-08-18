@@ -114,6 +114,58 @@ test("cache_control markers themselves are not mistaken for content poisoners", 
   assert.equal(r.breakpointCount, 1);
 });
 
+test("a NUMERIC epoch and a numeric id-field in the prefix are flagged (not just strings)", () => {
+  const r = analyzeCacheHygiene({
+    model: "m",
+    system: [{ type: "text", text: "ctx", timestamp: 1787063400000, run_id: 42 }],
+    messages: [{ role: "user", content: "hi" }],
+  });
+  assert.equal(r.cacheable, false);
+  assert.equal(r.prefixPoisoners.some((p) => p.reason === "epoch"), true, "numeric epoch caught");
+  assert.equal(r.prefixPoisoners.some((p) => p.reason === "session-id"), true, "numeric run_id caught");
+});
+
+test("thread_id / invocation_id / bare nonce keys are recognized", () => {
+  const r = analyzeCacheHygiene({
+    model: "m",
+    tools: [{ name: "t", thread_id: "th-1", invocation_id: "inv-2", nonce: "n-3" }],
+    messages: [{ role: "user", content: "hi" }],
+  });
+  assert.equal(r.prefixPoisoners.filter((p) => p.reason === "session-id").length, 3);
+});
+
+test("a JSON-schema property literally named cache_control is NOT counted as a breakpoint", () => {
+  const r = analyzeCacheHygiene({
+    model: "m",
+    tools: [
+      { name: "t1", input_schema: { properties: { cache_control: { type: "string" } } } },
+      { name: "t2", input_schema: { properties: { cache_control: { type: "string" } } } },
+      { name: "t3", input_schema: { properties: { cache_control: { type: "string" } } } },
+      { name: "t4", input_schema: { properties: { cache_control: { type: "string" } } } },
+      { name: "t5", input_schema: { properties: { cache_control: { type: "string" } } } },
+    ],
+    messages: [{ role: "user", content: "hi" }],
+  });
+  assert.equal(r.breakpointCount, 0, "schema props named cache_control are not real breakpoints");
+  assert.equal(r.overBreakpointCap, false);
+});
+
+test("dynamic content in the last message IS flagged when a breakpoint sits on it", () => {
+  const r = analyzeCacheHygiene({
+    model: "m",
+    system: "static",
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: "time is 2026-08-18T14:30:00Z", cache_control: { type: "ephemeral" } }],
+      },
+    ],
+  });
+  // With a breakpoint ON the last message, its content is part of the cache write and poisons it.
+  assert.equal(r.cacheable, false, "a breakpoint on the last message pulls it into the cached prefix");
+  assert.equal(r.prefixPoisoners.some((p) => p.reason === "timestamp"), true);
+});
+
 test("the proxy logs a cache-hygiene advisory for a prefix-poisoning request (never blocks it)", async () => {
   const stub = createServer((req, res) => {
     let n = "";

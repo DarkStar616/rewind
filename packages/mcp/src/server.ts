@@ -303,24 +303,38 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
       },
     },
     async (args) => {
-      // Rewind FIRST. engine.rewind validates the checkpoint id and refuses an unknown one BEFORE
-      // touching the tree, so an invalid id throws here and NO note is recorded — the attempt log is
-      // never polluted with a lesson tied to a checkpoint that does not exist. (Surfaces spent effects
-      // now refusable on replay, too.)
+      // A whitespace-only note is not a lesson — reject it (schema min(1) alone would accept "   ").
+      const note = args.note.trim();
+      if (note.length === 0) {
+        throw new Error("backtrack_commit requires a note with actual content (whitespace-only is not a lesson)");
+      }
+      // Validate the checkpoint exists BEFORE recording, so an unknown id pollutes nothing.
+      const checkpoints = await engine.list();
+      if (!checkpoints.some((c) => c.id === args.checkpointId)) {
+        throw new Error(`backtrack_commit: unknown checkpoint ${args.checkpointId}`);
+      }
+      // Record the lesson FIRST: it is valid regardless of the rewind's outcome and must never be lost
+      // to a mid-rewind failure. Retries are idempotent — an identical (checkpoint, note) already
+      // recorded is NOT duplicated, so a lost response + client retry never inflates the memory. seq is
+      // finite-filtered so a malformed record can never poison allocation into NaN.
+      const alreadyRecorded = rewindMemory
+        .since(RECOVERY_SCOPE, args.checkpointId)
+        .some((a) => a.outcome === "abandoned" && a.note === note);
+      if (!alreadyRecorded) {
+        const seqs = rewindMemory.all(RECOVERY_SCOPE).map((a) => a.seq).filter((n) => Number.isFinite(n));
+        const nextSeq = seqs.length === 0 ? 0 : Math.max(...seqs) + 1;
+        rewindMemory.record({
+          seq: nextSeq,
+          scope: RECOVERY_SCOPE,
+          checkpointId: args.checkpointId,
+          goal: args.goal ?? "abandoned branch",
+          outcome: "abandoned",
+          note,
+          at: nowMs(),
+        });
+      }
+      // Then selectively rewind the world (surfaces spent effects now refusable on replay).
       const result = await engine.rewind(args.checkpointId);
-      // Only after a successful rewind, record the abandoned branch's lesson AGAINST the checkpoint we
-      // returned to, so a future re-attempt from it sees what already failed. seq is monotonic per scope.
-      const existing = rewindMemory.all(RECOVERY_SCOPE);
-      const nextSeq = existing.length === 0 ? 0 : Math.max(...existing.map((a) => a.seq)) + 1;
-      rewindMemory.record({
-        seq: nextSeq,
-        scope: RECOVERY_SCOPE,
-        checkpointId: args.checkpointId,
-        goal: args.goal ?? "abandoned branch",
-        outcome: "abandoned",
-        note: args.note,
-        at: nowMs(),
-      });
       const carriedMemory = memoryForCheckpoint(rewindMemory, RECOVERY_SCOPE, args.checkpointId).map(publicAttempt);
       const refusedEffects = result.refusableEffects.map((e) => ({
         effectKey: e.effectKey,

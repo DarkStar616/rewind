@@ -29,17 +29,45 @@ export interface FileRewindMemoryOptions {
 export function createFileRewindMemory(opts: FileRewindMemoryOptions): RewindMemoryStore {
   const path = opts.path;
 
+  /** A structurally-valid attempt record with a finite numeric seq (the dedup/allocation key). */
+  function isValidRecord(v: unknown): v is AttemptRecord {
+    if (!v || typeof v !== "object") return false;
+    const r = v as Record<string, unknown>;
+    return (
+      typeof r.seq === "number" &&
+      Number.isFinite(r.seq) &&
+      typeof r.scope === "string" &&
+      typeof r.checkpointId === "string" &&
+      typeof r.note === "string"
+    );
+  }
+
   function load(): PersistShape {
     if (!existsSync(path)) return { version: 1, byScope: {} };
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(readFileSync(path, "utf8")) as PersistShape;
-      return { version: 1, byScope: parsed?.byScope ?? {} };
+      parsed = JSON.parse(readFileSync(path, "utf8"));
     } catch (err) {
       throw new Error(
         `rewind: the rewind-memory store at ${path} is corrupt and cannot be parsed (${(err as Error).message}); ` +
           `refusing to overwrite an unreadable attempt log`,
       );
     }
+    const raw = (parsed as { byScope?: unknown })?.byScope;
+    const byScope: Record<string, Record<string, AttemptRecord>> = {};
+    if (raw && typeof raw === "object") {
+      for (const [scope, entries] of Object.entries(raw as Record<string, unknown>)) {
+        if (!entries || typeof entries !== "object") continue;
+        const clean: Record<string, AttemptRecord> = {};
+        for (const [key, rec] of Object.entries(entries as Record<string, unknown>)) {
+          // Drop any record with a non-numeric seq — it can never be a valid allocation key and would
+          // poison Math.max() into NaN. Fail SOFT on a single bad record rather than bricking the store.
+          if (isValidRecord(rec) && String(rec.seq) === key) clean[key] = rec;
+        }
+        byScope[scope] = clean;
+      }
+    }
+    return { version: 1, byScope };
   }
 
   function flush(shape: PersistShape): void {

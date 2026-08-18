@@ -94,6 +94,68 @@ test("backtrack_commit with a note rewinds the world and carries the failure mem
   }
 });
 
+test("a whitespace-only note is refused and does NOT rewind", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-bt-"));
+  try {
+    await writeFile(join(dir, "a.txt"), "v1");
+    const { client, close } = await connect(dir);
+    try {
+      const id = (((await call(client, "checkpoint", { label: "s" })).structuredContent) as { id: string }).id;
+      execFileSync("bash", ["-c", "echo v2 > a.txt"], { cwd: dir });
+      const res = await call(client, "backtrack_commit", { checkpointId: id, note: "   " });
+      assert.equal(res.isError, true, "a whitespace-only note is not a lesson");
+      assert.equal(execFileSync("bash", ["-c", "cat a.txt"], { cwd: dir }).toString().trim(), "v2", "no rewind");
+    } finally {
+      await close();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("an unknown checkpoint id is refused and records NO note (no memory pollution)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-bt-"));
+  try {
+    await writeFile(join(dir, "a.txt"), "v1");
+    const { client, close } = await connect(dir);
+    try {
+      await call(client, "checkpoint", { label: "s" });
+      const bad = await call(client, "backtrack_commit", { checkpointId: "deadbeef", note: "lesson" });
+      assert.equal(bad.isError, true, "unknown checkpoint is refused");
+      // No candidate should carry a failure note tied to the bogus id.
+      const cand = await call(client, "backtrack_candidates", {});
+      const cands = (cand.structuredContent as { candidates: { priorFailures: unknown[] }[] }).candidates;
+      assert.equal(cands.every((c) => c.priorFailures.length === 0), true, "no note recorded for a bad id");
+    } finally {
+      await close();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("retrying an IDENTICAL backtrack_commit does not duplicate the failure memory (idempotent)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-bt-"));
+  try {
+    await writeFile(join(dir, "a.txt"), "v1");
+    const { client, close } = await connect(dir);
+    try {
+      const id = (((await call(client, "checkpoint", { label: "s" })).structuredContent) as { id: string }).id;
+      execFileSync("bash", ["-c", "echo v2 > a.txt"], { cwd: dir });
+      const first = await call(client, "backtrack_commit", { checkpointId: id, note: "same lesson" });
+      execFileSync("bash", ["-c", "echo v3 > a.txt"], { cwd: dir });
+      const retry = await call(client, "backtrack_commit", { checkpointId: id, note: "same lesson" });
+      const mem = (retry.structuredContent as { carriedMemory: { note: string }[] }).carriedMemory;
+      assert.deepEqual(mem.map((m) => m.note), ["same lesson"], "an identical retry is not double-counted");
+      void first;
+    } finally {
+      await close();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("backtrack_candidates lists checkpoints newest-first and recommends the failing one", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-bt-"));
   try {

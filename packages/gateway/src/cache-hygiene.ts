@@ -42,11 +42,25 @@ const ISO_DATETIME = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
 const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/;
 const UUID = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
 // Epoch seconds (10 digits, ~2001-2033) or ms (13 digits) starting with 1 — narrow to cut false positives.
-const EPOCH = /\b1\d{9}(\d{3})?\b/;
-const DYNAMIC_ID_KEY = /^(session|request|trace|correlation|conversation|turn|nonce)[_-]?id$/i;
+const EPOCH_STR = /\b1\d{9}(\d{3})?\b/;
+// Per-request id fields (session/run/thread/invocation/… _id, plus a bare nonce). Matched on the KEY.
+const DYNAMIC_ID_KEY =
+  /^((session|request|trace|correlation|conversation|turn|run|thread|invocation|message|call|tool)[_-]?id|nonce)$/i;
 
 function truncate(s: string, n = 40): string {
   return s.length > n ? `${s.slice(0, n)}…` : s;
+}
+
+/** A real Anthropic cache breakpoint: an object whose `type` is "ephemeral" (NOT a schema property that
+ *  merely happens to be named `cache_control`). */
+function isEphemeralCacheControl(v: unknown): boolean {
+  return !!v && typeof v === "object" && (v as Record<string, unknown>).type === "ephemeral";
+}
+
+/** A number that looks like a Unix epoch in seconds (2001-2033) or milliseconds — likely per-request. */
+function looksLikeEpochNumber(n: number): boolean {
+  if (!Number.isInteger(n)) return false;
+  return (n >= 1_000_000_000 && n < 10_000_000_000) || (n >= 1_000_000_000_000 && n < 10_000_000_000_000);
 }
 
 /** Test a string for the first dynamic-content pattern it matches; push at most one issue per string. */
@@ -55,41 +69,61 @@ function checkString(value: string, path: string, issues: HygieneIssue[]): void 
     issues.push({ path, reason: "timestamp", detail: `contains an ISO date/time ('${truncate(value)}')` });
   } else if (UUID.test(value)) {
     issues.push({ path, reason: "uuid", detail: `contains a UUID ('${truncate(value)}')` });
-  } else if (EPOCH.test(value)) {
+  } else if (EPOCH_STR.test(value)) {
     issues.push({ path, reason: "epoch", detail: `contains an epoch-like number ('${truncate(value)}')` });
   }
 }
 
-/** Recursively scan a value, recording poisoners with their path. */
+/** Recursively scan a value, recording poisoners with their path. Handles string AND numeric dynamics. */
 function walk(value: unknown, path: string, issues: HygieneIssue[]): void {
   if (typeof value === "string") {
     checkString(value, path, issues);
+  } else if (typeof value === "number") {
+    if (looksLikeEpochNumber(value)) {
+      issues.push({ path, reason: "epoch", detail: `numeric epoch-like value (${value})` });
+    }
   } else if (Array.isArray(value)) {
     value.forEach((v, i) => walk(v, `${path}[${i}]`, issues));
   } else if (value !== null && typeof value === "object") {
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (DYNAMIC_ID_KEY.test(k) && typeof v === "string" && v.length > 0) {
-        issues.push({ path: path ? `${path}.${k}` : k, reason: "session-id", detail: `field '${k}' holds a per-request id ('${truncate(v)}')` });
+      // A per-request id field, whether its value is a string or a number (run_id: 42, session_id: "…").
+      if (DYNAMIC_ID_KEY.test(k) && ((typeof v === "string" && v.length > 0) || typeof v === "number")) {
+        issues.push({
+          path: path ? `${path}.${k}` : k,
+          reason: "session-id",
+          detail: `field '${k}' holds a per-request id ('${truncate(String(v))}')`,
+        });
       }
-      // cache_control is intentionally skipped here — it's a hint, not content, and is counted separately.
+      // cache_control is a hint, not content — never scan it as a poisoner; it's counted separately.
       if (k === "cache_control") continue;
       walk(v, path ? `${path}.${k}` : k, issues);
     }
   }
 }
 
-/** Count cache_control markers anywhere in the request. */
+/** Count REAL cache breakpoints (ephemeral cache_control), not every key literally named cache_control. */
 function countBreakpoints(value: unknown): number {
   if (Array.isArray(value)) return value.reduce<number>((n, v) => n + countBreakpoints(v), 0);
   if (value !== null && typeof value === "object") {
     let n = 0;
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (k === "cache_control") n += 1;
+      if (k === "cache_control" && isEphemeralCacheControl(v)) n += 1;
       else n += countBreakpoints(v);
     }
     return n;
   }
   return 0;
+}
+
+/** Does a value carry a real ephemeral cache breakpoint anywhere within it? */
+function hasEphemeralCacheControl(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasEphemeralCacheControl);
+  if (value !== null && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    if ("cache_control" in o && isEphemeralCacheControl(o.cache_control)) return true;
+    return Object.values(o).some(hasEphemeralCacheControl);
+  }
+  return false;
 }
 
 /**
@@ -106,8 +140,14 @@ export function analyzeCacheHygiene(body: unknown): CacheHygieneReport {
     if (b.system !== undefined) walk(b.system, "system", issues);
     if (b.tools !== undefined) walk(b.tools, "tools", issues);
     const messages = Array.isArray(b.messages) ? b.messages : [];
-    // All but the LAST message is prefix; the last message is the fresh suffix and may vary freely.
-    messages.slice(0, Math.max(0, messages.length - 1)).forEach((m, i) => walk(m, `messages[${i}]`, issues));
+    const lastIdx = messages.length - 1;
+    // All but the LAST message is prefix; the last message is normally the fresh suffix and may vary
+    // freely. BUT if a breakpoint sits ON the last message, a cache write includes it, so its dynamic
+    // content DOES poison that write — scan it too in that case.
+    messages.slice(0, Math.max(0, lastIdx)).forEach((m, i) => walk(m, `messages[${i}]`, issues));
+    if (lastIdx >= 0 && hasEphemeralCacheControl(messages[lastIdx])) {
+      walk(messages[lastIdx], `messages[${lastIdx}]`, issues);
+    }
   }
 
   if (overBreakpointCap) {

@@ -73,3 +73,29 @@ test("a corrupt file is rejected, never silently dropped", async () => {
     assert.throws(() => createFileRewindMemory({ path }).all("s"), /corrupt/);
   });
 });
+
+test("a record with a non-numeric seq is dropped on load (cannot poison seq allocation into NaN)", async () => {
+  await withTemp(async (dir) => {
+    const path = join(dir, "mem.json");
+    // A structurally-parseable file with one BAD record (seq: "oops") and one good one.
+    await writeFile(
+      path,
+      JSON.stringify({
+        version: 1,
+        byScope: {
+          s: {
+            oops: { seq: "oops", scope: "s", checkpointId: "cp", goal: "g", outcome: "failure", note: "bad", at: 1 },
+            "0": { seq: 0, scope: "s", checkpointId: "cp", goal: "g", outcome: "failure", note: "good", at: 1 },
+          },
+        },
+      }),
+    );
+    const store = createFileRewindMemory({ path });
+    const all = store.all("s");
+    assert.equal(all.length, 1, "the malformed record is dropped");
+    assert.equal(all[0].note, "good");
+    // A subsequent append allocates a finite seq (not NaN) and persists.
+    store.record({ seq: 1, scope: "s", checkpointId: "cp", goal: "g", outcome: "failure", note: "new", at: 2 });
+    assert.deepEqual(createFileRewindMemory({ path }).all("s").map((r) => r.note), ["good", "new"]);
+  });
+});
