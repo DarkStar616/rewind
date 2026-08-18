@@ -205,10 +205,11 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
         return 1;
       }
       const attested = attestAnalysis(analyzeTraffic(parsed as AnalyzedCall[]));
-      // Emit the full evidence CHAIN, not just a producer-asserted verdict: the recipient must be able
-      // to run verifyChain over this artifact themselves and detect any edit to the analysis. rootHash
-      // is a convenience; the chain is what makes the report independently verifiable.
-      out({ analysis: attested.analysis, chain: attested.chain, rootHash: attested.rootHash });
+      // Emit ONLY the evidence chain (plus its root hash), NOT a second top-level copy of the analysis.
+      // The single authoritative report is `chain[0].detail` — the exact bytes verifyChain re-hashes.
+      // A separate top-level `analysis` copy could be edited while the chain still verified, so it is
+      // deliberately omitted: the recipient runs verifyChain(chain) and reads chain[0].detail.
+      out({ chain: attested.chain, rootHash: attested.rootHash });
       return 0;
     }
     case "gateway": {

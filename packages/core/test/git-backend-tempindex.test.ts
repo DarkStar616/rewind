@@ -38,6 +38,27 @@ test("snapshot builds its tree in a temp index — no shared index, no leaked te
   }
 });
 
+test("two backend instances on the same git dir serialize — concurrent snapshots both survive the chain", async () => {
+  // Regression for the cross-instance race: since snapshot() stages into its own temp index (no shared
+  // index.lock), two instances on one git dir must serialise through the process-global queue, or the
+  // second's update-ref orphans the first's commit off the append-only chain.
+  const dir = await mkdtemp(join(tmpdir(), "rewind-xinst-"));
+  try {
+    await writeFile(join(dir, "a.txt"), "seed");
+    const be1 = createGitBackend({ cwd: dir, log: () => {} });
+    const be2 = createGitBackend({ cwd: dir, log: () => {} });
+    // Fire both snapshots concurrently against the SAME git dir.
+    const [s1, s2] = await Promise.all([be1.snapshot("from-1"), be2.snapshot("from-2")]);
+    assert.notEqual(s1.id, s2.id, "the two snapshots are distinct commits");
+    const log = await be1.log();
+    assert.ok(log.some((r) => r.id === s1.id), "the first snapshot survives in the append-only log");
+    assert.ok(log.some((r) => r.id === s2.id), "the second snapshot survives in the append-only log");
+    assert.ok(log.length >= 2, "both commits are reachable from the tip — neither was orphaned");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("a snapshot taken after a restore's capture still does not disturb the shared index it leaves", async () => {
   // restore() legitimately writes the shared index (its capture + read-tree). A later snapshot must
   // build in its own temp index and leave that shared index exactly as restore left it.

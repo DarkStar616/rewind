@@ -9,6 +9,7 @@ const call = (scope: string, prompt: string, tokens: number) => ({
   body: { model: "claude-haiku-4-5", max_tokens: 10, messages: [{ role: "user", content: prompt }] },
   usage: { input_tokens: tokens, output_tokens: tokens },
   model: "claude-haiku-4-5",
+  headers: {}, // declared: no output-affecting headers, so identical calls are genuine replays
 });
 
 test("analysis counts byte-replayable repeats and prices the avoided cost", () => {
@@ -45,6 +46,33 @@ test("same body but a different anthropic-beta header is NOT a replay (no over-c
   // Whereas the SAME beta on both is a genuine replay.
   const b = analyzeTraffic([mk("v1"), mk("v1")]);
   assert.equal(b.total.replayableCalls, 1);
+});
+
+test("a malformed call missing usage is tolerated as zero, never a crash (under-counts, never over-credits)", () => {
+  const noUsage = { scope: "s", body: { model: "m", messages: [{ role: "user", content: "hi" }] }, model: "m", headers: {} } as never;
+  const a = analyzeTraffic([noUsage, noUsage]);
+  assert.equal(a.total.replayableCalls, 1, "still detected as a replay");
+  assert.equal(a.total.avoidedTokens, 0, "missing usage avoids zero tokens, not a throw");
+  assert.equal(a.total.avoidedCostMicros, 0);
+});
+
+test("calls with UNKNOWN headers (field omitted) are never counted as replayable — no over-credit", () => {
+  // Identical body + usage, but headers omitted => unknown => cannot be proven replayable.
+  const c = { scope: "s", body: { model: "m", messages: [{ role: "user", content: "hi" }] }, usage: { input_tokens: 9, output_tokens: 9 }, model: "m" };
+  const a = analyzeTraffic([c, c]);
+  assert.equal(a.total.calls, 2);
+  assert.equal(a.total.replayableCalls, 0, "unknown-headers calls never match each other");
+  assert.equal(a.total.avoidedCostMicros, 0, "and so credit nothing");
+});
+
+test("an empty traffic batch analyses and attests cleanly (no sample, still verifiable)", () => {
+  const a = analyzeTraffic([]);
+  assert.equal(a.total.calls, 0);
+  assert.equal(a.perScope.length, 0);
+  assert.equal(a.sample, undefined);
+  const { chain, rootHash } = attestAnalysis(a);
+  assert.equal(verifyChain(chain).ok, true, "an empty analysis still attests and verifies");
+  assert.match(rootHash, /^[0-9a-f]{64}$/);
 });
 
 test("the attested report verifies as a tamper-evident chain", () => {

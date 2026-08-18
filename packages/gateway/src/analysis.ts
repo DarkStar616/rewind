@@ -32,10 +32,14 @@ export interface AnalyzedCall {
   usage: ProviderUsage;
   model: string;
   /**
-   * The request's headers, if known. The output-affecting subset (`anthropic-version`, `anthropic-beta`
-   * — see canonical-request.ts KEY_HEADERS) is folded into the replay key exactly as the live gateway
-   * does, so two calls with the same body but a different API version/beta are NOT counted as a replay.
-   * Omitting them can only ever UNDER-count (a stricter key), never over-credit.
+   * The request's headers. The output-affecting subset (`anthropic-version`, `anthropic-beta` — see
+   * canonical-request.ts KEY_HEADERS) is folded into the replay key exactly as the live gateway does, so
+   * two calls with the same body but a different API version/beta are NOT counted as a replay.
+   *
+   * Semantics of absence matter: OMITTING this field means the headers are UNKNOWN, and an
+   * unknown-headers call is never counted as a replay (it might have differed in a header we cannot see —
+   * never over-credit). To have a call count as replayable you must DECLARE its headers, using `{}` to
+   * mean "I checked, there are no output-affecting headers."
    */
   headers?: Record<string, string | string[] | undefined>;
 }
@@ -100,7 +104,9 @@ export function analyzeTraffic(calls: readonly AnalyzedCall[], opts: AnalyzeOpti
   const order: string[] = [];
   const seenByScope = new Map<string, Set<string>>();
 
+  let callIndex = -1;
   for (const c of calls) {
+    callIndex += 1;
     let scope = scopes.get(c.scope);
     if (!scope) {
       scope = emptyScope(c.scope);
@@ -110,13 +116,22 @@ export function analyzeTraffic(calls: readonly AnalyzedCall[], opts: AnalyzeOpti
     }
     scope.calls += 1;
 
-    const key = canonicalizeRequest(c.body, c.headers);
+    // A call whose headers are UNKNOWN (the field is absent) cannot be PROVEN byte-replayable: two such
+    // calls may have differed in an output-affecting header (anthropic-version / anthropic-beta) that the
+    // live gateway keys on but we cannot see here. Give it a key that can never match another call, so it
+    // is never counted as a replay — over-crediting is the one thing a savings report must never do. A
+    // call that DECLARES its headers (even `{}` = "I checked, no output-affecting headers") is keyed
+    // normally and can match. The `unknown-headers:` key can never collide with a 64-hex canonical key.
+    const key = c.headers === undefined ? `unknown-headers:${callIndex}` : canonicalizeRequest(c.body, c.headers);
     const seen = seenByScope.get(c.scope)!;
     if (seen.has(key)) {
-      // A byte-replayable repeat: the whole upstream call is avoidable on replay.
+      // A byte-replayable repeat: the whole upstream call is avoidable on replay. A malformed call
+      // missing `usage` (untyped CLI/JSON input) is treated as zero usage — the honest under-count
+      // direction (avoids nothing) rather than a crash.
+      const usage = c.usage ?? {};
       scope.replayableCalls += 1;
-      scope.avoidedTokens += totalUsageTokens(c.usage);
-      scope.avoidedCostMicros += avoidedCostMicros(c.usage, c.model, table);
+      scope.avoidedTokens += totalUsageTokens(usage);
+      scope.avoidedCostMicros += avoidedCostMicros(usage, c.model ?? "", table);
     } else {
       seen.add(key); // first occurrence — must still be issued once, never counted as a saving
     }

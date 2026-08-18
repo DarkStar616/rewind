@@ -76,6 +76,14 @@ const FS = "\x1f";
 let TMP_INDEX_SEQ = 0;
 
 /**
+ * Process-global tree/ref mutation queue, keyed by git dir. MODULE-level, not per-backend, so every
+ * `createGitBackend` instance targeting the same git dir serialises through the same per-dir queue —
+ * the append-only chain is a per-dir invariant, and two instances on one dir must not both advance the
+ * ref concurrently and orphan each other's commit. Different git dirs run concurrently (distinct keys).
+ */
+const GLOBAL_MUTATE = createKeyedQueue<string>();
+
+/**
  * A restore that started mutating the work tree and then failed leaves the tree
  * partially reverted, not clean. We surface that loudly rather than pretend success.
  */
@@ -234,16 +242,17 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
     }
   };
 
-  // snapshot() and restore() both mutate the shared git index (index.lock) and, for snapshot, the
-  // single `refs/heads/main` tip. Run concurrently they RACE: each snapshot reads HEAD, builds a
-  // commit, and `update-ref`s the tip — last writer wins, so the others are orphaned off the chain
-  // and `log()` (which walks from the tip) silently loses them, breaking the append-only guarantee.
-  // A restore's `read-tree`/`clean` racing a snapshot's `add` corrupts the index the same way. We
-  // serialise every tree/ref-mutating op through one in-process queue keyed by this backend's git
-  // dir; reads (diff/log) don't take index.lock and stay unserialised. Cross-PROCESS concurrency is
-  // still git's own index.lock territory — this fixes concurrency within one backend instance.
-  const serial = createKeyedQueue<string>();
-  const mutate = <T>(fn: () => Promise<T>): Promise<T> => serial(gitDir, fn);
+  // snapshot() and restore() both mutate the git tree/ref state. Run concurrently they RACE: each
+  // snapshot reads HEAD, builds a commit, and `update-ref`s the tip — last writer wins, so the others
+  // are orphaned off the chain and `log()` (which walks from the tip) silently loses them, breaking the
+  // append-only guarantee. A restore's `read-tree`/`clean` racing a snapshot corrupts the tree the same
+  // way. We serialise every tree/ref-mutating op through GLOBAL_MUTATE, a MODULE-level queue keyed by
+  // git dir: two `createGitBackend` instances pointed at the SAME git dir share the same key and so
+  // serialise against each other — a per-instance queue would not, and since snapshot() now stages into
+  // its own temp index (no shared index.lock to collide on) nothing else would catch the cross-instance
+  // race. Reads (diff/log) don't mutate and stay unserialised. Cross-PROCESS races are additionally
+  // caught by the compare-and-swap ref update in snapshot() (see below).
+  const mutate = <T>(fn: () => Promise<T>): Promise<T> => GLOBAL_MUTATE(gitDir, fn);
 
   return {
     // `async` (not a bare promise-returning fn) so any synchronous throw — e.g. validateRef on a
@@ -279,9 +288,18 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
           throw new Error(`rewind git-backend: git commit-tree failed (exit ${commit.code}): ${commit.stderr.slice(0, 300)}`);
         }
         const id = commit.stdout.trim();
-        const ref = await run(["update-ref", "refs/heads/main", id]);
+        // COMPARE-AND-SWAP the tip: require refs/heads/main to still equal the HEAD we read (or to be
+        // absent, via the empty oldvalue, for the first snapshot). If a CONCURRENT process advanced the
+        // ref between our read and now, this fails rather than silently overwriting — so a cross-process
+        // race can never orphan a commit off the append-only chain. In-process races are already
+        // prevented by GLOBAL_MUTATE; this is the cross-process backstop.
+        const expectedOld = head.code === 0 ? head.stdout.trim() : "";
+        const ref = await run(["update-ref", "refs/heads/main", id, expectedOld]);
         if (ref.code !== 0) {
-          throw new Error(`rewind git-backend: git update-ref failed (exit ${ref.code}): ${ref.stderr.slice(0, 300)}`);
+          throw new Error(
+            `rewind git-backend: git update-ref failed (exit ${ref.code}); the snapshot tip moved concurrently ` +
+              `(compare-and-swap against ${expectedOld || "<no ref>"} failed): ${ref.stderr.slice(0, 300)}`,
+          );
         }
         return label === undefined ? { id, ts: Date.now() } : { id, label, ts: Date.now() };
       } finally {

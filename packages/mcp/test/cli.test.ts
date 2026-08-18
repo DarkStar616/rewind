@@ -126,21 +126,21 @@ test("rewind CLI: analyze prints a verifiable, redacted savings report and exits
       body: { model: "claude-haiku-4-5", api_key: "sk-ant-secret01xyz", messages: [{ role: "user", content: prompt }] },
       usage: { input_tokens: 100, output_tokens: 100 },
       model: "claude-haiku-4-5",
+      headers: {}, // declared: no output-affecting headers
     });
     const input = JSON.stringify([call("hello"), call("hello"), call("unique")]);
     const r = runCli(dir, ["analyze", input]);
     assert.equal(r.status, 0, `analyze should exit 0; stderr=${r.stderr}`);
-    const j = r.json as {
-      analysis: { total: { calls: number; replayableCalls: number } };
-      chain: AuditEntry[];
-      rootHash: string;
-    };
-    assert.equal(j.analysis.total.calls, 3);
-    assert.equal(j.analysis.total.replayableCalls, 1, "the 2nd identical call is byte-replayable");
+    const j = r.json as { chain: AuditEntry[]; rootHash: string };
+    // The report is the single authoritative copy inside the verified chain — no spoofable duplicate.
+    assert.equal((j as any).analysis, undefined, "no separate top-level analysis copy is emitted");
+    const report = j.chain[0].detail as { total: { calls: number; replayableCalls: number } };
+    assert.equal(report.total.calls, 3);
+    assert.equal(report.total.replayableCalls, 1, "the 2nd identical call is byte-replayable");
     // The recipient can INDEPENDENTLY verify the emitted chain — not just trust a producer verdict.
     assert.equal(verifyChain(j.chain).ok, true, "the emitted chain must verify on the consumer's side");
     assert.match(j.rootHash, /^[0-9a-f]{64}$/);
-    // Tampering with the emitted analysis must break that independent verification.
+    // Tampering with the emitted report must break that independent verification.
     (j.chain[0].detail as any).total = { calls: 9999 };
     assert.equal(verifyChain(j.chain).ok, false, "an edited report must fail the recipient's verification");
     // The secret must not survive into the shareable report.
