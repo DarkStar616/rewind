@@ -34,3 +34,5 @@ export { analyzeCacheHygiene } from "./cache-hygiene.ts";
 export type { CacheHygieneReport, HygieneIssue, HygieneReason } from "./cache-hygiene.ts";
 export { pruneToolOutputs } from "./prune.ts";
 export type { PruneOptions, PruneResult } from "./prune.ts";
+export { billableSavedTokens } from "./billable.ts";
+export type { BillableSavings } from "./billable.ts";
