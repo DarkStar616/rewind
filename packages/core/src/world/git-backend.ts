@@ -25,6 +25,40 @@ import { createKeyedQueue } from "../util/async.ts";
 /** Heavy build/dependency dirs kept out of snapshots (and, being excluded, out of `clean`). */
 const HEAVY_DIRS = ["node_modules", ".venv", "venv", "__pycache__", ".cache", ".npm", "dist", "build", ".next"];
 
+/**
+ * Secret / credential paths kept out of snapshots by DEFAULT (the "excluded" class of the AgentRewind
+ * three-class model: tracked · excluded · volatile). Being in `info/exclude`, they are never captured
+ * by `git add -A` and never touched by `restore` (which uses `clean -fd`, not `-x`) — so a rewind can
+ * NEVER silently revert a developer's live `.env`, rotated key, or credential to a stale checkpoint
+ * value. That would be a data-loss defect, not reversibility. Template files (`.env.example` and
+ * friends, public keys) are re-included via negation because they carry no secrets and ARE part of the
+ * reversible tree. Override with `snapshotSecrets: true` (track them) or extend with `extraExcludes`.
+ */
+const DEFAULT_SECRET_EXCLUDES = [
+  ".env",
+  ".env.*",
+  "!.env.example",
+  "!.env.sample",
+  "!.env.template",
+  "!.env.dist",
+  "*.pem",
+  "*.key",
+  "!*.pub.key",
+  "id_rsa",
+  "id_dsa",
+  "id_ecdsa",
+  "id_ed25519",
+  "*.p12",
+  "*.pfx",
+  "*.keystore",
+  "*.jks",
+  ".ssh/",
+  ".aws/credentials",
+  ".gnupg/",
+  "secrets.json",
+  "credentials.json",
+];
+
 /** A snapshot id is a git object name: 7–64 hex chars. Anything else is refused. */
 const REF_PATTERN = /^[0-9a-f]{7,64}$/i;
 
@@ -56,6 +90,17 @@ export interface GitBackendOptions {
   gitDir?: string;
   /** Sink for advisory messages (e.g. the reflink/CoW fallback notice). Default: console.warn. */
   log?: (message: string) => void;
+  /**
+   * Extra gitignore-syntax patterns to exclude from snapshots (the "excluded" class): never captured,
+   * never reverted. Appended after the built-in secret + heavy-dir excludes.
+   */
+  extraExcludes?: readonly string[];
+  /**
+   * By default, secret/credential files (`.env`, private keys, …) are EXCLUDED so a rewind can never
+   * revert a developer's live secrets. Set true to snapshot and revert them like any tracked file —
+   * only when you understand that a rewind will then roll them back. Default: false.
+   */
+  snapshotSecrets?: boolean;
 }
 
 interface GitResult {
@@ -109,6 +154,10 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
     // refuse-across-rewind guarantee. `.rewind/` is rewind's reserved namespace; exclude it wholesale.
     lines.push(".rewind/");
     for (const d of HEAVY_DIRS) lines.push(`${d}/`);
+    // Secrets are excluded by default so a rewind never reverts a live `.env`/key (see the constant).
+    if (opts.snapshotSecrets !== true) lines.push(...DEFAULT_SECRET_EXCLUDES);
+    // Caller-supplied extra excludes come last so they can further narrow or (via `!`) re-include.
+    if (opts.extraExcludes) lines.push(...opts.extraExcludes);
     return lines.join("\n") + "\n";
   };
 
