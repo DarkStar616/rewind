@@ -204,6 +204,15 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         // Forward the pruned bytes if pruning changed the body (so the model sees the pruned form the
         // key was computed over); otherwise the exact original bytes. Cache-breakpoint injection (below)
         // may further transform this.
+        //
+        // NOTE on the keying boundary: the replay key was computed over the PRE-cache-injection body,
+        // whereas the body forwarded below may carry injected cache_control (and a string `system`
+        // promoted to array form). This asymmetry is deliberate and safe, and differs from pruning on
+        // purpose: pruning changes the model-VISIBLE content, so we must key the pruned form; cache
+        // breakpoint injection is output-NEUTRAL (cache_control only affects billing/latency, and it is
+        // stripped from the key as noise), so keying the pre-injection body changes no answer while
+        // keeping the key STABLE across the preserveCache flag — a record made with preserveCache on
+        // still replays for the same caller request with it off, and never yields a false hit.
         let forwardBody = pruned && parsed ? Buffer.from(JSON.stringify(parsed), "utf8") : rawBody;
         if (options.preserveCache && parsed) {
           try {

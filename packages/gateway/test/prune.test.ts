@@ -69,6 +69,23 @@ test("tool_use blocks are NEVER pruned even if identical (only observations are 
   assert.equal(r.elided, 0, "an agent action/input must never be elided");
 });
 
+test("a success result is NEVER collapsed against an error result with the same text (is_error keys)", () => {
+  const body = req([
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "a", is_error: true, content: bigOutput }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "b", is_error: false, content: bigOutput }] },
+  ]);
+  const r = pruneToolOutputs(body);
+  assert.equal(r.elided, 0, "identical text under different error status is not a semantic duplicate");
+});
+
+test("two error results with identical text ARE collapsed (same content AND same is_error)", () => {
+  const body = req([
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "a", is_error: true, content: bigOutput }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "b", is_error: true, content: bigOutput }] },
+  ]);
+  assert.equal(pruneToolOutputs(body).elided, 1);
+});
+
 test("three identical results: the first is kept, the next TWO are elided", () => {
   const body = req([
     { role: "user", content: [toolResult("a", bigOutput)] },
@@ -116,6 +133,64 @@ test("IDEMPOTENT: pruning an already-pruned body changes nothing more", () => {
   const twice = pruneToolOutputs(once.body);
   assert.equal(twice.elided, 0, "the marker is short (< minLength) and there are no new duplicates");
   assert.equal(JSON.stringify(twice.body), JSON.stringify(once.body));
+});
+
+test("cross-config: a record made with preserveCache ON still replays for the SAME request with it OFF", async () => {
+  // Directly exercises the keying boundary: cache-breakpoint injection promotes a string `system` to
+  // array form on the forwarded body, but the replay key is computed over the PRE-injection body, so
+  // it stays stable across the preserveCache flag — the record replays whether or not the second
+  // proxy injects. (No false miss across configs; and because cache_control is output-neutral, no
+  // false hit either.)
+  let upstreamHits = 0;
+  const stub = createServer((req2, res) => {
+    req2.on("data", () => {});
+    req2.on("end", () => {
+      upstreamHits += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ type: "message", usage: { input_tokens: 1 } }));
+    });
+  });
+  await new Promise<void>((r) => stub.listen(0, "127.0.0.1", r));
+  const addr = stub.address();
+  const base = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}`;
+
+  const store = createMemoryRecordStore();
+  const savings = createMemoryReplaySavings();
+  const replayer = createReplayer(store, savings);
+  // A body with a string `system` and NO tools → cache preservation injects on system (string→array).
+  const body = JSON.stringify({
+    model: "m",
+    max_tokens: 100,
+    system: "you are a helpful assistant with a long stable system prompt",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  const send = (url: string) =>
+    fetch(`${url}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-rewind-scope": "x" },
+      body,
+    });
+
+  const recProxy = await startProxy({ upstreamBase: base, replayer, store, preserveCache: true });
+  try {
+    const r1 = await send(recProxy.url);
+    await r1.text();
+    assert.equal(r1.headers.get("x-rewind"), "live");
+    assert.equal(upstreamHits, 1);
+  } finally {
+    await recProxy.close();
+  }
+
+  const replayProxy = await startProxy({ upstreamBase: base, replayer, store, preserveCache: false });
+  try {
+    const r2 = await send(replayProxy.url);
+    await r2.text();
+    assert.equal(r2.headers.get("x-rewind"), "replay", "key is stable across the preserveCache flag");
+    assert.equal(upstreamHits, 1, "the replay served from record — no second upstream call");
+  } finally {
+    await replayProxy.close();
+    await new Promise<void>((r) => stub.close(() => r()));
+  }
 });
 
 test("end-to-end: pruneContext forwards a SMALLER body upstream and replay stays exact", async () => {
