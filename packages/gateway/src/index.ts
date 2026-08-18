@@ -28,3 +28,5 @@ export { extractUsage } from "./usage.ts";
 export type { ExtractedUsage } from "./usage.ts";
 export { startProxy } from "./proxy.ts";
 export type { ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
+export { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from "./cache-preserve.ts";
+export type { CachePlan, CachePreservationCredit } from "./cache-preserve.ts";

@@ -37,6 +37,15 @@ export interface MockUpstreamOptions {
   cacheTtlMs?: number;
   /** Deterministic output token count per response. Default 64. */
   outputTokens?: number;
+  /**
+   * How the simulated provider caches:
+   *   - "auto" (default): caches the static + conversation prefix implicitly (OpenAI-style), no
+   *     breakpoint needed.
+   *   - "explicit": caches ONLY the prefix up to an explicit `cache_control` breakpoint (Anthropic-
+   *     style); with no breakpoint anywhere, nothing is cached. Use this to demonstrate that
+   *     Mechanism B (breakpoint injection) actually causes the caching.
+   */
+  cacheMode?: "auto" | "explicit";
 }
 
 /** One recorded upstream call, for conservation-checking the bench against the transcript. */
@@ -85,34 +94,43 @@ function contentToText(content: unknown): string {
 }
 
 /**
- * Split a request into (cacheable prefix, fresh suffix). The prefix is system + tools + every message
- * up to and including the last block that carries a `cache_control` marker; if nothing is marked, the
- * prefix is everything before the final message (the provider's implicit behaviour is out of scope —
- * we only credit EXPLICIT breakpoints, matching how the real cache is controlled).
+ * Split a request into (cacheable prefix, fresh suffix).
+ *
+ * - "explicit" mode with NO cache_control anywhere → nothing is cacheable (prefix empty). This is how
+ *   Anthropic behaves: no breakpoint, no cache.
+ * - Otherwise the prefix is system + tools + messages up to (and including) the last message bearing a
+ *   `cache_control` marker; a breakpoint only on system/tools caches just the static parts; and in
+ *   "auto" mode with no breakpoint the prefix is the static parts + all-but-the-final message
+ *   (implicit prefix caching).
  */
-function splitPrefix(body: Record<string, unknown>): { prefix: string; suffix: string } {
+function splitPrefix(body: Record<string, unknown>, cacheMode: "auto" | "explicit"): { prefix: string; suffix: string } {
   const staticParts: string[] = [];
   if (body.system !== undefined) staticParts.push(`system:${contentToText(body.system)}`);
   if (body.tools !== undefined) staticParts.push(`tools:${JSON.stringify(body.tools)}`);
   const messages = Array.isArray(body.messages) ? (body.messages as AnthropicMessage[]) : [];
+  const asText = (m: AnthropicMessage) => `${m.role}:${contentToText(m.content)}`;
 
-  // Find the last message whose serialized content mentions a cache_control breakpoint.
+  const hasBreak = JSON.stringify(body).includes("cache_control");
+  if (cacheMode === "explicit" && !hasBreak) {
+    // Anthropic with no breakpoint: nothing is cached; the whole request is fresh input.
+    return { prefix: "", suffix: [...staticParts, ...messages.map(asText)].join("\n") };
+  }
+
+  // Last message index bearing a breakpoint (−1 if the breakpoint is only on system/tools, or none).
   let lastBreak = -1;
   for (let i = 0; i < messages.length; i++) {
     if (JSON.stringify(messages[i]).includes("cache_control")) lastBreak = i;
   }
-  const prefixEnd = lastBreak >= 0 ? lastBreak + 1 : Math.max(0, messages.length - 1);
-  const prefixMsgs = messages.slice(0, prefixEnd).map((m) => `${m.role}:${contentToText(m.content)}`);
-  const suffixMsgs = messages.slice(prefixEnd).map((m) => `${m.role}:${contentToText(m.content)}`);
-  return {
-    prefix: [...staticParts, ...prefixMsgs].join("\n"),
-    suffix: suffixMsgs.join("\n"),
-  };
+  const prefixEnd = lastBreak >= 0 ? lastBreak + 1 : cacheMode === "auto" ? Math.max(0, messages.length - 1) : 0;
+  const prefixMsgs = messages.slice(0, prefixEnd).map(asText);
+  const suffixMsgs = messages.slice(prefixEnd).map(asText);
+  return { prefix: [...staticParts, ...prefixMsgs].join("\n"), suffix: suffixMsgs.join("\n") };
 }
 
 export function startMockUpstream(options: MockUpstreamOptions): Promise<RunningMockUpstream> {
   const ttl = options.cacheTtlMs ?? 5 * 60 * 1000;
   const outTokens = options.outputTokens ?? 64;
+  const cacheMode = options.cacheMode ?? "auto";
   const calls: UpstreamCall[] = [];
   // prefix-hash → last-seen time (ms). A hit within TTL bills the prefix as a cheap cache read.
   const cacheSeen = new Map<string, number>();
@@ -129,7 +147,7 @@ export function startMockUpstream(options: MockUpstreamOptions): Promise<Running
         res.end(JSON.stringify({ error: { type: "invalid_request", message: "bad json" } }));
         return;
       }
-      const { prefix, suffix } = splitPrefix(body);
+      const { prefix, suffix } = splitPrefix(body, cacheMode);
       const prefixTokens = toTokens(prefix);
       const suffixTokens = toTokens(suffix);
       const now = options.clock.now();

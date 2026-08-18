@@ -25,6 +25,7 @@ import { request as httpsRequest } from "node:https";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
 import { extractUsage } from "./usage.ts";
+import { planCacheBreakpoints } from "./cache-preserve.ts";
 
 /** The stored form of a recorded response: opaque bytes + just enough to replay them faithfully. */
 export interface RecordedHttpResponse {
@@ -46,6 +47,13 @@ export interface ProxyOptions {
   messagesPath?: string;
   /** Header naming the isolation scope for records. Default "x-rewind-scope"; absent → "default". */
   scopeHeader?: string;
+  /**
+   * Opt-in (default false): when the agent set NO cache_control, inject one ephemeral breakpoint on
+   * the static prefix (tools/system) before forwarding, so the provider caches it. Departs from strict
+   * byte-transparency for this benefit; leaves the replay key unchanged and never overrides an agent's
+   * own breakpoints. OFF keeps the proxy strictly byte-transparent (Mechanism A only).
+   */
+  preserveCache?: boolean;
   log?: (message: string) => void;
 }
 
@@ -117,9 +125,10 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
       if (isMessages) {
         const scopeRaw = req.headers[scopeHeader];
         const scope = (Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw) || "default";
+        let parsed: Record<string, unknown> | undefined;
         let decision: { served: "replay" | "live"; keyed: string; response?: unknown } | undefined;
         try {
-          const parsed = JSON.parse(rawBody.toString("utf8"));
+          parsed = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
           decision = options.replayer.handle(scope, parsed);
         } catch (err) {
           log(`proxy: replay decision skipped (${err instanceof Error ? err.message : String(err)}); forwarding`);
@@ -136,8 +145,21 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           log(`proxy: REPLAY scope=${scope} key=${decision.keyed.slice(0, 12)} (0 upstream tokens)`);
           return;
         }
-        // MISS → forward, tee, record on success under the key the replayer already computed.
-        await forward(rawBody, { scope, replayKey: decision?.keyed });
+        // MISS → optionally add a cache breakpoint (opt-in), then forward, tee, record under the
+        // key the replayer already computed (the key is over the ORIGINAL body, unaffected by the hint).
+        let forwardBody = rawBody;
+        if (options.preserveCache && parsed) {
+          try {
+            const plan = planCacheBreakpoints(parsed);
+            if (plan.injected) {
+              forwardBody = Buffer.from(JSON.stringify(plan.body), "utf8");
+              log(`proxy: cache-preserve ${plan.reason} scope=${scope}`);
+            }
+          } catch (err) {
+            log(`proxy: cache-preserve skipped (${err instanceof Error ? err.message : String(err)})`);
+          }
+        }
+        await forward(forwardBody, { scope, replayKey: decision?.keyed });
         return;
       }
 
