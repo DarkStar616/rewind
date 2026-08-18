@@ -25,10 +25,11 @@ stdio server (all local agents), and a Claude Code plugin. Harvest, don't rebuil
   `module`/`moduleResolution` = `nodenext`, `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`;
   import sibling modules WITH the `.ts` extension.
 - Test runner: `node --test` (node:test). No vitest/jest.
-- Packages `@rewind/core` and `@rewind/mcp` are **PROPRIETARY / CLOSED SOURCE — NOT MIT**.
-  `package.json` `"license": "UNLICENSED"`; proprietary EULA `LICENSE` file (final text from the licence
-  decision, workflow `wlwjzoq7a`). Source repo private; any public npm artifact is a compiled/obfuscated
-  build. npm workspaces. Paid access is gated by a license key + entitlement/metering backend (later).
+- Packages `@rewind/core` and `@rewind/mcp` are licensed **FSL-1.1-Apache-2.0** (source-available,
+  legally proprietary — no competing product; converts to Apache-2.0 after 2 yrs). `package.json`
+  `"license": "FSL-1.1-ALv2"`; bundle the FSL `LICENSE` text. npm workspaces. Dev repo may be private,
+  but paid access is enforced SERVER-SIDE (entitlement + savings verification are hosted, never in the
+  shipped client — client-side checks are bypassable, CWE-602). See `docs/BUSINESS-MODEL.md`.
 - The effect barrier and the evidence chain read ONLY the effect log / trace, NEVER the filesystem.
   Exactly one real barrier implementation (this TypeScript one).
 - Harvest read-only from `/home/reuben/projects/qm-athena/.claude/worktrees/mvp-golden-path/` (branch
@@ -122,7 +123,7 @@ rewind/
   "name": "@rewind/core",
   "version": "0.0.0",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "FSL-1.1-ALv2",
   "exports": { ".": "./src/index.ts" }
 }
 ```
@@ -442,7 +443,7 @@ handle→state store (a JSON file under `.rewind/`), keyed by checkpoint id.
 
 ```json
 {
-  "name": "@rewind/mcp", "version": "0.0.0", "type": "module", "license": "UNLICENSED",
+  "name": "@rewind/mcp", "version": "0.0.0", "type": "module", "license": "FSL-1.1-ALv2",
   "bin": { "rewind": "./src/cli.ts" },
   "dependencies": { "@rewind/core": "0.0.0", "@modelcontextprotocol/sdk": "^1.29.0" }
 }

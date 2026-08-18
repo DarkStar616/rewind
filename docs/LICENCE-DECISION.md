@@ -73,3 +73,24 @@ procurement — while the money and the real moat live server-side. Apache-2.0 f
 the patent grant over the effect-barrier/hash-chain mechanics. Confirm exact SPDX string + run a
 dependency licence-scan before first publish. *Not legal advice — have an IP lawyer confirm the FSL
 "substantially similar functionality" language.*
+
+---
+
+## FINAL DECISION (locked 2026-08-18)
+
+**Licence: `FSL-1.1-Apache-2.0` (SPDX `FSL-1.1-ALv2`) on `@rewind/core` + `@rewind/mcp`.** Dev repo may
+stay private (hygiene only — the shipped package is readable on the user's disk regardless; protection is
+by licence + hosting, never by secrecy). The deep-research (`wuoiazto1`) confirmed the tactic: Bun/SEA
+binaries are extracted wholesale (Claude Code's own was), and client-side licence checks are bypassable
+(CWE-602) — so **access is enforced SERVER-SIDE**, not by hiding code.
+
+**"Proprietary" is delivered by three things, none of which is code secrecy:**
+1. **Licence (FSL)** — a competitor legally cannot build a competing/substituting product; converts to
+   Apache-2.0 after 2 years.
+2. **Hosting** — entitlement validation, savings verification/billing, the team dashboard, and the Athena
+   resolver run on a closed server and never ship.
+3. **Access sold server-side** — free tier = local + FSL; paid tier = server-gated.
+
+Business model + pricing (gainshare, hybrid base + 10–15% of verified savings, the counterfactual risk,
+Rewind's measured-avoided-re-spend edge): `docs/BUSINESS-MODEL.md`. Superseded: the earlier
+"UNLICENSED + obfuscated closed binary" and any "hide the source" framing — refuted by the evidence above.
