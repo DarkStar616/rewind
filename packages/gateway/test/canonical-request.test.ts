@@ -96,16 +96,31 @@ test("the stream flag does not affect the key", () => {
   assert.equal(canonicalizeRequest(blocking), canonicalizeRequest(baseRequest()));
 });
 
-test("auth / id / timestamp body fields do not affect the key", () => {
+test("known-noise + auth body fields do not affect the key", () => {
+  // These are provably-non-output fields (transport/caching) and auth material (which belongs in
+  // headers; stripped defensively so a misplaced secret is never hashed).
   const noisy = {
     ...baseRequest(),
     api_key: "sk-ant-secret",
     authorization: "Bearer nope",
-    request_id: "req_123",
     metadata: { user_id: "u_42" },
-    timestamp: "2026-08-18T00:00:00Z",
+    prompt_cache_key: "sess-1",
+    stream: true,
   };
   assert.equal(canonicalizeRequest(noisy), canonicalizeRequest(baseRequest()));
+});
+
+test("FAIL-SAFE: an UNRECOGNIZED field changes the key (unknown → miss, never a false hit)", () => {
+  // The safety asymmetry: a field this code has never heard of might change the model's output, so it
+  // MUST force a miss rather than collide onto an unrelated record. A future output-affecting API
+  // parameter is exactly this case.
+  const withUnknown = { ...baseRequest(), some_future_output_param: "reasoning_v2" };
+  assert.notEqual(canonicalizeRequest(withUnknown), canonicalizeRequest(baseRequest()));
+
+  // And two requests differing ONLY in that unknown field get DIFFERENT keys.
+  const a = { ...baseRequest(), mcp_servers: [{ url: "https://a.example" }] };
+  const b = { ...baseRequest(), mcp_servers: [{ url: "https://b.example" }] };
+  assert.notEqual(canonicalizeRequest(a), canonicalizeRequest(b));
 });
 
 test("a changed user message produces a DIFFERENT key", () => {

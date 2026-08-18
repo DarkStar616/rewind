@@ -1,4 +1,4 @@
-export { canonicalizeRequest, OUTPUT_AFFECTING_FIELDS } from "./canonical-request.ts";
+export { canonicalizeRequest, NOISE_FIELDS } from "./canonical-request.ts";
 export {
   createMemoryRecordStore,
   totalRecordedTokens,
