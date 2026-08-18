@@ -1,0 +1,421 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<title>Agent Burn Calculator</title>
+
+<style>
+  :root{
+    --bg:#EEF0F3; --surface:#FFFFFF; --surface-2:#F6F7F9;
+    --ink:#191C22; --muted:#5C6675; --faint:#8A94A3;
+    --line:#DDE1E7; --line-strong:#C7CDD6;
+    --ember:#D64A22; --ember-2:#F0982F; --ember-soft:#FBEAE0;
+    --recover:#0E9C74; --recover-soft:#E1F2EC;
+    --shadow:0 1px 2px rgba(20,24,32,.05), 0 12px 34px -18px rgba(20,24,32,.30);
+    --receipt-notch:#EEF0F3;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#101216; --surface:#181B21; --surface-2:#1F232B;
+      --ink:#EEF0F4; --muted:#9AA4B2; --faint:#69707D;
+      --line:#2A2F38; --line-strong:#39404B;
+      --ember:#F2683B; --ember-2:#F4A64A; --ember-soft:#33221A;
+      --recover:#2CC796; --recover-soft:#12241E;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 44px -20px rgba(0,0,0,.6);
+      --receipt-notch:#101216;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#101216; --surface:#181B21; --surface-2:#1F232B;
+    --ink:#EEF0F4; --muted:#9AA4B2; --faint:#69707D;
+    --line:#2A2F38; --line-strong:#39404B;
+    --ember:#F2683B; --ember-2:#F4A64A; --ember-soft:#33221A;
+    --recover:#2CC796; --recover-soft:#12241E;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 44px -20px rgba(0,0,0,.6);
+    --receipt-notch:#101216;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Instrument Sans",system-ui,-apple-system,sans-serif;
+    font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .wrap{max-width:1140px; margin:0 auto; padding:clamp(20px,4vw,56px) clamp(18px,4vw,40px) 64px}
+
+  /* ---- header ---- */
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:9px;
+    font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:500;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    border:1px solid var(--line); border-radius:999px; padding:6px 13px; background:var(--surface);
+  }
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--ember);
+    box-shadow:0 0 0 4px var(--ember-soft)}
+  h1{
+    font-family:"Archivo",sans-serif; font-weight:800; letter-spacing:-.022em;
+    font-size:clamp(2rem,5.4vw,3.4rem); line-height:1.02; text-wrap:balance;
+    margin:22px 0 0; max-width:16ch;
+  }
+  h1 .flame{
+    background:linear-gradient(96deg,var(--ember),var(--ember-2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .lede{margin:16px 0 0; max-width:56ch; color:var(--muted); font-size:clamp(1rem,2.1vw,1.12rem)}
+
+  /* ---- grid ---- */
+  .grid{
+    display:grid; grid-template-columns:1fr; gap:24px; margin-top:clamp(30px,5vw,48px);
+  }
+  @media(min-width:900px){ .grid{grid-template-columns:1fr 1.04fr; gap:36px; align-items:start} }
+
+  .panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:clamp(20px,3vw,30px); box-shadow:var(--shadow);
+  }
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:6px}
+  .panel-title{font-family:"Archivo",sans-serif; font-weight:700; font-size:1.05rem; letter-spacing:-.01em}
+  .panel-note{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--faint); letter-spacing:.04em}
+
+  /* ---- controls ---- */
+  .field{padding:17px 0; border-top:1px solid var(--line)}
+  .field:first-of-type{border-top:0}
+  .field-top{display:flex; align-items:baseline; justify-content:space-between; gap:14px; margin-bottom:11px}
+  .field label{font-weight:500; font-size:.96rem}
+  .field .val{
+    font-family:"JetBrains Mono",monospace; font-weight:700; font-size:1.02rem;
+    font-variant-numeric:tabular-nums; color:var(--ink); white-space:nowrap;
+  }
+  .field .hint{display:block; font-size:.8rem; color:var(--faint); font-weight:400; margin-top:2px; letter-spacing:.01em}
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:999px;
+    background:var(--line-strong); outline:none; cursor:pointer; margin:2px 0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%;
+    background:var(--surface); border:2.5px solid var(--ember); box-shadow:0 1px 4px rgba(0,0,0,.22);
+    transition:transform .12s ease;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px; height:20px; border-radius:50%;
+    background:var(--surface); border:2.5px solid var(--ember); box-shadow:0 1px 4px rgba(0,0,0,.22);
+  }
+  input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
+  input[type=range]:focus-visible{outline:2px solid var(--ember); outline-offset:6px; border-radius:999px}
+
+  /* ---- statement / receipt ---- */
+  .receipt{
+    position:relative; background:var(--surface); border:1px solid var(--line);
+    border-radius:16px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  @media(min-width:900px){ .receipt{position:sticky; top:24px} }
+  .receipt-head{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:16px 24px; border-bottom:1px dashed var(--line-strong);
+    font-family:"JetBrains Mono",monospace; font-size:12px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  .toggle{display:inline-flex; border:1px solid var(--line-strong); border-radius:999px; overflow:hidden}
+  .toggle button{
+    font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    padding:5px 11px; border:0; background:transparent; color:var(--muted); cursor:pointer;
+  }
+  .toggle button[aria-pressed="true"]{background:var(--ink); color:var(--surface)}
+
+  .receipt-body{padding:clamp(22px,3vw,32px) clamp(20px,3vw,28px)}
+  .burn-label{
+    font-family:"JetBrains Mono",monospace; font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:6px;
+  }
+  .burn{
+    font-family:"Archivo",sans-serif; font-weight:800; letter-spacing:-.03em; line-height:.95;
+    font-size:clamp(3.1rem,10vw,5.2rem); font-variant-numeric:tabular-nums;
+    background:linear-gradient(100deg,var(--ember),var(--ember-2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .burn-sub{margin-top:8px; color:var(--muted); font-size:.95rem; font-variant-numeric:tabular-nums}
+  .burn-sub b{color:var(--ink); font-weight:600}
+
+  .meter{height:8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--line);
+    overflow:hidden; margin:22px 0 4px}
+  .meter i{display:block; height:100%; width:40%;
+    background:linear-gradient(90deg,var(--ember-2),var(--ember)); transition:width .35s ease}
+  .meter-cap{display:flex; justify-content:space-between; font-family:"JetBrains Mono",monospace;
+    font-size:11px; color:var(--faint); letter-spacing:.05em; margin-top:8px}
+
+  .lines{margin:22px 0 0; border-top:1px solid var(--line)}
+  .line{display:flex; justify-content:space-between; align-items:baseline; gap:14px;
+    padding:12px 0; border-bottom:1px solid var(--line); font-size:.95rem}
+  .line .k{color:var(--muted)}
+  .line .v{font-family:"JetBrains Mono",monospace; font-weight:500; font-variant-numeric:tabular-nums}
+
+  .recover{
+    margin-top:20px; background:var(--recover-soft); border:1px solid color-mix(in srgb,var(--recover) 30%,transparent);
+    border-radius:12px; padding:16px 18px;
+  }
+  .recover-top{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
+  .recover-top .k{font-weight:600; color:var(--recover); display:flex; align-items:center; gap:8px}
+  .recover-top .v{font-family:"Archivo",sans-serif; font-weight:800; font-size:1.5rem; color:var(--recover);
+    font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+  .tag{font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--recover); border:1px solid color-mix(in srgb,var(--recover) 40%,transparent);
+    border-radius:999px; padding:2px 7px}
+  .recover p{margin:9px 0 0; font-size:.85rem; color:var(--muted); line-height:1.45}
+
+  .cta{margin-top:22px; display:flex; flex-direction:column; gap:12px}
+  .install{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-family:"JetBrains Mono",monospace; font-size:.9rem; background:var(--surface-2);
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px; color:var(--ink);
+  }
+  .install .cmd{overflow-x:auto; white-space:nowrap}
+  .install .cmd b{color:var(--ember); font-weight:700}
+  .copy{border:0; background:transparent; color:var(--muted); cursor:pointer; font:inherit;
+    font-size:11px; letter-spacing:.06em; text-transform:uppercase; padding:4px 6px; border-radius:6px}
+  .copy:hover{color:var(--ink)}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:9px;
+    background:var(--ink); color:var(--surface); border:0; border-radius:10px;
+    padding:14px 18px; font-family:"Archivo",sans-serif; font-weight:700; font-size:1rem;
+    cursor:pointer; text-decoration:none; transition:transform .12s ease, opacity .12s ease;
+  }
+  .btn:hover{transform:translateY(-1px); opacity:.94}
+  .btn .free{font-family:"JetBrains Mono",monospace; font-size:11px; font-weight:500;
+    letter-spacing:.06em; opacity:.7; text-transform:uppercase}
+
+  /* ---- methodology ---- */
+  .method{margin-top:34px; border-top:1px solid var(--line); padding-top:22px}
+  .method h2{font-family:"Archivo",sans-serif; font-size:.95rem; font-weight:700; margin:0 0 4px;
+    letter-spacing:.02em}
+  .method .sub{color:var(--faint); font-family:"JetBrains Mono",monospace; font-size:11px;
+    letter-spacing:.06em; text-transform:uppercase; margin-bottom:14px}
+  .notes{display:grid; gap:12px; grid-template-columns:1fr; margin:0; padding:0; list-style:none}
+  @media(min-width:680px){ .notes{grid-template-columns:1fr 1fr} }
+  .notes li{font-size:.86rem; color:var(--muted); line-height:1.5; padding-left:16px; position:relative}
+  .notes li::before{content:""; position:absolute; left:0; top:.5em; width:6px; height:6px;
+    border-radius:50%; background:var(--ember)}
+  .notes b{color:var(--ink); font-weight:600}
+  .disclaimer{margin-top:16px; font-size:.8rem; color:var(--faint); line-height:1.5; max-width:70ch}
+
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow"><span class="dot"></span>Rewind · agent economics</span>
+    <h1>How much are you <span class="flame">burning</span> on failed agent runs?</h1>
+    <p class="lede">Coding agents submit a patch on nearly every run and resolve fewer than half. The
+      other runs still cost full price. Drag the numbers to see your team's annual bill for work that
+      shipped nothing.</p>
+  </header>
+
+  <div class="grid">
+    <!-- CONTROLS -->
+    <section class="panel" aria-label="Your team">
+      <div class="panel-head">
+        <span class="panel-title">Your team</span>
+        <span class="panel-note">drag to adjust</span>
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label for="devs">Developers running agents</label>
+          <span class="val" id="devs-v">30</span></div>
+        <input type="range" id="devs" min="1" max="200" step="1" value="30">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label for="runs">Agent runs · per dev · per day</label>
+          <span class="val" id="runs-v">12</span></div>
+        <input type="range" id="runs" min="1" max="50" step="1" value="12">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label for="tokens">Average tokens per run
+          <span class="hint">a failed run is ~50–60 model calls</span></label>
+          <span class="val" id="tokens-v">200K</span></div>
+        <input type="range" id="tokens" min="20000" max="1000000" step="10000" value="200000">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label for="fail">Failure rate
+          <span class="hint">runs that don't ship a usable result</span></label>
+          <span class="val" id="fail-v">40%</span></div>
+        <input type="range" id="fail" min="5" max="70" step="1" value="40">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label for="price">Blended price · per 1M tokens</label>
+          <span class="val" id="price-v">$6.00</span></div>
+        <input type="range" id="price" min="1" max="30" step="0.5" value="6">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><label for="recover">Recoverable with checkpoint + replay
+          <span class="hint">conservative estimate — the re-spend Rewind avoids</span></label>
+          <span class="val" id="recover-v">35%</span></div>
+        <input type="range" id="recover" min="10" max="60" step="5" value="35">
+      </div>
+    </section>
+
+    <!-- STATEMENT -->
+    <section class="receipt" aria-live="polite">
+      <div class="receipt-head">
+        <span>Failed-run waste statement</span>
+        <span class="toggle" role="group" aria-label="Period">
+          <button id="per-year" aria-pressed="true">Year</button>
+          <button id="per-month" aria-pressed="false">Month</button>
+        </span>
+      </div>
+      <div class="receipt-body">
+        <div class="burn-label">Burned on runs that shipped nothing · <span id="period-label">per year</span></div>
+        <div class="burn" id="burn">$0</div>
+        <div class="burn-sub"><b id="failed-runs">0</b> failed runs · <b id="wasted-tokens">0</b> tokens spent for nothing</div>
+
+        <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+        <div class="meter-cap"><span>all runs succeed</span><span id="meter-pct">40% fail</span></div>
+
+        <div class="lines">
+          <div class="line"><span class="k">Agent runs / period</span><span class="v" id="li-runs">0</span></div>
+          <div class="line"><span class="k">Of which fail</span><span class="v" id="li-failed">0</span></div>
+          <div class="line"><span class="k">Wasted tokens / period</span><span class="v" id="li-tokens">0</span></div>
+          <div class="line"><span class="k">Cost per developer</span><span class="v" id="li-perdev">$0</span></div>
+        </div>
+
+        <div class="recover">
+          <div class="recover-top">
+            <span class="k">↩ Recoverable with Rewind <span class="tag">estimate</span></span>
+            <span class="v" id="recover-amt">$0</span>
+          </div>
+          <p>Rewind checkpoints before each step, so a failed run rewinds to the last good state and
+            replays the unchanged prefix from record instead of re-spending on it. It won't recover the
+            first attempt — only the re-runs it saves you.</p>
+        </div>
+
+        <div class="cta">
+          <div class="install">
+            <span class="cmd"><b>npx</b> rewind</span>
+            <button class="copy" id="copy" aria-label="Copy install command">copy</button>
+          </div>
+          <a class="btn" href="#" id="getbtn">Stop the burn <span class="free">free · local · no signup</span></a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="method">
+    <h2>How this is calculated</h2>
+    <div class="sub">evidence-grounded defaults · adjust everything above</div>
+    <ul class="notes">
+      <li><b>~44% resolve rate.</b> On SWE-bench Verified, agents submit a patch on nearly 100% of runs
+        but resolve only ~44% — so the default failure rate is set conservatively to 40%.</li>
+      <li><b>Failed runs cost full price.</b> A failed trajectory is typically 50–60 model calls of
+        exploration and looping — you pay for every token whether or not it ships.</li>
+      <li><b>Recoverable ≠ total.</b> The recovery estimate counts only re-spend that checkpoint +
+        replay avoids, never the original attempt. Published replay-savings figures don't exist yet;
+        this is deliberately conservative.</li>
+      <li><b>Your numbers beat ours.</b> Every default is a slider. Set your real team size, run
+        volume, and provider price for a figure you can take to your own invoice.</li>
+    </ul>
+    <p class="disclaimer">An estimate for discussion, not a quote. Working year assumed at 250 days.
+      Token pricing is a blended input/output rate you set yourself; actual spend depends on your
+      provider, models, and prompt-cache usage (a discount that accrues to you, not to Rewind).</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  var DAYS = 250;
+  var period = "year";
+
+  var el = function(id){return document.getElementById(id);};
+  var ins = {devs:el("devs"),runs:el("runs"),tokens:el("tokens"),fail:el("fail"),price:el("price"),recover:el("recover")};
+
+  function fmtMoney(n){
+    if(n>=1e6) return "$"+(n/1e6).toFixed(n>=1e7?1:2).replace(/\.0$/,"")+"M";
+    return "$"+Math.round(n).toLocaleString("en-US");
+  }
+  function fmtMoneyFull(n){return "$"+Math.round(n).toLocaleString("en-US");}
+  function fmtTokens(n){
+    if(n>=1e9) return (n/1e9).toFixed(1).replace(/\.0$/,"")+"B";
+    if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"")+"M";
+    if(n>=1e3) return Math.round(n/1e3)+"K";
+    return String(Math.round(n));
+  }
+  function fmtInt(n){return Math.round(n).toLocaleString("en-US");}
+
+  // count-up for the hero figure
+  var burnEl = el("burn"), curBurn = 0, raf = null;
+  function setBurn(target){
+    if(reduce){ curBurn = target; burnEl.textContent = fmtMoney(target); return; }
+    var start = curBurn, t0 = null, dur = 480;
+    if(raf) cancelAnimationFrame(raf);
+    function step(ts){
+      if(!t0) t0 = ts;
+      var p = Math.min(1,(ts-t0)/dur), e = 1-Math.pow(1-p,3);
+      var v = start+(target-start)*e;
+      burnEl.textContent = fmtMoney(v);
+      if(p<1) raf = requestAnimationFrame(step); else curBurn = target;
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  function compute(){
+    var devs=+ins.devs.value, runsDay=+ins.runs.value, tok=+ins.tokens.value,
+        fail=+ins.fail.value/100, price=+ins.price.value, rec=+ins.recover.value/100;
+
+    // readouts
+    el("devs-v").textContent = devs;
+    el("runs-v").textContent = runsDay;
+    el("tokens-v").textContent = fmtTokens(tok);
+    el("fail-v").textContent = ins.fail.value+"%";
+    el("price-v").textContent = "$"+(+ins.price.value).toFixed(2);
+    el("recover-v").textContent = ins.recover.value+"%";
+
+    var div = period==="year" ? 1 : 12;
+    var runs = devs*runsDay*DAYS/div;
+    var failed = runs*fail;
+    var wastedTokens = failed*tok;
+    var wastedCost = wastedTokens/1e6*price;
+    var perDev = devs>0 ? wastedCost/devs : 0;
+    var recoverCost = wastedCost*rec;
+
+    setBurn(wastedCost);
+    el("failed-runs").textContent = fmtInt(failed);
+    el("wasted-tokens").textContent = fmtTokens(wastedTokens);
+    el("li-runs").textContent = fmtInt(runs);
+    el("li-failed").textContent = fmtInt(failed);
+    el("li-tokens").textContent = fmtTokens(wastedTokens);
+    el("li-perdev").textContent = fmtMoneyFull(perDev);
+    el("recover-amt").textContent = fmtMoney(recoverCost);
+
+    el("meter").style.width = Math.max(3,Math.min(100,+ins.fail.value))+"%";
+    el("meter-pct").textContent = ins.fail.value+"% fail";
+    el("period-label").textContent = "per "+period;
+  }
+
+  Object.keys(ins).forEach(function(k){ ins[k].addEventListener("input",compute); });
+
+  function setPeriod(p){
+    period = p;
+    el("per-year").setAttribute("aria-pressed", p==="year");
+    el("per-month").setAttribute("aria-pressed", p==="month");
+    curBurn = 0; // recount from zero on unit switch
+    compute();
+  }
+  el("per-year").addEventListener("click",function(){setPeriod("year");});
+  el("per-month").addEventListener("click",function(){setPeriod("month");});
+
+  el("copy").addEventListener("click",function(){
+    var b=this;
+    navigator.clipboard && navigator.clipboard.writeText("npx rewind").then(function(){
+      b.textContent="copied"; setTimeout(function(){b.textContent="copy";},1400);
+    });
+  });
+
+  compute();
+})();
+</script>

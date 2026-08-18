@@ -9,6 +9,13 @@ shell command, rewinds to the checkpoint, and is refused when it tries to re-fir
 across the rewind, with the refusal recorded and verifiable. That is the whole thesis, end to end,
 with zero accounts and zero privileges.
 
+**This is a sprint** (strategy folded in 2026-08-18): the product ships free, local-only, zero
+marginal cost (their API key, their disk, their provider's cache discount — we are never in the data
+path). The growth engine is not a later phase — it is **the savings receipt** (Slice 1.5), built on
+the same replay-savings data we are already harvesting. Distribution is a config line into the harness
+they already run. The full go-to-market shape and the honest business model are in `POSITIONING.md`;
+the sprint-critical pieces are pulled into the slices below.
+
 ---
 
 ## MVP
@@ -63,6 +70,32 @@ points as you port the hash chain.
   and an agent completes the success demo above end to end through the MCP tools.
 - Verified live against at least one real client before the slice is called done.
 
+### Slice 1.5: the savings receipt (the growth engine — do NOT defer)
+
+The single highest-leverage feature in the whole product. It is the retention hook, the shareable
+artifact, and the upsell trigger, and its data source **already exists in the harvest**
+(`src/harness/recorded/replay-savings.ts` writes a `ReplaySaving` with tokens/cost avoided on every
+replay). Full spec: `docs/SAVINGS-RECEIPT.md`.
+
+- A `rewind savings` CLI command (and an MCP `savings` tool) that reads the accumulated
+  `ReplaySaving` records for a scope and prints one honest line:
+  `Rewind recovered 4.2M tokens this week (~$63 saved).`
+- **Honest counterfactual metering is the acceptance bar, not a nicety.** "Saved" counts ONLY tokens
+  that would provably have been re-spent and were not: replay cache-hits (a recorded turn returned with
+  `modelCalls:0`) and re-executions avoided by rewinding to a checkpoint with a real prior. It must
+  NEVER credit a whole failed run, or bill-agnostic wall-clock. A padded number dies the moment a
+  sharp engineering manager checks it; a conservative real number is a category we can own (no public
+  replay-savings figure exists — Lane C).
+- Local and account-free. When cumulative savings cross a threshold it prints ONE upsell line pointing
+  at the (paid, hosted) team view — the only place an email is ever requested.
+
+**Acceptance:**
+- Given a sequence with a real replay cache-hit, `rewind savings` reports exactly the avoided token
+  count from the `ReplaySaving` records — and reports **zero** for a run with no avoided re-spend.
+  A test feeds a no-replay session and asserts the receipt says 0 (guards against an inflated number).
+- The token/cost figures reconcile to the sum of the underlying `ReplaySaving` records (no double
+  count across overlapping rewinds).
+
 ### Slice 2: keep it inside the larger product
 
 - Confirm the two coupling points (action vocabulary, authority resolver) are injected in
@@ -75,6 +108,38 @@ points as you port the hash chain.
   with no behaviour change. One implementation, consumed in two places, no fork.
 
 ---
+
+## Go-to-market sprint (folded from strategy 2026-08-18, founder-confirmed)
+
+The build and the distribution are one sprint, in this order. Rationale and the honest business model
+live in `POSITIONING.md` §5; the risks (support-time-scales-with-success, the two-motions focus
+question) are founder calls and are noted there, not resolved here.
+
+1. **Name:** deferred by founder — ship under `rewind` / `@rewind/*` for now, rename in prod before a
+   loud launch. (The collision risk still stands for the *public* launch; it is not a blocker for the
+   sprint.)
+2. **Savings receipt (Slice 1.5)** — built on the harvested replay-savings sink. The growth engine.
+3. **Waste calculator** — a standalone public page ("How much are you burning on failed agent runs?").
+   One week of work, **no product dependency**, the most linkable thing we will own. Defaults grounded
+   in evidence, not vibes: a failed run ≈ 50–60 LLM calls; 28–64% of tokens on failed trajectories are
+   recoverable (arxiv:2608.03222); agents submit ~100% but resolve ~44% (arxiv:2603.25764). Spec +
+   first build: `docs/calculator/`.
+4. **Distribution** — the four minimum-viable artifacts in Slice 1 (npm stdio bin, two config snippets,
+   the Claude Code plugin that auto-wires the barrier, the "Add to Cursor" deeplink).
+5. **Twenty real users, quietly. Fix onboarding. Then one loud launch** (Product Hunt / Show HN are
+   one-shot cards — do not spike onto a broken onboarding).
+
+**The free/paid line = the local/hosted line.** Everything free is local and account-free (a library +
+a CLI that prints to the terminal). The paid convert is the **team view** — a manager seeing spend
+across N developers inherently needs aggregation, which inherently needs a server. Keep cloud
+checkpoint sync and any hosted dashboard strictly paid and metered; they are the only things that turn
+a zero marginal cost into a real bill.
+
+**The one path back to Athena** is a single button in the (paid) team view: *"See who authorised these
+runs."* That button is not a bolt-on — it is the **authority resolver** coupling point
+(`ARCHITECTURE.md` #2). Free Rewind ships the **no-op default resolver** (no authority, no button);
+Athena injects its **real resolver** and the button lights up. Same `@rewind/core`, no fork. Do not
+mention Athena anywhere else in the product.
 
 ## Later phases (do not pull forward)
 
