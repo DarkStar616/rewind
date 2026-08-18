@@ -63,8 +63,10 @@ export const DEFAULT_PRICE_TABLE: PriceTable = {
     "claude-opus-4-8": { input: 15_000_000, output: 75_000_000, cacheWrite: 18_750_000, cacheRead: 1_500_000 },
     "claude-sonnet-4-5": { input: 3_000_000, output: 15_000_000, cacheWrite: 3_750_000, cacheRead: 300_000 },
     "claude-haiku-4-5": { input: 1_000_000, output: 5_000_000, cacheWrite: 1_250_000, cacheRead: 100_000 },
-    // Conservative default = the cheapest tier, so unknown models under-bill, never over-bill.
-    default: { input: 1_000_000, output: 5_000_000, cacheWrite: 1_250_000, cacheRead: 100_000 },
+    // Conservative default = the CHEAPEST rate Anthropic has ever charged (Haiku-3-class, $0.25/$1.25
+    // per MTok), NOT the cheapest currently-listed tier. An exact-but-unlisted model id (e.g. an older
+    // snapshot) must under-bill, never over-bill — so the floor, not a mid-tier, is the fallback.
+    default: { input: 250_000, output: 1_250_000, cacheWrite: 312_500, cacheRead: 25_000 },
   },
 };
 
@@ -92,7 +94,10 @@ export function avoidedCostMicros(
     (usage.output_tokens ?? 0) * r.output +
     (usage.cache_creation_input_tokens ?? 0) * r.cacheWrite +
     (usage.cache_read_input_tokens ?? 0) * r.cacheRead;
-  return Math.round(microTimesMillion / 1_000_000);
+  // FLOOR, not round: a saving is billed, so a fractional micro must round DOWN. Rounding half-up
+  // per-record systematically over-credits across a month of records (a half-micro becomes a full
+  // one every time); flooring errs strictly toward under-billing, the honest direction.
+  return Math.floor(microTimesMillion / 1_000_000);
 }
 
 /** Total tokens across every provider-reported field — the ownable "tokens avoided" number. */

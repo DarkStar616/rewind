@@ -113,7 +113,8 @@ export function meterCachePreservation(
   if (!r) return { costMicros: 0, creditedTokens: 0, priceTableVersion: version };
   const perTokenDiscount = Math.max(0, r.input - r.cacheRead); // µUSD per 1e6 tokens
   return {
-    costMicros: Math.round((cacheRead * perTokenDiscount) / 1_000_000),
+    // FLOOR, not round — a billed saving must never round a fractional micro UP (see meter.ts).
+    costMicros: Math.floor((cacheRead * perTokenDiscount) / 1_000_000),
     creditedTokens: cacheRead,
     priceTableVersion: version,
   };

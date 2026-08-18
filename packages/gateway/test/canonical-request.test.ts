@@ -89,11 +89,12 @@ test("a top-level prompt_cache_key does not affect the key", () => {
   assert.equal(canonicalizeRequest(withKey), canonicalizeRequest(baseRequest()));
 });
 
-test("the stream flag does not affect the key", () => {
+test("the stream flag DOES affect the key (wire format differs; we replay opaque bytes)", () => {
+  // A JSON record must never be served to a streaming client (or vice-versa), so stream/non-stream
+  // requests get DIFFERENT keys even though the eventual TEXT would match.
   const streaming = { ...baseRequest(), stream: true };
   const blocking = { ...baseRequest(), stream: false };
-  assert.equal(canonicalizeRequest(streaming), canonicalizeRequest(baseRequest()));
-  assert.equal(canonicalizeRequest(blocking), canonicalizeRequest(baseRequest()));
+  assert.notEqual(canonicalizeRequest(streaming), canonicalizeRequest(blocking));
 });
 
 test("known-noise + auth body fields do not affect the key", () => {
@@ -105,9 +106,34 @@ test("known-noise + auth body fields do not affect the key", () => {
     authorization: "Bearer nope",
     metadata: { user_id: "u_42" },
     prompt_cache_key: "sess-1",
-    stream: true,
   };
   assert.equal(canonicalizeRequest(noisy), canonicalizeRequest(baseRequest()));
+});
+
+test("a nested `ttl` inside tool input is NOT stripped (only cache_control's ttl is)", () => {
+  // Regression: deepStrip once removed ANY key named ttl, colliding two materially different requests.
+  const a = { model: "m", messages: [{ role: "user", content: "hi" }], tools: [{ name: "t", input: { ttl: 60 } }] };
+  const b = { model: "m", messages: [{ role: "user", content: "hi" }], tools: [{ name: "t", input: { ttl: 3600 } }] };
+  assert.notEqual(canonicalizeRequest(a), canonicalizeRequest(b));
+});
+
+test("output-affecting headers change the key; noise headers do not", () => {
+  const body = baseRequest();
+  const none = canonicalizeRequest(body, {});
+  const withBeta = canonicalizeRequest(body, { "anthropic-beta": "mcp-client-2025-04-04" });
+  const otherBeta = canonicalizeRequest(body, { "anthropic-beta": "something-else" });
+  const withVersion = canonicalizeRequest(body, { "anthropic-version": "2023-06-01" });
+  assert.notEqual(withBeta, none, "presence of anthropic-beta changes the key");
+  assert.notEqual(withBeta, otherBeta, "a different anthropic-beta value changes the key");
+  assert.notEqual(withVersion, none, "anthropic-version changes the key");
+  // Auth and transport headers are NOT part of replay identity.
+  assert.equal(
+    canonicalizeRequest(body, { authorization: "Bearer x", "user-agent": "ua", "x-api-key": "sk" }),
+    none,
+    "auth/transport headers do not affect the key",
+  );
+  // Header casing is normalised.
+  assert.equal(canonicalizeRequest(body, { "Anthropic-Beta": "mcp-client-2025-04-04" }), withBeta);
 });
 
 test("FAIL-SAFE: an UNRECOGNIZED field changes the key (unknown → miss, never a false hit)", () => {

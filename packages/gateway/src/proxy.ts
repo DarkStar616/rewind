@@ -24,6 +24,7 @@ import { request as httpsRequest } from "node:https";
 
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
+import { StrictReplayMissError } from "./replay.ts";
 import { extractUsage } from "./usage.ts";
 import { planCacheBreakpoints } from "./cache-preserve.ts";
 
@@ -85,9 +86,14 @@ function forwardableRequestHeaders(headers: IncomingHttpHeaders, bodyLen: number
   for (const [k, v] of Object.entries(headers)) {
     if (v === undefined) continue;
     if (HOP_BY_HOP.has(k.toLowerCase())) continue;
+    if (k.toLowerCase() === "accept-encoding") continue; // overridden below
     out[k] = Array.isArray(v) ? v.join(", ") : v;
   }
   out["content-length"] = String(bodyLen); // exact byte count of the body we forward
+  // Force an UNCOMPRESSED upstream response. We store and replay opaque bytes and parse a copy for
+  // usage; a gzip/br body would replay without its content-encoding (corrupt to the client) and read
+  // as zero usage. The localhost hop loses nothing meaningful by skipping compression.
+  out["accept-encoding"] = "identity";
   return out;
 }
 
@@ -129,8 +135,16 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         let decision: { served: "replay" | "live"; keyed: string; response?: unknown } | undefined;
         try {
           parsed = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
-          decision = options.replayer.handle(scope, parsed);
+          decision = options.replayer.handle(scope, parsed, req.headers);
         } catch (err) {
+          // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
+          // NOT fall through to a paid upstream forward. Surface it; forward only on real parse faults.
+          if (err instanceof StrictReplayMissError) {
+            res.writeHead(409, { "content-type": "application/json", "x-rewind": "strict-miss" });
+            res.end(JSON.stringify({ error: { type: "rewind_strict_replay_miss", message: err.message } }));
+            log(`proxy: STRICT MISS refused scope=${scope} (no upstream call)`);
+            return;
+          }
           log(`proxy: replay decision skipped (${err instanceof Error ? err.message : String(err)}); forwarding`);
         }
         if (decision?.served === "replay") {
@@ -231,14 +245,17 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             upRes.on("end", () => {
               endQuietly();
               const full = Buffer.concat(chunks);
-              // Record only a genuine success on the replay-able endpoint, keyed as the replayer keyed it.
-              if (record?.replayKey && status >= 200 && status < 300) {
+              // Record only a genuine, COMPLETE success on the replay-able endpoint. A 2xx that carries
+              // an SSE error or a truncated stream is transient and must never be frozen into a replay.
+              if (record?.replayKey && status >= 200 && status < 300 && isRecordableSuccess(full, contentType)) {
                 try {
                   recordResponse(options.store, record.scope, record.replayKey, full, contentType, status);
                   log(`proxy: LIVE recorded scope=${record.scope} key=${record.replayKey.slice(0, 12)}`);
                 } catch (err) {
                   log(`proxy: record failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
                 }
+              } else if (record?.replayKey && status >= 200 && status < 300) {
+                log(`proxy: NOT recording an incomplete/error 2xx response scope=${record.scope}`);
               }
               done();
             });
@@ -276,7 +293,35 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   });
 }
 
-/** Parse usage + model out of a live response and store it for future replay. */
+/**
+ * Whether a 2xx response body is a genuine, COMPLETE success worth freezing into a replay. Anthropic
+ * can return HTTP 200 and then deliver an error or a truncated stream — those must NOT be recorded, or
+ * a transient failure would be replayed forever (and any partial usage credited as a saving).
+ *
+ *   - SSE: require a terminal `message_stop` and reject any `error` event. An incomplete stream (no
+ *     stop) or an error frame is transient, not a cacheable answer.
+ *   - JSON: reject a body whose `type` is `"error"`.
+ *   - Anything we cannot parse: do NOT record (fail closed on the recording side — a miss just costs a
+ *     redundant call, whereas recording garbage would serve garbage forever).
+ */
+export function isRecordableSuccess(body: Buffer, contentType: string): boolean {
+  const text = body.toString("utf8");
+  const ct = (contentType ?? "").toLowerCase();
+  const looksSse = ct.includes("event-stream") || /^\s*event:|^\s*data:\s*\{/m.test(text);
+  if (looksSse) {
+    const hasStop = text.includes('"type":"message_stop"') || /^\s*event:\s*message_stop/m.test(text);
+    const hasError = text.includes('"type":"error"') || /^\s*event:\s*error/m.test(text);
+    return hasStop && !hasError;
+  }
+  try {
+    const parsed = JSON.parse(text) as { type?: unknown };
+    return parsed?.type !== "error";
+  } catch {
+    return false; // unparseable JSON → not a success we can safely replay
+  }
+}
+
+/** Parse usage + model out of a live response and store it for future replay (validated caller-side). */
 function recordResponse(
   store: RecordStore,
   scope: string,
