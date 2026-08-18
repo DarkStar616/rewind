@@ -28,3 +28,7 @@ export type {
   EffectAdmission,
   EffectRefusal,
 } from "./audit/effect-ledger.ts";
+export { createGitBackend, RevertIndeterminateError } from "./world/git-backend.ts";
+export type { GitBackendOptions } from "./world/git-backend.ts";
+export { refId } from "./world/world-backend.ts";
+export type { WorldBackend, WorldRef, RestoreResult, Change } from "./world/world-backend.ts";
