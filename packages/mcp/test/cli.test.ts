@@ -97,6 +97,27 @@ test("rewind CLI: an unknown subcommand is refused non-zero", async () => {
   }
 });
 
+test("rewind CLI: prune previews duplicate-tool-output savings", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-cli-"));
+  try {
+    const big = "LINE ".repeat(100);
+    const tr = (id: string) => ({ type: "tool_result", tool_use_id: id, content: big });
+    const body = JSON.stringify({
+      model: "m",
+      messages: [
+        { role: "user", content: [tr("a")] },
+        { role: "user", content: [tr("b")] },
+      ],
+    });
+    const r = runCli(dir, ["prune", body]);
+    assert.equal(r.status, 0);
+    assert.equal((r.json as { elided: number }).elided, 1);
+    assert.ok((r.json as { charsSaved: number }).charsSaved > 300);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("rewind CLI: cache-report prints the hygiene report and exits 1 on a poisoned prefix", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-cli-"));
   try {

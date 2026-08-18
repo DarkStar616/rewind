@@ -28,6 +28,7 @@ import { StrictReplayMissError } from "./replay.ts";
 import { extractUsage } from "./usage.ts";
 import { planCacheBreakpoints } from "./cache-preserve.ts";
 import { analyzeCacheHygiene } from "./cache-hygiene.ts";
+import { pruneToolOutputs } from "./prune.ts";
 
 /** The stored form of a recorded response: opaque bytes + just enough to replay them faithfully. */
 export interface RecordedHttpResponse {
@@ -56,6 +57,13 @@ export interface ProxyOptions {
    * own breakpoints. OFF keeps the proxy strictly byte-transparent (Mechanism A only).
    */
   preserveCache?: boolean;
+  /**
+   * Opt-in (default false): deterministically collapse byte-identical duplicate tool_result blocks
+   * (an agent re-reading the same file / re-running the same command) before forwarding — a real token
+   * saving on long runs. The prune is deterministic, so the replay key is computed over the PRUNED body
+   * and replay stays exact. OFF forwards the request untouched.
+   */
+  pruneContext?: boolean;
   log?: (message: string) => void;
 }
 
@@ -133,9 +141,20 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         const scopeRaw = req.headers[scopeHeader];
         const scope = (Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw) || "default";
         let parsed: Record<string, unknown> | undefined;
+        let pruned = false; // did deterministic pruning change the body? (then forward the pruned bytes)
         let decision: { served: "replay" | "live"; keyed: string; response?: unknown } | undefined;
         try {
           parsed = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
+          // Deterministic context pruning BEFORE keying, so the key reflects what the model actually
+          // sees and replay stays exact over the pruned form.
+          if (options.pruneContext) {
+            const pr = pruneToolOutputs(parsed);
+            if (pr.elided > 0) {
+              parsed = pr.body as Record<string, unknown>;
+              pruned = true;
+              log(`proxy: pruned ${pr.elided} duplicate tool output(s) (~${pr.charsSaved} chars) scope=${scope}`);
+            }
+          }
           decision = options.replayer.handle(scope, parsed, req.headers);
         } catch (err) {
           // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
@@ -182,9 +201,10 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             /* advisory only; never let hygiene analysis affect the forward */
           }
         }
-        // Optionally add a cache breakpoint (opt-in), then forward, tee, record under the key the
-        // replayer already computed (the key is over the ORIGINAL body, unaffected by the hint).
-        let forwardBody = rawBody;
+        // Forward the pruned bytes if pruning changed the body (so the model sees the pruned form the
+        // key was computed over); otherwise the exact original bytes. Cache-breakpoint injection (below)
+        // may further transform this.
+        let forwardBody = pruned && parsed ? Buffer.from(JSON.stringify(parsed), "utf8") : rawBody;
         if (options.preserveCache && parsed) {
           try {
             const plan = planCacheBreakpoints(parsed);

@@ -32,3 +32,5 @@ export { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from ".
 export type { CachePlan, CachePreservationCredit } from "./cache-preserve.ts";
 export { analyzeCacheHygiene } from "./cache-hygiene.ts";
 export type { CacheHygieneReport, HygieneIssue, HygieneReason } from "./cache-hygiene.ts";
+export { pruneToolOutputs } from "./prune.ts";
+export type { PruneOptions, PruneResult } from "./prune.ts";
