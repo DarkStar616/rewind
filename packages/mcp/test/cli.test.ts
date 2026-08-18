@@ -118,6 +118,41 @@ test("rewind CLI: prune previews duplicate-tool-output savings", async () => {
   }
 });
 
+test("rewind CLI: analyze prints a verifiable, redacted savings report and exits 0", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-cli-"));
+  try {
+    const call = (prompt: string) => ({
+      scope: "s",
+      body: { model: "claude-haiku-4-5", api_key: "sk-ant-secret01xyz", messages: [{ role: "user", content: prompt }] },
+      usage: { input_tokens: 100, output_tokens: 100 },
+      model: "claude-haiku-4-5",
+    });
+    const input = JSON.stringify([call("hello"), call("hello"), call("unique")]);
+    const r = runCli(dir, ["analyze", input]);
+    assert.equal(r.status, 0, `analyze should exit 0; stderr=${r.stderr}`);
+    const j = r.json as { analysis: { total: { calls: number; replayableCalls: number } }; rootHash: string; verified: boolean };
+    assert.equal(j.analysis.total.calls, 3);
+    assert.equal(j.analysis.total.replayableCalls, 1, "the 2nd identical call is byte-replayable");
+    assert.equal(j.verified, true, "the attested report verifies");
+    assert.match(j.rootHash, /^[0-9a-f]{64}$/);
+    // The secret must not survive into the shareable report.
+    assert.equal(r.stdout.includes("sk-ant-secret01xyz"), false, "the api key must be redacted from the report");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("rewind CLI: analyze rejects non-array input non-zero", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-cli-"));
+  try {
+    const r = runCli(dir, ["analyze", JSON.stringify({ not: "an array" })]);
+    assert.notEqual(r.status, 0, "a non-array must be refused");
+    assert.match(r.stderr, /array/i);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("rewind CLI: cache-report prints the hygiene report and exits 1 on a poisoned prefix", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-cli-"));
   try {
