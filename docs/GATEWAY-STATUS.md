@@ -64,11 +64,20 @@ serve a wrong answer):**
   finish streaming to the client. A client hang-up mid-replay still counts as avoided (the upstream
   call was skipped) — defensible; a malformed record falls through to a live forward rather than a 502.
 
-## Deferred (documented, not built — resisting scope creep)
+## Shipped since (research-driven, `docs/RESEARCH-ROADMAP.md`)
 
-- **BP2 recovery-policy** (AgentRewind two-tool `backtrack_candidates`/`backtrack_commit` + rewind-memory
-  + checkpoint-sparsity): the *accuracy* feature. A separate slice with its own design; not required for
-  the token-saving thesis, which Mechanism A already delivers.
+- **BP2 recovery / accuracy engine** ✅ — the AgentRewind-style **selective rewind + failure-memory**
+  (`@rewind/core` recovery policy; durable attempt log; `backtrack_candidates` / `backtrack_commit` MCP
+  tools; checkpoint-sparsity gate). `backtrack_commit` requires a non-empty note (the carried-forward
+  lesson) and returns the accumulated failure memory for the target checkpoint. Memory survives across
+  sessions/processes. This is the measured +25.6pp accuracy mechanism, and Mechanism A makes its
+  re-exploration cheap.
+- **Cache-breakpoint hygiene** ✅ — a static analyzer (`analyzeCacheHygiene`) that flags dynamic content
+  poisoning the cacheable prefix (the #1 way ~78-80% of cache savings are silently lost) + the
+  4-breakpoint cap; wired as a proxy advisory (never blocks/mutates → exact-replay-safe) and a
+  `rewind cache-report` CLI.
+
+## Deferred (documented, not built — resisting scope creep)
 - **`bench --live` real-dollar proof:** the mechanism and meter are proven deterministically; only a run
   with a real key proves dollars against the live provider. Runbook: `packages/gateway/bench/LIVE-RUNBOOK.md`.
 - **Durable record store:** records are per-gateway-session (in memory); the savings number is durable.

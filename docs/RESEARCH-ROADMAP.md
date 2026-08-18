@@ -109,3 +109,15 @@ tree-search cheap." Don't sell savings and accuracy as two features — sell the
 **BP2 — selective rewind + failure-memory**, because it (a) is the largest measured accuracy win, (b)
 maps onto substrate we already have, and (c) is the demo that proves savings and accuracy are one loop.
 Ship the Mechanism-B breakpoint-discipline hardening alongside it (cheap, replay-safe, ~78–80% cache win).
+
+## Status (2026-08-18) — SHIPPED
+The recommended slice is **built and tested** (plan: `docs/superpowers/plans/2026-08-18-recovery-and-cache-hygiene.md`):
+- **Accuracy:** `@rewind/core` recovery policy (rewind-memory, selective `recommendedCheckpoint`,
+  sparsity gate) + durable attempt log + `backtrack_candidates`/`backtrack_commit` MCP tools (note
+  required; memory survives across sessions).
+- **Savings:** `analyzeCacheHygiene` + proxy advisory + `rewind cache-report` CLI (flags prefix
+  poisoners + the 4-breakpoint cap; advisory-only, exact-replay-safe).
+
+**Still deferred** (next candidates from the ranking above): deterministic line-level context pruning
+(SWE-Pruner style, savings lever #2 — must be deterministic + hash-chained), and verified semantic
+caching as an opt-in off-path tier (savings lever #3).
