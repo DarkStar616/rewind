@@ -97,19 +97,23 @@ test("backtrackCandidates are newest-first with their prior failures attached", 
   assert.equal(cands[0].priorFailures.length, 0);
 });
 
-test("recommendedCheckpoint is SELECTIVE — the most-recent FAILING checkpoint, not a restart", () => {
+test("recommendedCheckpoint is the NEWEST checkpoint (minimal loss), never a jump back past clean progress", () => {
   const m = createMemoryRewindStore();
-  // cpB (newer) has a failure; cpA (older) is clean. Selective rewind targets cpB, not the oldest.
+  // An OLD checkpoint failed, but a NEWER clean checkpoint (cpC) exists above it. Recommending cpB
+  // would discard the recovered progress at cpC — so the newest (cpC) is the minimal-loss target.
   m.record(attempt({ seq: 1, checkpointId: "cpB", note: "b failed" }));
   const cands = backtrackCandidates([cp("cpA", 100), cp("cpB", 200), cp("cpC", 300)], m, "s");
-  const rec = recommendedCheckpoint(cands);
-  assert.equal(rec?.checkpointId, "cpB", "rewind to just before the failing work, not a full restart");
+  assert.equal(recommendedCheckpoint(cands)?.checkpointId, "cpC", "newest = least work lost");
 });
 
-test("recommendedCheckpoint with NO failures falls back to the latest checkpoint", () => {
+test("recommendedCheckpoint surfaces the newest checkpoint's own memory when it has failed before", () => {
   const m = createMemoryRewindStore();
+  // The newest checkpoint (cpB) itself has failures — recommend it, armed with its memory (a smarter retry).
+  m.record(attempt({ seq: 1, checkpointId: "cpB", note: "b failed once" }));
   const cands = backtrackCandidates([cp("cpA", 100), cp("cpB", 200)], m, "s");
-  assert.equal(recommendedCheckpoint(cands)?.checkpointId, "cpB");
+  const rec = recommendedCheckpoint(cands);
+  assert.equal(rec?.checkpointId, "cpB");
+  assert.equal(rec?.priorFailures.length, 1);
 });
 
 test("recommendedCheckpoint with no checkpoints is undefined", () => {

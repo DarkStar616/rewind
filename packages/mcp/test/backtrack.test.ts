@@ -116,7 +116,7 @@ test("backtrack_candidates lists checkpoints newest-first and recommends the fai
       // Newest first: B (newer) before A.
       assert.equal(s.candidates[0].checkpointId, b);
       assert.equal(s.candidates[1].checkpointId, a);
-      // B has a recorded failure; it is the selective recommendation (not a restart to A).
+      // Recommendation is the newest checkpoint (B) — minimal loss — and it carries B's failure memory.
       assert.equal(s.recommended, b);
       assert.equal(s.candidates[0].priorFailures.length, 1);
       assert.equal(s.candidates[1].priorFailures.length, 0);

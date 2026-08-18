@@ -121,16 +121,21 @@ export function memoryForCheckpoint(
 }
 
 /**
- * SELECTIVE rewind target — the heart of the +accuracy result. Pick the MOST RECENT checkpoint that
- * already has a failure recorded from it (rewind to just before the work that keeps failing, carrying
- * that failure forward), NOT the oldest checkpoint (a restart, which measured worse than continuing).
- * With no failures anywhere, fall back to the latest checkpoint. `undefined` if there are none.
+ * SELECTIVE rewind target — the minimal-loss default. Rewind to the NEWEST checkpoint: it undoes only
+ * the current failed branch and loses the least recovered progress. If that checkpoint already carries
+ * failures, they come back as memory so the re-attempt is smarter; if it is clean, it is a fresh retry.
+ *
+ * Deliberately NOT "the most-recent checkpoint that ever failed": jumping back past a NEWER clean
+ * checkpoint would throw away work already recovered. Escalating further back after repeated failures
+ * from the newest point is the CALLER's decision — every candidate carries its `priorFailures` count so
+ * the caller can choose to go deeper. `undefined` if there are no checkpoints.
+ *
+ * (This is still "selective, not restart": a restart is the OLDEST checkpoint — which measured worse
+ * than continuing — whereas this is the newest.)
  */
 export function recommendedCheckpoint(candidates: readonly BacktrackCandidate[]): BacktrackCandidate | undefined {
-  if (candidates.length === 0) return undefined;
-  // candidates are newest-first; the first one WITH prior failures is the closest failing branch.
-  const failing = candidates.find((c) => c.priorFailures.length > 0);
-  return failing ?? candidates[0];
+  // candidates are newest-first (see backtrackCandidates), so the newest is candidates[0].
+  return candidates[0];
 }
 
 /**
