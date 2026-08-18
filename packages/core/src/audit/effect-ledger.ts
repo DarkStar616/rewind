@@ -7,6 +7,16 @@ import { EvidenceLedgerError, type AuditEntry, type EvidenceLedger } from "./evi
 export const EFFECT_EMITTED = "effect_emitted";
 export const EFFECT_REPLAY_REFUSED = "effect_replay_refused";
 
+/**
+ * The stable, agent-actionable reason a spent effect is refused across a rewind. It is written to the
+ * chain AND handed back on the EffectRefusal, so an agent (via MCP/CLI) can read WHY and adapt — stop
+ * retrying the effect — instead of blindly re-firing. One canonical string, used in both places, so the
+ * recorded reason and the returned reason can never drift. This is the deny-reason half of RIP-LIST #11
+ * only; no auto-approve/skip-permissions state is introduced.
+ */
+export const REPLAY_REFUSED_REASON =
+  "the effect materialised outside the workspace and is not replayable across a revert";
+
 export interface ExternalEffect {
   effectKey: string;
   scopeLabel: ScopeId;
@@ -20,6 +30,8 @@ export interface EffectRefusal {
   refused: true;
   effectKey: string;
   firstEmittedSeq: number;
+  /** Stable, agent-actionable explanation of the refusal — the same string recorded on the chain. */
+  reason: string;
 }
 
 export interface EffectAdmission {
@@ -83,10 +95,10 @@ export function createEffectLedger(ledger: EvidenceLedger, _opts: EffectLedgerOp
               effectKey: effect.effectKey,
               kind: effect.kind,
               firstEmittedSeq: already,
-              reason: "the effect materialised outside the workspace and is not replayable across a revert",
+              reason: REPLAY_REFUSED_REASON,
             },
           });
-          return { refused: true, effectKey: effect.effectKey, firstEmittedSeq: already };
+          return { refused: true, effectKey: effect.effectKey, firstEmittedSeq: already, reason: REPLAY_REFUSED_REASON };
         }
         await ledger.append({
           scopeLabel: effect.scopeLabel,

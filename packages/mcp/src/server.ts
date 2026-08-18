@@ -204,9 +204,11 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
       if (outcome.refused) {
         return ok({
           decision: "refused",
+          // Lead with the barrier's own structured, agent-actionable reason (the same string on the
+          // chain), then add the actionable context so the agent knows to stop re-firing this effect.
           reason:
-            `effect ${effect.effectKey} already fired (first at seq ${outcome.firstEmittedSeq}) and is not ` +
-            `replayable across a rewind`,
+            `${outcome.reason} — effect ${effect.effectKey} already fired (first at seq ${outcome.firstEmittedSeq}); ` +
+            `do not re-fire it across the rewind`,
           chainHash,
           firstEmittedSeq: outcome.firstEmittedSeq,
         });

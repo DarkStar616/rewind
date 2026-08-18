@@ -20,6 +20,7 @@ export {
   createEffectLedger,
   EFFECT_EMITTED,
   EFFECT_REPLAY_REFUSED,
+  REPLAY_REFUSED_REASON,
 } from "./audit/effect-ledger.ts";
 export type {
   EffectLedger,
