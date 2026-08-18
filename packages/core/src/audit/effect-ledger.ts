@@ -62,8 +62,14 @@ export function createEffectLedger(ledger: EvidenceLedger, _opts: EffectLedgerOp
   return {
     spentAt,
     async emit(effect): Promise<EffectOutcome> {
-      if (!effect.effectKey.trim()) {
-        throw new EvidenceLedgerError("an external effect requires a non-empty effectKey");
+      // Validate the key BEFORE touching the ledger. A non-string key (a real risk for a direct
+      // core consumer, and for an MCP client since `z.string()` still admits ""), must surface the
+      // domain error, not a raw `TypeError: ... reading 'trim'` from the guard itself — an
+      // unclassifiable throw is harder for a caller to handle and leaks the implementation. `.trim()`
+      // also rejects whitespace-only keys; note it is used ONLY for the emptiness check, never to
+      // normalise the stored key, so " x " and "x" remain distinct effects by design.
+      if (typeof effect.effectKey !== "string" || !effect.effectKey.trim()) {
+        throw new EvidenceLedgerError("an external effect requires a non-empty string effectKey");
       }
       return gate(String(effect.scopeLabel), async () => {
         const already = await spentAt(effect.scopeLabel, effect.effectKey);
