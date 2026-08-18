@@ -95,19 +95,43 @@ appear to be missing these files. Harvest from the worktree that has `deploy-lat
 that base). If that worktree is gone, check out branch `deploy-latest` (or ask whether it has since
 merged to `main`).
 
+All paths below were confirmed present in `mvp-golden-path` on 2026-08-18 (HEAD `800bf8a`).
+
 | Rewind core piece | harvest from | notes |
 |---|---|---|
-| git snapshot backend (Tier 0) | `src/sandbox/git-tracked-sandbox.ts` | pure git; the MVP backend |
-| effect barrier | `src/audit/effect-ledger.ts` | genericize action vocab + authority |
-| evidence hash chain | `src/audit/evidence-ledger.ts` + `src/audit/correlation.ts` | genericize; inject store |
-| canonical JSON | the canonical-json helper used by the chain | keep byte-stable hashing |
-| replay + cost accounting | `src/harness/recorded/*` | tokens/cost avoided sink |
-| jail-enforcement gate (Tier 1) | `src/shepherd/shepherd-run.ts`, `shepherd-starter.ts` | later; wraps the substrate CLI |
-| conformance model (tests only) | `scripts/effect_replay_barrier.py`, `scripts/reversion_completeness.py`, `scripts/probe_fork_revert.py` | Python probe, not a second impl |
-| Python carriers (Tier 1+) | `deploy/layers/athena/snapshot-carrier`, `deploy/layers/athena/replay-provider` | stay Python, extract as-is later |
+| git snapshot backend (Tier 0) | `src/sandbox/git-tracked-sandbox.ts` (decorates `src/sandbox/sandbox.ts`) | `createGitTrackedSandbox`: per-turn snapshot to a side GIT_DIR, `snapshot`/`revert`/`log`, `RevertIndeterminateError` fails loud on partial revert. Pure git — the MVP backend. |
+| effect barrier | `src/audit/effect-ledger.ts` | `emitEffect`, idempotency `effectKey`, spent-mark, `EFFECT_REPLAY_REFUSED`, `firstEmittedSeq`. **See concurrency bug below — fix during extraction.** |
+| evidence hash chain | `src/audit/evidence-ledger.ts` (+ `postgres-evidence-ledger.ts`) | append-only, `computeEntryHash` over canonical JSON, `append`/`verify`. The effect spent-mark is an ENTRY on this chain (not a separate store) — deliberate, so a revert can't un-spend it. |
+| canonical JSON | `src/audit/canonical-json.ts` | `canonicalize`, byte-stable. Used by the chain. |
+| correlation identity | `src/audit/correlation.ts` | AsyncLocalStorage correlation-id propagation; `correlationIdForEvent`. |
+| replay + cost accounting | `src/harness/recorded/replay-savings.ts` (+ `postgres-replay-savings.ts`); consumer `src/harness/recorded-response-harness.ts`; store `src/harness/recorded/recorded-response-store.ts` | recorded turn → `modelCalls:0` → writes a `ReplaySaving` (tokens/cost avoided); divergence throws, never falls through to a paid call. `replay-savings.ts` is the clean portable piece; the store has qm session coupling. |
+| jail-enforcement gate (Tier 1, SKIP for MVP) | `src/shepherd/shepherd-run.ts`, `shepherd-starter.ts` | `assertJailEnforcement`; shells out to the `sp` CLI (not vendored). Later tier only. |
+| conformance model (tests only) | `scripts/effect_replay_barrier.py`, `scripts/reversion_completeness.py`, `scripts/probe_fork_revert.py` | Python probe; docstring says "PORTABLE MODEL, not the shipped code." NEVER promote to a 2nd impl. |
+| conformance oracle (port as our suite) | `tests/athena/test_effect_replay_barrier.py`, `test/effect-ledger.test.ts` (literal payment example) | these define "correct" — port them as the conformance suite. |
+| Python carriers (Tier 1+) | `deploy/layers/athena/snapshot-carrier` (reflink CoW), `deploy/layers/athena/replay-provider` | stay Python, extract as-is later. |
+
+**The two coupling points to genericize — both in `src/audit/evidence-ledger.ts`, confirmed by line:**
+1. **Action vocabulary** — `export const AUDIT_ACTIONS = [...]` at **line 10** (closed set of qm domain
+   actions + `effect_emitted`/`effect_replay_refused`/`approval_*`). The Postgres `CHECK` constraint in
+   `postgres-evidence-ledger.ts` is derived from it. → **inject the vocabulary.**
+2. **Authority resolver** — `import { resolveAuthority } from "../decisions/decision.ts"` at **line 6**,
+   called ~line 183. → **inject a resolver, with a no-op default.**
+
+**Known bug to fix while lifting (verified by reading the source):** the barrier reads `spentAt` (a
+`ledger.list` query) *outside* the append lock, and there is no uniqueness constraint on the effect
+key, so a concurrent/retried double-emit can slip a duplicate `EFFECT_EMITTED` through (a TOCTOU gap
+between the spent-check and the append). It has only ever been proven against sequential
+replay-after-revert. **Move the spent-check inside the serializing lock and add a unique constraint on
+`(scope, effectKey)` when you port it, and write a concurrent-double-emit test that fails on the
+lifted-as-is code.** Concurrent effects are the real-world case.
+
+**Don't clean-lift beyond the two injections:** `postgres-evidence-ledger.ts` couples to qm's Postgres
+store — treat the durable store as an injected interface (as the MVP already intends).
 
 Base substrate: `/home/reuben/projects/shepherd` (`shepherd-workspace` v0.3.0, MIT). Tier 0 git and
-copy-on-write snapshotting is already implemented there; harvest it rather than rebuild it.
+copy-on-write snapshotting is already implemented there; harvest it rather than rebuild it. Note:
+shepherd's own docs pitch **reversibility / inspection / supervision** — they make NO token-saving,
+accuracy, or "lightweight" claim, so those are Rewind's to substantiate, not shepherd's to borrow.
 
 ## Keeping it inside the larger product
 

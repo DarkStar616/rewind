@@ -38,6 +38,10 @@ points as you port the hash chain.
   `restore` is refused and the refusal is recorded citing the first.
 - `verify` passes on an untouched chain and fails, pointing at the entry, when any interior field is
   edited. This test must fail on a do-nothing implementation.
+- **Concurrent double-emit of the same effect key produces exactly one spent entry.** The harvested
+  barrier has a verified TOCTOU gap (spent-check outside the append lock, no uniqueness constraint on
+  the key) — the port must close it (check inside the serializing lock + unique `(scope, effectKey)`
+  constraint). This test must fail on the lifted-as-is code. See `ARCHITECTURE.md` harvest map.
 
 ### Slice 1: the MCP server (`@rewind/mcp`) — the first adoptable surface
 
@@ -45,7 +49,14 @@ points as you port the hash chain.
   `guard_effect` as tools, each minting and accepting a checkpoint-id handle, with all state in the
   durable store keyed by the handle, none in transport or connection memory.
 - Distribution as `npx rewind` with zero install.
-- A short docs page with the one-line config entry for Claude Code, Cursor and Codex CLI.
+- **Minimum viable distribution (see `POSITIONING.md` §5):** (1) the `npx -y @rewind/mcp` stdio bin;
+  (2) two copy-paste snippets on the docs page — one JSON `mcpServers` block with `"type":"stdio"` that
+  drops into Claude Code + Cursor + Cline + Windsurf unchanged, and one TOML `[mcp_servers.rewind]` for
+  Codex CLI (the outlier) — plus the `claude mcp add` / `codex mcp add` one-liners as the primary path;
+  (3) a Claude Code **plugin** in a marketplace repo bundling `.mcp.json` **+ a `PreToolUse`
+  `guard_effect` hook on `Bash|Write|Edit`** — the ONLY surface that auto-wires the barrier with zero
+  user config; (4) an "Add to Cursor" deeplink button. Web connectors (one shared remote
+  Streamable-HTTP transport, barrier/audit half only — no local rewind on web) are deferred.
 
 **Acceptance:**
 - The same server binary is added to Claude Code and to one of Cursor or Codex CLI from its config,
@@ -90,19 +101,24 @@ later moat surface and is not part of the standalone SDK's near-term path.
 
 ## Cross-cutting, do these early and cheaply
 
-- **Name and trademark check, day one.** Confirm "Rewind" is usable and pick the npm scope; at least
-  one unrelated product uses the name. Not a blocker for building, but decide the published name
-  before the first release.
+- **Name — escalated to a publish blocker (2026-08-18).** "Rewind" is crowded in exactly this niche:
+  `khalilbalaree/Rewind-MCP` (a checkpoint MCP server), `nicobailon/pi-rewind-hook` (161★),
+  `adi-suresh01/rewind`. Pick a distinctive name + npm scope **before the first npm publish / plugin
+  listing.** See `POSITIONING.md` §4.
 - **Open-core boundary from the first commit.** Core packages MIT or Apache; keep any hosted or
   enterprise code in separate packages so the boundary never has to be untangled later.
 - **Honesty guardrails, in the docs and the tool descriptions.** Tier 0 is reversibility, not
-  isolation. Git snapshots do not capture process memory or external effects; the effect barrier is
-  what covers the external-effect gap. On web there is no local rollback. State each of these plainly;
-  they are the positioning, not caveats to bury.
-- **Pressure-test the positioning with a fresh web search** on agent-checkpoint and reversibility
-  prior art, since the positioning research on this pass was synthesized rather than fully sourced.
-  Confirm that the refuse-and-record effect barrier is genuinely unshipped by competitors before
-  making it the headline.
+  isolation — and per fresh research it is now **commodity** (Claude Code/Cline/OpenCode/Gemini CLI all
+  ship rewind); do not market it as the moat. Git snapshots do not capture process memory or external
+  effects; the effect barrier covers the external-effect gap. On web there is no local rollback. State
+  each plainly.
+- **Positioning — pressure-tested (DONE, see `POSITIONING.md`).** Finding: the effect-barrier *concept*
+  is NOT novel (ACRFence arxiv:2603.20625; `rune0-dev/agent-ledger` on PyPI; LangGraph #8464 building
+  it), but the *combination* Rewind ships is unshipped and the *implementation* is defensible. New
+  headline: "the only deterministic, filesystem-independent, TypeScript-native effect barrier +
+  tamper-evident chain — in a space the research has proven every framework gets wrong." Reversibility's
+  value is strongly evidenced (AgentRewind 30% vs 8% recovery); the token-saving $ number is a
+  land-grab we should publish first.
 
 ---
 
