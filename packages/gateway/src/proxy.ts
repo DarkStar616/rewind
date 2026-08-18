@@ -148,16 +148,22 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           log(`proxy: replay decision skipped (${err instanceof Error ? err.message : String(err)}); forwarding`);
         }
         if (decision?.served === "replay") {
-          const rec = decision.response as RecordedHttpResponse;
-          const body = Buffer.from(rec.bodyBase64, "base64");
-          res.writeHead(rec.status, {
-            "content-type": rec.contentType,
-            "content-length": String(body.length),
-            "x-rewind": "replay",
-          });
-          res.end(body);
-          log(`proxy: REPLAY scope=${scope} key=${decision.keyed.slice(0, 12)} (0 upstream tokens)`);
-          return;
+          const rec = decision.response as RecordedHttpResponse | undefined;
+          // Defensive: a well-formed record always carries a string bodyBase64 (recordResponse
+          // guarantees it). If the store handed back something malformed (a corrupt/foreign backend),
+          // fall through to a live forward rather than 502 — serving the real answer beats crashing.
+          if (rec && typeof rec.bodyBase64 === "string" && typeof rec.status === "number") {
+            const body = Buffer.from(rec.bodyBase64, "base64");
+            res.writeHead(rec.status, {
+              "content-type": typeof rec.contentType === "string" ? rec.contentType : "application/json",
+              "content-length": String(body.length),
+              "x-rewind": "replay",
+            });
+            res.end(body);
+            log(`proxy: REPLAY scope=${scope} key=${decision.keyed.slice(0, 12)} (0 upstream tokens)`);
+            return;
+          }
+          log(`proxy: replay record malformed for key ${decision.keyed.slice(0, 12)}; forwarding live instead`);
         }
         // MISS → optionally add a cache breakpoint (opt-in), then forward, tee, record under the
         // key the replayer already computed (the key is over the ORIGINAL body, unaffected by the hint).

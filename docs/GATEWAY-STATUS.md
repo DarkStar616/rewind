@@ -40,6 +40,30 @@ export ANTHROPIC_BASE_URL=http://127.0.0.1:8788
 npx rewind savings --json                      # the tokens/cost actually avoided
 ```
 
+## Cross-vendor review (codex, unsteered) — run and addressed
+
+A different-vendor review pass (per the build method) surfaced 11 issues; the correctness and
+over-credit ones are **fixed** (commit `f949365`):
+
+- **Fixed (false-hit → wrong answer):** nested-`ttl` key collision; missing `anthropic-beta`/`-version`
+  in the key; `stream`/non-stream sharing a key; a 200 SSE-error/truncated stream frozen as a replay;
+  gzip/br responses replayed without their encoding; a strict-mode miss silently forwarded to a paid
+  call.
+- **Fixed (over-credit):** unknown-model fallback now the cheapest rate Anthropic ever charged;
+  avoided-cost floors instead of rounding half-up.
+
+**Known limitations (safe direction — they under-report or cost a redundant call, never over-credit or
+serve a wrong answer):**
+
+- **Concurrent identical misses** both reach upstream (no in-flight coalescing). Both get correct
+  answers; dedup-by-callId means only one saving is booked. A per-key in-flight lock is a later slice.
+- **Multiple gateway processes** sharing `.rewind/savings.json` can lose a record (last-flush-wins).
+  Single-writer is the documented model; this under-reports, never over-credits. A durable multi-writer
+  ledger is a later slice.
+- **A saving is booked on avoidance** (when the upstream call is genuinely skipped), before the bytes
+  finish streaming to the client. A client hang-up mid-replay still counts as avoided (the upstream
+  call was skipped) — defensible; a malformed record falls through to a live forward rather than a 502.
+
 ## Deferred (documented, not built — resisting scope creep)
 
 - **BP2 recovery-policy** (AgentRewind two-tool `backtrack_candidates`/`backtrack_commit` + rewind-memory
