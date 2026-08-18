@@ -15,7 +15,7 @@
  * This is REVERSIBILITY, not isolation. See world-backend.ts.
  */
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import type { Change, RestoreResult, WorldBackend, WorldRef } from "./world-backend.ts";
@@ -141,7 +141,9 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
   const gitDir = opts.gitDir ?? join(cwd, ".rewind", "snapshots.git");
   const emit = opts.log ?? ((m: string) => console.warn(m));
 
-  const run = (args: readonly string[]): Promise<GitResult> =>
+  // `extraEnv` lets a caller scope a single git invocation to a throwaway index via GIT_INDEX_FILE
+  // (see snapshot()), so building a tree never touches the shared `index` that restore() also uses.
+  const run = (args: readonly string[], extraEnv?: Readonly<Record<string, string>>): Promise<GitResult> =>
     new Promise((resolve) => {
       execFile(
         "git",
@@ -151,7 +153,7 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
         // and double-quoting any path with non-ASCII/control chars — otherwise `diff()` would hand
         // back a mangled `"caf\303\251.txt"` for `café.txt`, useless to any caller that opens it.
         ["--git-dir", gitDir, "--work-tree", cwd, "-c", "core.excludesFile=/dev/null", "-c", "core.quotePath=false", ...args],
-        { cwd, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, ...GIT_IDENTITY } },
+        { cwd, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, ...GIT_IDENTITY, ...extraEnv } },
         (err, stdout, stderr) => {
           const code = !err ? 0 : typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : 1;
           resolve({ code, stdout: stdout?.toString() ?? "", stderr: stderr?.toString() ?? "" });
@@ -233,6 +235,11 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
   const serial = createKeyedQueue<string>();
   const mutate = <T>(fn: () => Promise<T>): Promise<T> => serial(gitDir, fn);
 
+  // Monotonic, deterministic (no clock/random) suffix for per-call temp index files, so a snapshot's
+  // staging never collides with — or writes — the shared `index`. Serialized through `mutate`, so a
+  // plain closure counter is race-free within one backend instance.
+  let tmpIndexCounter = 0;
+
   return {
     // `async` (not a bare promise-returning fn) so any synchronous throw — e.g. validateRef on a
     // malformed ref — surfaces as a REJECTED promise, never a thrown exception the caller's
@@ -240,29 +247,44 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
     async snapshot(label?: string): Promise<WorldRef> {
       return mutate(async () => {
       await ensureInit();
-      const add = await run(["add", "-A"]);
-      if (add.code !== 0) {
-        throw new Error(`rewind git-backend: git add failed (exit ${add.code}): ${add.stderr.slice(0, 300)}`);
+      // Build the tree in a throwaway index scoped to THIS call via GIT_INDEX_FILE, so `add -A`/
+      // `write-tree` never read or write the shared `<gitDir>/index` that restore() (and A1's
+      // pre-restore capture) depend on. A fresh empty temp index + `add -A` stages the whole work
+      // tree — identical to the shared-index result, since `add -A` re-stages everything anyway. The
+      // per-repo info/exclude still applies (it is index-independent), so excludes are honoured.
+      const tmpIndex = join(gitDir, `tmp-index-${process.pid}-${tmpIndexCounter++}`);
+      const idxEnv = { GIT_INDEX_FILE: tmpIndex };
+      try {
+        const add = await run(["add", "-A"], idxEnv);
+        if (add.code !== 0) {
+          throw new Error(`rewind git-backend: git add failed (exit ${add.code}): ${add.stderr.slice(0, 300)}`);
+        }
+        const tree = await run(["write-tree"], idxEnv);
+        if (tree.code !== 0) {
+          throw new Error(`rewind git-backend: git write-tree failed (exit ${tree.code}): ${tree.stderr.slice(0, 300)}`);
+        }
+        const treeId = tree.stdout.trim();
+        // commit-tree / update-ref / rev-parse need no index — run them WITHOUT the temp env.
+        const head = await run(["rev-parse", "-q", "--verify", "HEAD"]);
+        const message = label ?? "snapshot";
+        const commitArgs =
+          head.code === 0 ? ["commit-tree", treeId, "-p", head.stdout.trim(), "-m", message] : ["commit-tree", treeId, "-m", message];
+        const commit = await run(commitArgs);
+        if (commit.code !== 0) {
+          throw new Error(`rewind git-backend: git commit-tree failed (exit ${commit.code}): ${commit.stderr.slice(0, 300)}`);
+        }
+        const id = commit.stdout.trim();
+        const ref = await run(["update-ref", "refs/heads/main", id]);
+        if (ref.code !== 0) {
+          throw new Error(`rewind git-backend: git update-ref failed (exit ${ref.code}): ${ref.stderr.slice(0, 300)}`);
+        }
+        return label === undefined ? { id, ts: Date.now() } : { id, label, ts: Date.now() };
+      } finally {
+        // Always remove the throwaway index (and any lock git may have left) — a leak would accrete
+        // files in the git dir. Best-effort: the tree/commit are already durable in the object store.
+        await rm(tmpIndex, { force: true }).catch(() => {});
+        await rm(`${tmpIndex}.lock`, { force: true }).catch(() => {});
       }
-      const tree = await run(["write-tree"]);
-      if (tree.code !== 0) {
-        throw new Error(`rewind git-backend: git write-tree failed (exit ${tree.code}): ${tree.stderr.slice(0, 300)}`);
-      }
-      const treeId = tree.stdout.trim();
-      const head = await run(["rev-parse", "-q", "--verify", "HEAD"]);
-      const message = label ?? "snapshot";
-      const commitArgs =
-        head.code === 0 ? ["commit-tree", treeId, "-p", head.stdout.trim(), "-m", message] : ["commit-tree", treeId, "-m", message];
-      const commit = await run(commitArgs);
-      if (commit.code !== 0) {
-        throw new Error(`rewind git-backend: git commit-tree failed (exit ${commit.code}): ${commit.stderr.slice(0, 300)}`);
-      }
-      const id = commit.stdout.trim();
-      const ref = await run(["update-ref", "refs/heads/main", id]);
-      if (ref.code !== 0) {
-        throw new Error(`rewind git-backend: git update-ref failed (exit ${ref.code}): ${ref.stderr.slice(0, 300)}`);
-      }
-      return label === undefined ? { id, ts: Date.now() } : { id, label, ts: Date.now() };
       });
     },
 
