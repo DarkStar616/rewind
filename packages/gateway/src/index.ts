@@ -40,6 +40,8 @@ export { redactValue, redactedExportView, DEFAULT_REDACTORS, DROP } from "./reda
 export type { RedactFn, RedactContext } from "./redact.ts";
 export { reconcileAgainstProviderBill } from "./reconcile.ts";
 export type { ReconciliationReport, ProviderUsageFetcher } from "./reconcile.ts";
+export { divergeMessages } from "./diverge.ts";
+export type { DivergenceReport, Divergence, DivergenceKind } from "./diverge.ts";
 export { analyzeTraffic, attestAnalysis } from "./analysis.ts";
 export type {
   AnalyzedCall,
