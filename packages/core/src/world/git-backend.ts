@@ -20,6 +20,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import type { Change, RestoreResult, WorldBackend, WorldRef } from "./world-backend.ts";
 import { refId } from "./world-backend.ts";
+import { createKeyedQueue } from "../util/async.ts";
 
 /** Heavy build/dependency dirs kept out of snapshots (and, being excluded, out of `clean`). */
 const HEAVY_DIRS = ["node_modules", ".venv", "venv", "__pycache__", ".cache", ".npm", "dist", "build", ".next"];
@@ -81,7 +82,10 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
         "git",
         // `-c core.excludesFile=/dev/null` neutralises the user's GLOBAL gitignore so it cannot
         // silently drop files from a snapshot; the per-repo info/exclude below is still honoured.
-        ["--git-dir", gitDir, "--work-tree", cwd, "-c", "core.excludesFile=/dev/null", ...args],
+        // `-c core.quotePath=false` makes git emit path bytes RAW (UTF-8) instead of octal-escaping
+        // and double-quoting any path with non-ASCII/control chars — otherwise `diff()` would hand
+        // back a mangled `"caf\303\251.txt"` for `café.txt`, useless to any caller that opens it.
+        ["--git-dir", gitDir, "--work-tree", cwd, "-c", "core.excludesFile=/dev/null", "-c", "core.quotePath=false", ...args],
         { cwd, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, ...GIT_IDENTITY } },
         (err, stdout, stderr) => {
           const code = !err ? 0 : typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : 1;
@@ -149,8 +153,23 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
     }
   };
 
+  // snapshot() and restore() both mutate the shared git index (index.lock) and, for snapshot, the
+  // single `refs/heads/main` tip. Run concurrently they RACE: each snapshot reads HEAD, builds a
+  // commit, and `update-ref`s the tip — last writer wins, so the others are orphaned off the chain
+  // and `log()` (which walks from the tip) silently loses them, breaking the append-only guarantee.
+  // A restore's `read-tree`/`clean` racing a snapshot's `add` corrupts the index the same way. We
+  // serialise every tree/ref-mutating op through one in-process queue keyed by this backend's git
+  // dir; reads (diff/log) don't take index.lock and stay unserialised. Cross-PROCESS concurrency is
+  // still git's own index.lock territory — this fixes concurrency within one backend instance.
+  const serial = createKeyedQueue<string>();
+  const mutate = <T>(fn: () => Promise<T>): Promise<T> => serial(gitDir, fn);
+
   return {
+    // `async` (not a bare promise-returning fn) so any synchronous throw — e.g. validateRef on a
+    // malformed ref — surfaces as a REJECTED promise, never a thrown exception the caller's
+    // `.catch()`/`assert.rejects` would miss.
     async snapshot(label?: string): Promise<WorldRef> {
+      return mutate(async () => {
       await ensureInit();
       const add = await run(["add", "-A"]);
       if (add.code !== 0) {
@@ -175,11 +194,16 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
         throw new Error(`rewind git-backend: git update-ref failed (exit ${ref.code}): ${ref.stderr.slice(0, 300)}`);
       }
       return label === undefined ? { id, ts: Date.now() } : { id, label, ts: Date.now() };
+      });
     },
 
+    // `async` so validateRef's synchronous throw on a bad ref becomes a rejection (see snapshot).
+    // The ref is validated BEFORE queueing, so a malformed ref is refused immediately and never
+    // waits behind — or interferes with — in-flight mutations.
     async restore(ref: WorldRef | string): Promise<RestoreResult> {
       const id = refId(ref);
       validateRef(id);
+      return mutate(async () => {
       await ensureInit();
       // Reject an unknown snapshot BEFORE touching the tree, so a bad id cannot leave a partial revert.
       const known = await run(["rev-parse", "-q", "--verify", `${id}^{commit}`]);
@@ -198,6 +222,7 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
         throw new RevertIndeterminateError(id, `post-read-tree clean exited ${clean.code}: ${clean.stderr.slice(0, 300)}`);
       }
       return { restoredTo: id };
+      });
     },
 
     async diff(a: WorldRef | string, b: WorldRef | string): Promise<Change[]> {
@@ -206,18 +231,23 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
       validateRef(idA);
       validateRef(idB);
       await ensureInit();
-      const res = await run(["--no-pager", "diff", "--name-status", "--no-renames", idA, idB]);
+      // `-z` emits NUL-delimited `<status>\0<path>\0` records with the path bytes VERBATIM. A
+      // newline-delimited parse would corrupt any filename containing a newline, and the default
+      // (non-`-z`) formatting octal-escapes and double-quotes non-ASCII paths — both mangle real,
+      // legitimate filenames. `--no-renames` guarantees exactly one path per record (renames are
+      // decomposed to D+A), so records are strict [status, path] pairs.
+      const res = await run(["--no-pager", "diff", "--name-status", "--no-renames", "-z", idA, idB]);
       if (res.code !== 0) {
         throw new Error(`rewind git-backend: git diff failed (exit ${res.code}): ${res.stderr.slice(0, 300)}`);
       }
+      const tokens = res.stdout.split("\0");
       const changes: Change[] = [];
-      for (const line of res.stdout.split("\n")) {
-        if (!line.trim()) continue;
-        const tab = line.indexOf("\t");
-        if (tab < 0) continue;
-        const code = line[0];
-        const path = line.slice(tab + 1);
-        const status: Change["status"] = code === "A" ? "A" : code === "D" ? "D" : "M";
+      // Records come in pairs; a trailing empty token after the final NUL is ignored by the bound.
+      for (let i = 0; i + 1 < tokens.length; i += 2) {
+        const code = tokens[i];
+        const path = tokens[i + 1];
+        if (!code || !path) continue;
+        const status: Change["status"] = code[0] === "A" ? "A" : code[0] === "D" ? "D" : "M";
         changes.push({ path, status });
       }
       return changes;
