@@ -66,6 +66,16 @@ const REF_PATTERN = /^[0-9a-f]{7,64}$/i;
 const FS = "\x1f";
 
 /**
+ * Process-global, deterministic (no clock/random) counter for temp-index filenames. It is MODULE-level,
+ * not per-backend, on purpose: two `createGitBackend` instances pointed at the same git dir have
+ * SEPARATE `mutate` queues, so their snapshots can run concurrently — a per-instance counter would let
+ * both pick `tmp-index-<pid>-0` and clobber each other's staging. A module counter is unique across every
+ * instance in the process, and the `<pid>` prefix keeps it unique across processes. `x++` is synchronous,
+ * so each call reads a distinct value before any await.
+ */
+let TMP_INDEX_SEQ = 0;
+
+/**
  * A restore that started mutating the work tree and then failed leaves the tree
  * partially reverted, not clean. We surface that loudly rather than pretend success.
  */
@@ -235,11 +245,6 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
   const serial = createKeyedQueue<string>();
   const mutate = <T>(fn: () => Promise<T>): Promise<T> => serial(gitDir, fn);
 
-  // Monotonic, deterministic (no clock/random) suffix for per-call temp index files, so a snapshot's
-  // staging never collides with — or writes — the shared `index`. Serialized through `mutate`, so a
-  // plain closure counter is race-free within one backend instance.
-  let tmpIndexCounter = 0;
-
   return {
     // `async` (not a bare promise-returning fn) so any synchronous throw — e.g. validateRef on a
     // malformed ref — surfaces as a REJECTED promise, never a thrown exception the caller's
@@ -252,7 +257,7 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
       // pre-restore capture) depend on. A fresh empty temp index + `add -A` stages the whole work
       // tree — identical to the shared-index result, since `add -A` re-stages everything anyway. The
       // per-repo info/exclude still applies (it is index-independent), so excludes are honoured.
-      const tmpIndex = join(gitDir, `tmp-index-${process.pid}-${tmpIndexCounter++}`);
+      const tmpIndex = join(gitDir, `tmp-index-${process.pid}-${TMP_INDEX_SEQ++}`);
       const idxEnv = { GIT_INDEX_FILE: tmpIndex };
       try {
         const add = await run(["add", "-A"], idxEnv);
@@ -312,13 +317,23 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
 
       // Roll the work tree back to the captured pre-restore state, then classify the failure: a clean
       // rollback is a RestoreFailedError (tree is safe); a rollback that itself fails is the strictly
-      // worse RevertIndeterminateError (tree may be half-applied).
+      // worse RevertIndeterminateError (tree may be half-applied). The rollback is only "clean" if BOTH
+      // its read-tree AND its `clean -fd` succeed: if the second clean fails, untracked files created
+      // during the failed forward attempt may remain, so the tree still differs from pre-restore and we
+      // must NOT promise a clean rollback. (Limitation: empty directories are not part of a git tree, so
+      // an empty untracked dir removed by a forward `clean` cannot be recreated by the rollback — that
+      // state was never in `rollbackId` to begin with. This is git's tracked-tree model, not a rollback
+      // defect; state that matters must be a file.)
       const rollbackOrThrow = async (detail: string): Promise<never> => {
         if (rollbackId) {
           const back = await run(["read-tree", "-u", "--reset", rollbackId]);
           if (back.code === 0) {
-            await run(["clean", "-fd"]); // best-effort; the tree already matches rollbackId
-            throw new RestoreFailedError(id, detail);
+            const backClean = await run(["clean", "-fd"]);
+            if (backClean.code === 0) {
+              throw new RestoreFailedError(id, detail);
+            }
+            // read-tree restored tracked files, but cleanup of post-capture untracked files failed —
+            // the tree may still differ from pre-restore. That is indeterminate, not a clean rollback.
           }
         }
         throw new RevertIndeterminateError(id, detail);
