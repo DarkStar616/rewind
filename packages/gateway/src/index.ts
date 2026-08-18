@@ -38,6 +38,8 @@ export { billableSavedTokens } from "./billable.ts";
 export type { BillableSavings } from "./billable.ts";
 export { redactValue, redactedExportView, DEFAULT_REDACTORS, DROP } from "./redact.ts";
 export type { RedactFn, RedactContext } from "./redact.ts";
+export { reconcileAgainstProviderBill } from "./reconcile.ts";
+export type { ReconciliationReport, ProviderUsageFetcher } from "./reconcile.ts";
 export { analyzeTraffic, attestAnalysis } from "./analysis.ts";
 export type {
   AnalyzedCall,
