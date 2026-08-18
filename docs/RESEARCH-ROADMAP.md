@@ -69,8 +69,13 @@ tree-search cheap." Don't sell savings and accuracy as two features — sell the
 ## Part 2 — MORE ACCURACY (ranked)
 
 ### 1. AgentRewind-style selective rewind + failure-memory — **the big one** (this is the deferred BP2)
-- **Impact:** **+25.6pp** task success (62.2%→87.8%) on MettleBench; **+12.9pp** checklist progress;
-  generalizes to Terminal-Bench 2.0 (83.1% vs 78.7% Continue vs 70.8% Restart).
+- **Impact (quote HONESTLY — corrected by the 2026-08-18 prospect pass):** the headline **+25.6pp**
+  (62.2%→87.8% on MettleBench) is vs the *weakest* baseline (Continue). Vs the *strongest* baseline
+  (Restart-with-Experiences) it is **+10.2pp**, and on Terminal-Bench 2.0 it is **+4.4pp** (83.1% vs
+  78.7%). MettleBench is the authors' own 82-task benchmark on GPT-5.4. **Do not quote +25.6pp bare.**
+- **The real moat is COST, not just accuracy:** AgentRewind gets long-horizon recovery gains at **~1×
+  tokens** because rewind + replay replaces re-exploration — whereas tree-search (LATS) buys comparable
+  coding gains at **10–40× tokens**. That cost asymmetry is Rewind's defensible edge.
 - **Key design lesson:** naive environment-**reset restart can be WORSE than just continuing**;
   **selective** rewind-to-checkpoint (carrying the failure experience forward) beats both.
 - **Why cheap for us specifically:** it maps directly onto our whole-workspace checkpoint/rewind

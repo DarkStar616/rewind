@@ -1,62 +1,46 @@
 # deep-prospect log
 
-## 2026-08-18 — Rewind: prior art, reusable OSS, evidence, distribution
+## 2026-08-18 — harvest targets for Rewind's next levers (pruning · verified cache · tree-search · proxy interop)
 
-Grounding: Rewind = standalone TS SDK + stdio MCP server giving any coding agent (Claude Code/Cursor/
-Cline/Windsurf/Codex CLI) — later Claude.ai/ChatGPT web — git/CoW checkpoint+rewind + refuse-and-record
-effect barrier + tamper-evident hash chain; MVP TS-only; distribution/virality is the goal. Strategic
-synthesis lives in `POSITIONING.md`; this is the raw verified candidate log.
+Grounding: Rewind is TypeScript/Node 24; **exact-replay determinism is the sacred invariant**. Next
+levers (from `docs/RESEARCH-ROADMAP.md`): deterministic pruning (savings), verified off-path semantic
+cache (savings), tree-search/backtracking (accuracy). Three lanes (HF / GitHub / papers), all
+candidates verified against live APIs.
 
-### Competitors / prior art (GitHub — Lane B)
+### Ranked — worth harvesting or interoperating
 
-| Repo | What it does | Stars | Last push | License | Closeness |
-|---|---|---|---|---|---|
-| New1Direction/korg | Hash-chained signed ledger + replay/rewind of ledger AND workspace (`git read-tree`), MCP-callable | 4 | 2026-06 | MIT | Closest to CHAIN+REWIND half. **No effect barrier.** Rust. Watch it. |
-| SeanFDZ/agent-gate | Pre-exec authority gate at proposed→executed seam; vault-backup before destructive ops | 5 | 2026-03 | none | Closest to BARRIER half. **Not rewind-aware.** Python, no license. |
-| ThousandBirdsInc/chidori | Durable runtime; every side-effect a recorded host call → byte-identical replay, 0 LLM calls | 1362 | 2026-08 | Apache-2.0 | Effect-record/replay axis, not the barrier. Most mature. Rust core. |
-| khalilbalaree/Rewind-MCP | Checkpointing MCP server for Claude Code | 13 | 2025-08 | MIT | Checkpoint+rewind only. **NAME COLLISION.** |
-| nicobailon/pi-rewind-hook | Pi-agent file-state rewind via a git ref | 161 | 2026-07 | none | Checkpoint half. **NAME COLLISION** (most-starred). |
-| combinatrix-ai/PromptTrail.ts | TS: tools declare re-run-safety / idempotency key; gate refuses silent tools | 2 | 2026-07 | MIT | TS idempotency-declaration idiom ≈ our injected vocabulary. Good pattern ref. |
+| Candidate | Lane | What it is | Verified stats | Relevance / replay verdict |
+|---|---|---|---|---|
+| **SWE-Pruner** (Ayanami1314/swe-pruner; paper 2601.16746; model `ayanami-kitasan/code-pruner`) | B+A+C | 0.6B skimmer picks keep/drop LINES of tool output; **23–38% token cut, +1.2–1.4pp** resolve on SWE-bench Verified; syntax-preserving (87.3% AST-correct vs 0.29% LLMLingua) | 310★ · MIT · pushed 2026-06 · Python + PyPI + HF weights | Lever 1 model-based. **PRESERVES replay only if** the skim call+output is recorded (temp-0/Viterbi argmax, pinned precision). Heavier: a model in the path. **Port the selection algorithm; record the skim.** LATER slice. |
+| **opencode-dynamic-context-pruning (DCP)** | B | Rule-based: collapse superseded tool-call/result pairs, keep-latest, drop obsolete | **4,012★** · AGPL-3.0 · pushed 2026-08-16 · **TypeScript** | Lever 1 rule-based — **replay-safe BY CONSTRUCTION (no LLM)**. AGPL → reimplement clean. **Closest prior art to our first slice.** |
+| **tuanhung303/opencode-agent-context-pruning** | B | Rule-based latest-only tool-output prune, npm-published | 10★ · **MIT · TypeScript** · pushed 2026-02 | The one we could actually vendor/fork — clean license + TS. Rule-based → replay-safe. |
+| **Krites** (paper 2602.13165, ACM) | B+C | **Verified** semantic cache: async off-path judge promotes grey-zone matches; **triggering request NEVER served a near-hit**; +136–290% curated-served share, zero critical-path latency | Peer-reviewed · **no OSS impl** | Lever 2 — the design to build from the paper. PRESERVES replay if each cache decision is a recorded trace node. LATER slice (needs async judge). |
+| **Slipstream** (2605.08580; github chenzhuofu/slipstream) | C | Off-path judge validates a candidate context-compaction against the agent's next-k steps; **+8.8pp SWE-bench, −39.7% latency**; small (2–3B) judge suffices | Open source · Princeton | Best off-path-validation template for Lever 2. Record the adopt/reject decision. |
+| **Speculate-with-Memory** (2607.12236) | C | **Provably lossless** speculative pre-launch of side-effect-free calls during idle | Salesforce · no repo | Latency lever (not tokens). **Safest under exact-replay** — committed trace unchanged. Optional later. |
+| **LATS** (2310.04406; lapisrocks/LanguageAgentTreeSearch) | B+C | MCTS over agent trajectories; HumanEval +12.6pp (GPT-4), +26.9pp (GPT-3.5) — but **10–40× tokens** | 852★ · MIT · Python · stale (2024-07) | Lever 3. **A tree node = a Rewind checkpoint; backtrack = `rewind`.** LATS explicitly NEEDS env reversion — which we uniquely provide. Sell the substrate; port the search loop later. |
+| **Reflexion** (2303.11366; noahshinn/reflexion) | B+C | Verbal self-reflection carried across attempts; ~2–3× tokens | 3,233★ · MIT · Python | Our rewind-memory IS Reflexion-across-a-rewind. Validated pattern. |
+| **Portkey-AI/gateway** | B | Production AI gateway, plugin/hooks + cache modes | **12,757★ · MIT · TypeScript** · active | Lever 4 — highest-value interop (TS+MIT). Rewind owns the record/replay boundary; treat its cache hit as a recorded substitution. |
+| **Helicone**, **LiteLLM** | B | Proxy + observability / dominant OpenAI-format proxy | 6k★ Apache TS · 56k★ Python | Interop/learn-from. Be wire-compatible so Rewind drops into existing stacks. |
+| **nebius/SWE-agent-trajectories**, **SWE-bench Verified**, **terminal-bench** | A | 80k real agent trajectories; the 500-instance gold eval; terminal-agent bench | CC-BY / MIT · high downloads | The benchmark + test corpus to MEASURE pruning token-cut and rewind accuracy. Inert data → zero replay risk. |
+| **swe-pruner-pro-training-corpus** | A | 22,609 line-level keep/prune annotations | 210 dl · Apache-2.0 | Training data to build OUR OWN deterministic skimmer (we control precision) if we go model-based. |
 
-Framework-level "unsolved" validation (not repos): **microsoft/agent-framework #3938** (checkpoint
-retry re-sends `send_email`), **pydantic-ai #7247** (asks for first-class checkpoint/rewind). Best
-"incumbents know the problem, haven't solved it" citations.
-
-Academic (Lane C): **ACRFence** (arxiv:2603.20625) — the effect-barrier thesis formalized, closest
-prior art. **AgentRewind** (arxiv:2608.14380) — recoverable execution, 30% vs 8% recovery.
-**DeltaBox/Crab/Shepherd/ChronoMem/DART/GA-Rollback** — reversibility space is crowded.
-Shipped-OSS competitor: **rune0-dev/agent-ledger** (PyPI) — idempotency+replay+intent-bound approvals.
-
-### Reusable building blocks (GitHub — Lane B)
-
-| Package | Take | Stars / last / license | Verdict |
-|---|---|---|---|
-| @reflink/reflink (npm) | Node CoW reflink (APFS/btrfs/XFS/ReFS), pnpm-maintained | 27★ / 2024-12 / MIT | **IMPORT.** Only clean fit. Pin version, add ext4 fallback + capability detect. |
-| New1Direction/korg | HLC causal ordering, `git read-tree` restore-on-rewind pattern | 4★ / MIT | LEARN-FROM (Rust). |
-| SeanFDZ/agent-gate | proposed→executed gate seam, literal-only enforcement, identity binding | 5★ / none | LEARN-FROM (don't vendor — no license). |
-| ThousandBirdsInc/chidori | "every side effect a recorded host call" → deterministic replay | 1362★ / Apache-2.0 | LEARN-FROM (Rust core). |
-| combinatrix-ai/PromptTrail.ts | TS idempotency-key declaration idiom | 2★ / MIT | LEARN-FROM (cherry-pick). |
-
-### Datasets / evidence (HuggingFace — Lane A)
-
-| Dataset | What | Verified stats | Relevance |
-|---|---|---|---|
-| Anonymousblind/agent-failure-dynamics (AgentHazard) | Coding-agent trajectories, edit-level error labels, stopping rules | 85,050 traj; cc-by-4.0; upd 2026-07 | Strongest match: "agents make bad edits, need rollback." Anonymous → cite cautiously. |
-| SWE-bench/SWE-bench_Verified | De-facto coding-agent benchmark, human-validated | 500 tasks; 92,633 dl | Demo venue + credibility; measure token/accuracy delta here. |
-| SWE-bench/SWE-smith-trajectories | Coding-agent execution trajectories | ~76k rows; **MIT** | Clean replay fuel (redistributable). |
-| obaydata/mcp-agent-trajectory-benchmark | MCP agent trajectories, full tool traces | 49 traj; apache-2.0 | Only MCP-native trace set; small but on-format. |
-| GXCafe/ai-agent-failure-logs | Real production silent-failure records | 3,518 records; cc-by-4.0 | "Agents fail silently" narrative color (JP back-office, not code). |
+### The two cross-cutting findings
+1. **Rule-based tool-output pruning is deterministic and replay-safe by construction** (DCP/ACP): drop
+   byte-identical/superseded tool outputs, no model. This is the highest impact-÷-cost, lowest-risk next
+   slice for a TS replay-invariant system. Model-based SWE-Pruner is a heavier later slice.
+2. **No existing proxy does byte-exact record/replay** (LiteLLM/Portkey/Helicone all cache on content
+   similarity). **That is Rewind's defensible moat.** Best interop: be OpenAI/Anthropic-wire-compatible.
 
 ### Checked, didn't hold up
-- HF: solsticestudioai/agent-failure-atlas-benchmark ("Synthetic Smoke Set"), Maitreyajayaraj/… (10 dl),
-  orlando23/failed_agent_trajectory (mobile-UI), xwang2775/long-horizon-agent-failures (NO license),
-  diyuxiaoyemao & ClarusC64 rollback sets (stubs). No HF dataset measures "reversibility saves tokens."
-- GitHub: LangGraph "time-travel" debugger cluster (in-memory state, not FS workspace, all near-0★);
-  adi-suresh01/rewind (agent memory, name collision); nicokoch/reflink (Rust), KarpelesLab/reflink (Go)
-  — wrong language; kiro-mcp-checkpoint / agentcheckpoint / AgentKernel (0★ thin experiments).
+- **TweakLLM** (2507.23674): the OPPOSITE of Krites — synchronous, on-path, rewrites+serves the near-hit
+  to the triggering request → corrupts code, threatens replay. Single unreplicated student preprint with
+  soft metrics. **AVOID.**
+- **GPTCache** (8k★ MIT): serves near-hits VERBATIM (the anti-pattern). Harvest the architecture, not the
+  behavior. **RouteLLM**: cost-router, not caching/replay, stale. **llm-d**: K8s inference infra, wrong
+  layer. Various `*/semantic-cache-llm` demos: 0–4★, unlicensed, verbatim near-hit serving — vaporware.
+- **orca-zhang/code-pruner-onnx**, unlicensed HF cache datasets: stubs / no license.
 
-### Distribution mechanics (Lane D) — see POSITIONING.md §5 for the full plan
-One core + two transports (stdio = full local moat across 5 agents; remote Streamable-HTTP = both webs,
-barrier/audit half only). MVP distribution: npm stdio bin + two config snippets + a Claude Code plugin
-(only surface that auto-wires the `PreToolUse` barrier) + "Add to Cursor" deeplink. Defer web
-connectors + directories. Virality driver: killer demo + `npx`/one-click friction, not registry rank.
+### Decision
+Build the **deterministic rule-based tool-output pruner** first (pure TS, no model, replay-safe by
+construction). Defer model-based SWE-Pruner, Krites verified-cache, and a LATS controller as later,
+heavier slices — each validated here as real, with a clear harvest path.
