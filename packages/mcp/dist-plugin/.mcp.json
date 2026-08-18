@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "rewind": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@rewind/mcp", "mcp"]
+    }
+  }
+}
