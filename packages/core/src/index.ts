@@ -34,3 +34,11 @@ export { refId } from "./world/world-backend.ts";
 export type { WorldBackend, WorldRef, RestoreResult, Change } from "./world/world-backend.ts";
 export { createMemoryReplaySavings } from "./replay/replay-savings.ts";
 export type { ReplaySavingsSink, ReplaySaving, ReplaySavingsTotal } from "./replay/replay-savings.ts";
+export { createEngine } from "./engine.ts";
+export type {
+  Engine,
+  EngineOptions,
+  RewindResult,
+  ReplayResult,
+  RefusableEffect,
+} from "./engine.ts";
