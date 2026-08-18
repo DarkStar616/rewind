@@ -17,3 +17,10 @@ export type {
   ReplayOutcomeReplay,
   ReplayOutcomeLive,
 } from "./replay.ts";
+export {
+  avoidedCostMicros,
+  meterAvoidance,
+  totalUsageTokens,
+  DEFAULT_PRICE_TABLE,
+} from "./meter.ts";
+export type { PriceTable, ComponentRates, MeteredAvoidance } from "./meter.ts";

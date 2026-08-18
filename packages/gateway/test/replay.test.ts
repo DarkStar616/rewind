@@ -36,6 +36,18 @@ function recordedCall(): RecordedCall {
   };
 }
 
+// A fixed price table (µUSD per 1e6 tokens) so the booked cost is hand-checkable and independent of
+// whatever the shipped DEFAULT table's list prices are on any given day.
+const TEST_PRICES = {
+  version: "test",
+  currency: "USD" as const,
+  rates: {
+    "claude-opus-4-8": { input: 1_000_000, output: 5_000_000, cacheWrite: 1_250_000, cacheRead: 100_000 },
+  },
+};
+// recordedCall @ TEST_PRICES: (1000·1M + 200·5M + 300·1.25M + 5000·0.1M)/1e6 = 2875 µUSD.
+const RECORDED_CALL_COST = 2875;
+
 test("a miss reports served:'live' and books NO savings", () => {
   const store = createMemoryRecordStore();
   const savings = createMemoryReplaySavings();
@@ -53,7 +65,7 @@ test("a miss reports served:'live' and books NO savings", () => {
 test("a hit serves the recorded response and books tokensAvoided = recorded total", () => {
   const store = createMemoryRecordStore();
   const savings = createMemoryReplaySavings();
-  const replayer = createReplayer(store, savings);
+  const replayer = createReplayer(store, savings, { priceTable: TEST_PRICES });
 
   const body = requestBody();
   const call = recordedCall();
@@ -64,14 +76,14 @@ test("a hit serves the recorded response and books tokensAvoided = recorded tota
   assert.equal(outcome.served, "replay");
   assert.equal(outcome.keyed, canonicalizeRequest(body));
   assert.deepEqual(outcome.served === "replay" ? outcome.response : undefined, call.response);
-  // 1000 + 200 + 5000 + 300 = 6500 tokens avoided; scoped total reflects exactly that.
-  assert.deepEqual(savings.total("scope-a"), { tokens: 6500, costMicros: 0 });
+  // 1000 + 200 + 5000 + 300 = 6500 tokens avoided; cost is the whole avoided call priced per-component.
+  assert.deepEqual(savings.total("scope-a"), { tokens: 6500, costMicros: RECORDED_CALL_COST });
 });
 
 test("re-serving the SAME request in a scope does not double-count (content-addressed callId)", () => {
   const store = createMemoryRecordStore();
   const savings = createMemoryReplaySavings();
-  const replayer = createReplayer(store, savings);
+  const replayer = createReplayer(store, savings, { priceTable: TEST_PRICES });
 
   const body = requestBody();
   store.put({ scope: "scope-a", replayKey: canonicalizeRequest(body) }, recordedCall());
@@ -79,7 +91,7 @@ test("re-serving the SAME request in a scope does not double-count (content-addr
   replayer.handle("scope-a", body);
   replayer.handle("scope-a", body);
 
-  assert.deepEqual(savings.total("scope-a"), { tokens: 6500, costMicros: 0 });
+  assert.deepEqual(savings.total("scope-a"), { tokens: 6500, costMicros: RECORDED_CALL_COST });
 });
 
 test("cross-scope NEVER serves: a record in scope-a is a miss for scope-b", () => {
@@ -109,12 +121,12 @@ test("strict mode HARD-FAILS on a miss instead of silently paying", () => {
 test("strict mode still serves a hit normally", () => {
   const store = createMemoryRecordStore();
   const savings = createMemoryReplaySavings();
-  const replayer = createReplayer(store, savings, { strict: true });
+  const replayer = createReplayer(store, savings, { strict: true, priceTable: TEST_PRICES });
 
   const body = requestBody();
   store.put({ scope: "scope-a", replayKey: canonicalizeRequest(body) }, recordedCall());
 
   const outcome = replayer.handle("scope-a", body);
   assert.equal(outcome.served, "replay");
-  assert.deepEqual(savings.total("scope-a"), { tokens: 6500, costMicros: 0 });
+  assert.deepEqual(savings.total("scope-a"), { tokens: 6500, costMicros: RECORDED_CALL_COST });
 });
