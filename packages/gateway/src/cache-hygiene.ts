@@ -36,6 +36,10 @@ export interface CacheHygieneReport {
 
 // High-confidence "this is per-request dynamic content" patterns. Tuned to avoid flagging static text.
 const ISO_DATETIME = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
+// A bare ISO date (no time). Agents VERY commonly inject "Today's date is 2026-08-18" into the system
+// prompt, which changes daily and forfeits the cache — a false negative we must not miss. The false
+// positive (a static date mentioned in content) only costs a spurious advisory, so we accept it.
+const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/;
 const UUID = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
 // Epoch seconds (10 digits, ~2001-2033) or ms (13 digits) starting with 1 — narrow to cut false positives.
 const EPOCH = /\b1\d{9}(\d{3})?\b/;
@@ -47,8 +51,8 @@ function truncate(s: string, n = 40): string {
 
 /** Test a string for the first dynamic-content pattern it matches; push at most one issue per string. */
 function checkString(value: string, path: string, issues: HygieneIssue[]): void {
-  if (ISO_DATETIME.test(value)) {
-    issues.push({ path, reason: "timestamp", detail: `contains an ISO timestamp ('${truncate(value)}')` });
+  if (ISO_DATETIME.test(value) || ISO_DATE.test(value)) {
+    issues.push({ path, reason: "timestamp", detail: `contains an ISO date/time ('${truncate(value)}')` });
   } else if (UUID.test(value)) {
     issues.push({ path, reason: "uuid", detail: `contains a UUID ('${truncate(value)}')` });
   } else if (EPOCH.test(value)) {

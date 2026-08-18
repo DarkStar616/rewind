@@ -303,8 +303,13 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
       },
     },
     async (args) => {
-      // Record the abandoned branch's lesson AGAINST the checkpoint we return to, so a future
-      // re-attempt from it sees what already failed. seq is monotonic per scope (dedup key).
+      // Rewind FIRST. engine.rewind validates the checkpoint id and refuses an unknown one BEFORE
+      // touching the tree, so an invalid id throws here and NO note is recorded — the attempt log is
+      // never polluted with a lesson tied to a checkpoint that does not exist. (Surfaces spent effects
+      // now refusable on replay, too.)
+      const result = await engine.rewind(args.checkpointId);
+      // Only after a successful rewind, record the abandoned branch's lesson AGAINST the checkpoint we
+      // returned to, so a future re-attempt from it sees what already failed. seq is monotonic per scope.
       const existing = rewindMemory.all(RECOVERY_SCOPE);
       const nextSeq = existing.length === 0 ? 0 : Math.max(...existing.map((a) => a.seq)) + 1;
       rewindMemory.record({
@@ -316,8 +321,6 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
         note: args.note,
         at: nowMs(),
       });
-      // Then selectively rewind the world (also surfaces spent effects now refusable on replay).
-      const result = await engine.rewind(args.checkpointId);
       const carriedMemory = memoryForCheckpoint(rewindMemory, RECOVERY_SCOPE, args.checkpointId).map(publicAttempt);
       const refusedEffects = result.refusableEffects.map((e) => ({
         effectKey: e.effectKey,

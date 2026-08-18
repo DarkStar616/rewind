@@ -41,6 +41,16 @@ test("an ISO timestamp in the system prompt is a prefix poisoner", () => {
   assert.match(r.recommendation, /dynamic content/i);
 });
 
+test("a bare injected date (no time) in the system prompt is flagged — the common 'today is' case", () => {
+  const r = analyzeCacheHygiene({
+    model: "m",
+    system: "You are a helpful assistant. Today's date is 2026-08-18.",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  assert.equal(r.cacheable, false);
+  assert.equal(r.prefixPoisoners[0].reason, "timestamp");
+});
+
 test("a UUID in a tool description is flagged", () => {
   const r = analyzeCacheHygiene({
     model: "m",
