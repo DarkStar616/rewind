@@ -25,10 +25,25 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { EFFECT_EMITTED, GENESIS_HASH } from "@rewind/core";
+import {
+  EFFECT_EMITTED,
+  GENESIS_HASH,
+  backtrackCandidates,
+  memoryForCheckpoint,
+  recommendedCheckpoint,
+  type AttemptRecord,
+} from "@rewind/core";
 import type { ExternalEffect } from "@rewind/core";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { buildSavingsReceipt } from "./savings.ts";
+
+/** The default recovery scope for the workspace (one attempt log per workspace in the MVP). */
+const RECOVERY_SCOPE = "workspace";
+
+/** Now in epoch ms — supplied by the durable adapter (the pure recovery core never reads a clock). */
+function nowMs(): number {
+  return Date.now();
+}
 
 const TIER0_HONESTY = "Tier 0 is REVERSIBILITY, not isolation or security.";
 
@@ -53,8 +68,25 @@ function ok(structured: Record<string, unknown>): {
  * pair in tests).
  */
 export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
-  const { engine, store } = buildAdapterEngine(opts.cwd, opts.log);
+  const { engine, store, rewindMemory } = buildAdapterEngine(opts.cwd, opts.log);
   const server = new McpServer({ name: "rewind", version: "0.0.0" });
+
+  const attemptShape = z.object({
+    seq: z.number(),
+    checkpointId: z.string(),
+    goal: z.string(),
+    outcome: z.enum(["failure", "success", "abandoned"]),
+    note: z.string(),
+    at: z.number(),
+  });
+  const publicAttempt = (a: AttemptRecord) => ({
+    seq: a.seq,
+    checkpointId: a.checkpointId,
+    goal: a.goal,
+    outcome: a.outcome,
+    note: a.note,
+    at: a.at,
+  });
 
   // ── checkpoint ────────────────────────────────────────────────────────────────────────────────
   server.registerTool(
@@ -209,6 +241,90 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
       // Same core receipt the CLI prints (one engine, thin adapters): read the deduped savings total.
       const receipt = buildSavingsReceipt(engine.savings(args.scope), { window: args.since });
       return ok({ ...receipt });
+    },
+  );
+
+  // ── backtrack_candidates (recovery / accuracy) ───────────────────────────────────────────────────
+  server.registerTool(
+    "backtrack_candidates",
+    {
+      description:
+        `List the checkpoints you could selectively rewind to, NEWEST FIRST, each annotated with the ` +
+        `failures already recorded from it (the memory a re-attempt would inherit). 'recommended' is the ` +
+        `most-recent FAILING checkpoint — rewind to just before the work that keeps failing, not a full ` +
+        `restart. Pair with backtrack_commit. ${TIER0_HONESTY}`,
+      inputSchema: {},
+      outputSchema: {
+        candidates: z.array(
+          z.object({
+            checkpointId: z.string(),
+            label: z.string(),
+            ts: z.number(),
+            priorFailures: z.array(attemptShape),
+          }),
+        ),
+        recommended: z.string().optional(),
+      },
+    },
+    async () => {
+      const checkpoints = await engine.list();
+      const cands = backtrackCandidates(checkpoints, rewindMemory, RECOVERY_SCOPE);
+      const recommended = recommendedCheckpoint(cands)?.checkpointId;
+      const candidates = cands.map((c) => ({
+        checkpointId: c.checkpointId,
+        label: c.label,
+        ts: c.ts,
+        priorFailures: c.priorFailures.map(publicAttempt),
+      }));
+      return ok(recommended === undefined ? { candidates } : { candidates, recommended });
+    },
+  );
+
+  // ── backtrack_commit (recovery / accuracy) ───────────────────────────────────────────────────────
+  server.registerTool(
+    "backtrack_commit",
+    {
+      description:
+        `Selectively rewind the workspace to a checkpoint AND carry the failure forward. REQUIRES a ` +
+        `non-empty 'note' saying why the current branch is being abandoned — that note is what makes the ` +
+        `re-attempt smarter (this is the measured accuracy mechanism, not just undo). Returns the ` +
+        `accumulated failure memory for that checkpoint to inject into your next attempt. ${TIER0_HONESTY}`,
+      inputSchema: {
+        checkpointId: z.string(),
+        note: z.string().min(1, "a backtrack requires a non-empty note (the carried-forward lesson)"),
+        goal: z.string().optional(),
+      },
+      outputSchema: {
+        rewoundTo: z.string(),
+        carriedMemory: z.array(attemptShape),
+        refusedEffects: z.array(
+          z.object({ effectKey: z.string(), scopeLabel: z.string(), firstEmittedSeq: z.number() }),
+        ),
+      },
+    },
+    async (args) => {
+      // Record the abandoned branch's lesson AGAINST the checkpoint we return to, so a future
+      // re-attempt from it sees what already failed. seq is monotonic per scope (dedup key).
+      const existing = rewindMemory.all(RECOVERY_SCOPE);
+      const nextSeq = existing.length === 0 ? 0 : Math.max(...existing.map((a) => a.seq)) + 1;
+      rewindMemory.record({
+        seq: nextSeq,
+        scope: RECOVERY_SCOPE,
+        checkpointId: args.checkpointId,
+        goal: args.goal ?? "abandoned branch",
+        outcome: "abandoned",
+        note: args.note,
+        at: nowMs(),
+      });
+      // Then selectively rewind the world (also surfaces spent effects now refusable on replay).
+      const result = await engine.rewind(args.checkpointId);
+      const carriedMemory = memoryForCheckpoint(rewindMemory, RECOVERY_SCOPE, args.checkpointId).map(publicAttempt);
+      const refusedEffects = result.refusableEffects.map((e) => ({
+        effectKey: e.effectKey,
+        scopeLabel: e.scopeLabel,
+        firstEmittedSeq: e.firstEmittedSeq,
+      }));
+      return ok({ rewoundTo: result.restoredTo, carriedMemory, refusedEffects });
     },
   );
 

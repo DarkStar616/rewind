@@ -16,9 +16,16 @@ import {
   EFFECT_EMITTED,
   EFFECT_REPLAY_REFUSED,
 } from "@rewind/core";
-import type { Engine, EvidenceLedger, ReplaySavingsSink, WorldBackend } from "@rewind/core";
+import type {
+  Engine,
+  EvidenceLedger,
+  ReplaySavingsSink,
+  RewindMemoryStore,
+  WorldBackend,
+} from "@rewind/core";
 import { createFileEvidenceLedger } from "./store.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
+import { createFileRewindMemory } from "./durable-rewind-memory.ts";
 
 export interface AdapterEngine {
   engine: Engine;
@@ -26,8 +33,10 @@ export interface AdapterEngine {
   store: EvidenceLedger;
   /** The Tier-0 git backend the snapshots live in. */
   backend: WorldBackend;
-  /** The (process-lifetime) replay-savings sink. */
+  /** The durable replay-savings sink (shared with the gateway via .rewind/savings.json). */
   savings: ReplaySavingsSink;
+  /** The durable rewind-memory (attempt log) — the accuracy engine's failure memory. */
+  rewindMemory: RewindMemoryStore;
 }
 
 /**
@@ -46,6 +55,9 @@ export function buildAdapterEngine(workdir: string, log?: (message: string) => v
   // `rewind gateway` proxy books savings here, and a separate `rewind savings` invocation reads the
   // same file. Dedup-by-callId is preserved, so the total never double-counts.
   const savings = createFileReplaySavings({ path: join(rewindDir, "savings.json") });
+  // Durable attempt log for the recovery engine — a failure recorded in one process is seen by a
+  // later re-attempt from the same checkpoint (the AgentRewind accuracy mechanism).
+  const rewindMemory = createFileRewindMemory({ path: join(rewindDir, "rewind-memory.json") });
   const engine = createEngine({ cwd: workdir, store, backend, savings });
-  return { engine, store, backend, savings };
+  return { engine, store, backend, savings, rewindMemory };
 }

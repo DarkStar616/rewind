@@ -36,7 +36,16 @@ test("MCP server exposes the five MVP tools plus the Slice 1.5 savings receipt",
     try {
       const { tools } = await client.listTools();
       const names = tools.map((t) => t.name).sort();
-      assert.deepEqual(names, ["checkpoint", "guard_effect", "list", "replay", "rewind", "savings"]);
+      assert.deepEqual(names, [
+        "backtrack_candidates",
+        "backtrack_commit",
+        "checkpoint",
+        "guard_effect",
+        "list",
+        "replay",
+        "rewind",
+        "savings",
+      ]);
       // The honesty line (Tier-0 = reversibility, not isolation) must ride on the tool descriptions.
       const rewindTool = tools.find((t) => t.name === "rewind");
       assert.ok(rewindTool?.description && /reversibility/i.test(rewindTool.description));
