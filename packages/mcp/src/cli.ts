@@ -8,7 +8,8 @@
  * repo (git's own store) and the evidence chain (store.ts) — so nothing is held in process memory
  * between invocations; each subcommand is a fresh, stateless process keyed by the handles it is given.
  *
- * Subcommands: checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | savings [scope] | mcp
+ * Subcommands: checkpoint [label] | list | rewind <id> | replay <id> | guard <json> |
+ *              savings [--scope <id>] [--since <window>] [--json] | mcp
  *
  * Honesty (CLAUDE.md / product brief): Tier 0 is REVERSIBILITY, not isolation or security. `guard`
  * refuses replaying a spent effect across a rewind and records the refusal on the tamper-evident
@@ -19,9 +20,11 @@ import { argv, cwd, exit } from "node:process";
 import type { Engine, ExternalEffect } from "@rewind/core";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { runStdioServer } from "./server.ts";
+import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts";
 
 const USAGE =
-  "usage: rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | savings [scope] | mcp>";
+  "usage: rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
+  "savings [--scope <id>] [--since <window>] [--json] | mcp>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -31,6 +34,23 @@ function out(value: unknown): void {
 /** A diagnostic line to stderr (never mixed into the machine-readable stdout stream). */
 function errline(message: string): void {
   writeSync(2, `rewind: ${message}\n`);
+}
+
+/** Parse the `savings` subcommand flags: `--scope <id>`, `--since <window>`, `--json` (order-free). */
+function parseSavingsFlags(args: readonly string[]): { scope?: string; since?: string; json: boolean } {
+  let scope: string | undefined;
+  let since: string | undefined;
+  let json = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--json") json = true;
+    else if (a === "--scope") scope = args[++i];
+    else if (a === "--since") since = args[++i];
+    else if (a.startsWith("--scope=")) scope = a.slice("--scope=".length);
+    else if (a.startsWith("--since=")) since = a.slice("--since=".length);
+    else if (scope === undefined && !a.startsWith("-")) scope = a; // tolerate a bare positional scope
+  }
+  return { scope, since, json };
 }
 
 function buildEngine(workdir: string): Engine {
@@ -83,7 +103,18 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       return outcome.refused ? 2 : 0;
     }
     case "savings": {
-      out(engine.savings(rest[0]));
+      const flags = parseSavingsFlags(rest);
+      const receipt = buildSavingsReceipt(engine.savings(flags.scope), { window: flags.since });
+      if (flags.json) {
+        out(receipt);
+        return 0;
+      }
+      // Human, shareable line. The cost figure is a marked estimate (the `~`), never a bill.
+      writeSync(1, `${formatReceiptLine(receipt)}\n`);
+      // The single upsell ask — only once cumulative LIFETIME savings (across all scopes) cross the
+      // threshold; nothing else in the free, local product asks for an account.
+      const upsell = upsellLine(engine.savings().tokens);
+      if (upsell) writeSync(1, `${upsell}\n`);
       return 0;
     }
     case "mcp": {

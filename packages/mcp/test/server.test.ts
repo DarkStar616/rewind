@@ -28,7 +28,7 @@ async function connect(cwd: string): Promise<{ client: Client; close: () => Prom
   };
 }
 
-test("MCP server exposes exactly the five rewind tools", async () => {
+test("MCP server exposes the five MVP tools plus the Slice 1.5 savings receipt", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-mcp-"));
   try {
     await writeFile(join(dir, "a.txt"), "original");
@@ -36,7 +36,7 @@ test("MCP server exposes exactly the five rewind tools", async () => {
     try {
       const { tools } = await client.listTools();
       const names = tools.map((t) => t.name).sort();
-      assert.deepEqual(names, ["checkpoint", "guard_effect", "list", "replay", "rewind"]);
+      assert.deepEqual(names, ["checkpoint", "guard_effect", "list", "replay", "rewind", "savings"]);
       // The honesty line (Tier-0 = reversibility, not isolation) must ride on the tool descriptions.
       const rewindTool = tools.find((t) => t.name === "rewind");
       assert.ok(rewindTool?.description && /reversibility/i.test(rewindTool.description));

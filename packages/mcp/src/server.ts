@@ -8,6 +8,9 @@
  *   rewind {id}                -> { revertedTo, refusedEffects[] }
  *   replay {id}                -> { steps, tokensAvoided, costAvoided }
  *   guard_effect {descriptor}  -> { decision, reason, chainHash }
+ *   savings {scope?, since?}   -> { tokensSaved, costSaved, currency, window, breakdown }
+ *
+ * (checkpoint/list/rewind/replay/guard_effect are the MVP five; `savings` is the Slice 1.5 receipt.)
  *
  * MCP stateless-core rule (CLAUDE.md): no per-connection / per-session state. Every stateful tool
  * mints or takes back an explicit handle, and ALL durable state lives in the substrate — the git
@@ -25,6 +28,7 @@ import { z } from "zod";
 import { EFFECT_EMITTED, GENESIS_HASH } from "@rewind/core";
 import type { ExternalEffect } from "@rewind/core";
 import { buildAdapterEngine } from "./build-engine.ts";
+import { buildSavingsReceipt } from "./savings.ts";
 
 const TIER0_HONESTY = "Tier 0 is REVERSIBILITY, not isolation or security.";
 
@@ -180,6 +184,31 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
         reason: `effect ${effect.effectKey} admitted and recorded on the tamper-evident chain`,
         chainHash,
       });
+    },
+  );
+
+  // ── savings (Slice 1.5 honest receipt) ──────────────────────────────────────────────────────────
+  server.registerTool(
+    "savings",
+    {
+      description:
+        `Report the honest token/cost savings: ONLY re-spend that was provably avoided (replay ` +
+        `cache-hits, deduped by call id), never a whole rewound run, wall-clock, or the provider's own ` +
+        `prompt-cache discount. Cost is a marked ESTIMATE from a per-model rate table, not a bill. ${TIER0_HONESTY}`,
+      inputSchema: { scope: z.string().optional(), since: z.string().optional() },
+      outputSchema: {
+        tokensSaved: z.number(),
+        costSaved: z.number(),
+        currency: z.literal("USD"),
+        window: z.string(),
+        breakdown: z.object({ replayHits: z.number(), rewindAvoided: z.number() }),
+        estimate: z.literal(true),
+      },
+    },
+    async (args) => {
+      // Same core receipt the CLI prints (one engine, thin adapters): read the deduped savings total.
+      const receipt = buildSavingsReceipt(engine.savings(args.scope), { window: args.since });
+      return ok({ ...receipt });
     },
   );
 
