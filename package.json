@@ -1,0 +1,8 @@
+{
+  "name": "rewind-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "engines": { "node": ">=24.15.0" },
+  "scripts": { "test": "node --test packages/*/test/*.test.ts" }
+}
