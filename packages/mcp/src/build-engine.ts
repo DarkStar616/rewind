@@ -13,12 +13,12 @@ import { join } from "node:path";
 import {
   createEngine,
   createGitBackend,
-  createMemoryReplaySavings,
   EFFECT_EMITTED,
   EFFECT_REPLAY_REFUSED,
 } from "@rewind/core";
 import type { Engine, EvidenceLedger, ReplaySavingsSink, WorldBackend } from "@rewind/core";
 import { createFileEvidenceLedger } from "./store.ts";
+import { createFileReplaySavings } from "./durable-savings.ts";
 
 export interface AdapterEngine {
   engine: Engine;
@@ -42,9 +42,10 @@ export function buildAdapterEngine(workdir: string, log?: (message: string) => v
     path: join(rewindDir, "evidence.json"),
     vocabulary: [EFFECT_EMITTED, EFFECT_REPLAY_REFUSED],
   });
-  // Savings accounting is in-memory for the local adapters; the durable honest-metering receipt is a
-  // later slice. `replay`/`savings` therefore report the current process's recorded savings only.
-  const savings = createMemoryReplaySavings();
+  // Savings persist to disk under `.rewind/` so they survive across processes: the long-lived
+  // `rewind gateway` proxy books savings here, and a separate `rewind savings` invocation reads the
+  // same file. Dedup-by-callId is preserved, so the total never double-counts.
+  const savings = createFileReplaySavings({ path: join(rewindDir, "savings.json") });
   const engine = createEngine({ cwd: workdir, store, backend, savings });
   return { engine, store, backend, savings };
 }

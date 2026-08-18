@@ -16,15 +16,21 @@
  * chain; a refusal exits 2 so a PreToolUse hook can BLOCK the offending tool call.
  */
 import { writeSync } from "node:fs";
+import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 import type { Engine, ExternalEffect } from "@rewind/core";
+import { createMemoryRecordStore, createReplayer, startProxy } from "@rewind/gateway";
 import { buildAdapterEngine } from "./build-engine.ts";
+import { createFileReplaySavings } from "./durable-savings.ts";
 import { runStdioServer } from "./server.ts";
 import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts";
 
 const USAGE =
   "usage: rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
-  "savings [--scope <id>] [--since <window>] [--json] | mcp>";
+  "savings [--scope <id>] [--since <window>] [--json] | gateway [--port <n>] [--upstream <url>] | mcp>";
+
+const DEFAULT_GATEWAY_PORT = 8788;
+const DEFAULT_UPSTREAM = "https://api.anthropic.com";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -51,6 +57,20 @@ function parseSavingsFlags(args: readonly string[]): { scope?: string; since?: s
     else if (scope === undefined && !a.startsWith("-")) scope = a; // tolerate a bare positional scope
   }
   return { scope, since, json };
+}
+
+/** Parse the `gateway` subcommand flags: `--port <n>`, `--upstream <url>` (order-free). */
+function parseGatewayFlags(args: readonly string[]): { port: number; upstream: string } {
+  let port = DEFAULT_GATEWAY_PORT;
+  let upstream = DEFAULT_UPSTREAM;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--port") port = Number(args[++i]);
+    else if (a.startsWith("--port=")) port = Number(a.slice("--port=".length));
+    else if (a === "--upstream") upstream = args[++i];
+    else if (a.startsWith("--upstream=")) upstream = a.slice("--upstream=".length);
+  }
+  return { port, upstream };
 }
 
 function buildEngine(workdir: string): Engine {
@@ -115,6 +135,34 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       // threshold; nothing else in the free, local product asks for an account.
       const upsell = upsellLine(engine.savings().tokens);
       if (upsell) writeSync(1, `${upsell}\n`);
+      return 0;
+    }
+    case "gateway": {
+      // The token-saving proxy. Point your agent's ANTHROPIC_BASE_URL at it: a byte-equivalent
+      // request after a rewind is served from the record with zero upstream call, and the avoided
+      // cost is booked to the SAME durable savings file `rewind savings` reads. Records live in
+      // memory for this gateway session; the savings number persists across processes.
+      const { port, upstream } = parseGatewayFlags(rest);
+      if (!Number.isInteger(port) || port < 0 || port > 65535) {
+        errline(`gateway: --port must be an integer 0-65535, got ${JSON.stringify(port)}`);
+        return 1;
+      }
+      const savings = createFileReplaySavings({ path: join(cwd(), ".rewind", "savings.json") });
+      const store = createMemoryRecordStore();
+      const replayer = createReplayer(store, savings);
+      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, log: (m) => errline(m) });
+      errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
+      errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
+      errline("replays after a rewind cost 0 upstream tokens; run `rewind savings` to see the total. Ctrl-C to stop.");
+      // Stay alive serving requests until a termination signal; close the listener cleanly then exit.
+      await new Promise<void>((resolve) => {
+        const stop = () => {
+          errline("rewind gateway shutting down");
+          void proxy.close().then(resolve, resolve);
+        };
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      });
       return 0;
     }
     case "mcp": {

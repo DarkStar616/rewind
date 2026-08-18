@@ -6,6 +6,7 @@
   "bin": { "rewind": "./src/cli.ts" },
   "dependencies": {
     "@rewind/core": "0.0.0",
+    "@rewind/gateway": "0.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
   }
