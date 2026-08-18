@@ -83,6 +83,26 @@ export class RevertIndeterminateError extends Error {
   }
 }
 
+/**
+ * A restore that failed mid-flight but was successfully ROLLED BACK: the work tree is exactly as it was
+ * before the restore was attempted — safe, not indeterminate. This is the good failure: the caller can
+ * retry or investigate without fear of a half-applied tree. `RevertIndeterminateError` is reserved for
+ * the strictly worse case where even the rollback failed.
+ */
+export class RestoreFailedError extends Error {
+  readonly ref: string;
+  readonly detail: string;
+  constructor(ref: string, detail: string) {
+    super(
+      `rewind git-backend: restore to ${ref} failed (${detail}); the work tree was rolled back to its ` +
+        `pre-restore state and is clean`,
+    );
+    this.name = "RestoreFailedError";
+    this.ref = ref;
+    this.detail = detail;
+  }
+}
+
 export interface GitBackendOptions {
   /** The workspace whose tree is snapshotted. */
   cwd: string;
@@ -259,16 +279,39 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
       if (known.code !== 0) {
         throw new Error(`rewind git-backend: unknown snapshot ref ${id}`);
       }
+      // Capture the CURRENT work tree as a throwaway tree object BEFORE mutating anything, so a restore
+      // that fails mid-flight can be rolled back to exactly where it started rather than left half-
+      // applied. It writes a tree object only — no ref moves, so the append-only chain is untouched.
+      // If even the capture fails we cannot promise rollback, so `rollbackId` stays undefined and any
+      // later failure is (correctly) reported as indeterminate.
+      const preAdd = await run(["add", "-A"]);
+      const preTree = preAdd.code === 0 ? await run(["write-tree"]) : undefined;
+      const rollbackId = preTree && preTree.code === 0 ? preTree.stdout.trim() : undefined;
+
+      // Roll the work tree back to the captured pre-restore state, then classify the failure: a clean
+      // rollback is a RestoreFailedError (tree is safe); a rollback that itself fails is the strictly
+      // worse RevertIndeterminateError (tree may be half-applied).
+      const rollbackOrThrow = async (detail: string): Promise<never> => {
+        if (rollbackId) {
+          const back = await run(["read-tree", "-u", "--reset", rollbackId]);
+          if (back.code === 0) {
+            await run(["clean", "-fd"]); // best-effort; the tree already matches rollbackId
+            throw new RestoreFailedError(id, detail);
+          }
+        }
+        throw new RevertIndeterminateError(id, detail);
+      };
+
       // Reset index + work tree to the snapshot without moving any ref (append-only chain).
       const readTree = await run(["read-tree", "-u", "--reset", id]);
       if (readTree.code !== 0) {
-        throw new RevertIndeterminateError(id, `read-tree exited ${readTree.code}: ${readTree.stderr.slice(0, 300)}`);
+        await rollbackOrThrow(`read-tree exited ${readTree.code}: ${readTree.stderr.slice(0, 300)}`);
       }
       // read-tree removes tracked files not in the target; `clean -fd` removes files created
       // since the snapshot (never `-x`, so excluded dirs like node_modules/.git survive).
       const clean = await run(["clean", "-fd"]);
       if (clean.code !== 0) {
-        throw new RevertIndeterminateError(id, `post-read-tree clean exited ${clean.code}: ${clean.stderr.slice(0, 300)}`);
+        await rollbackOrThrow(`post-read-tree clean exited ${clean.code}: ${clean.stderr.slice(0, 300)}`);
       }
       return { restoredTo: id };
       });
