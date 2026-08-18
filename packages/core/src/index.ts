@@ -15,3 +15,16 @@ export type {
   AuthorityResolver,
   UnhashedEntry,
 } from "./audit/evidence-ledger.ts";
+export {
+  createEffectLedger,
+  EFFECT_EMITTED,
+  EFFECT_REPLAY_REFUSED,
+} from "./audit/effect-ledger.ts";
+export type {
+  EffectLedger,
+  EffectLedgerOptions,
+  ExternalEffect,
+  EffectOutcome,
+  EffectAdmission,
+  EffectRefusal,
+} from "./audit/effect-ledger.ts";
