@@ -1,3 +1,5 @@
 node_modules/
 # Rewind's own per-workspace control directory (snapshot repo + durable evidence store).
 .rewind/
+# /graphify scratch output — a knowledge-graph build artifact, never part of the product.
+graphify-out/
