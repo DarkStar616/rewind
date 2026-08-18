@@ -63,6 +63,13 @@ serve a wrong answer):**
 - **A saving is booked on avoidance** (when the upstream call is genuinely skipped), before the bytes
   finish streaming to the client. A client hang-up mid-replay still counts as avoided (the upstream
   call was skipped) — defensible; a malformed record falls through to a live forward rather than a 502.
+- **Rewind-memory is single-writer**, like the savings ledger: two gateway/MCP processes sharing one
+  `.rewind/rewind-memory.json` can lose a note (last-flush-wins). Under-reports failure memory; never
+  corrupts or fabricates it. A durable multi-writer log is a later slice.
+- **Cache-hygiene is a static advisory**: it flags text/values that *look* dynamic (dates, UUIDs,
+  epoch-like numbers, id-fields). It cannot prove a given date/UUID actually changes between requests,
+  so a static one is a false positive — harmless, since the output is only advice. The safe bias is
+  toward flagging (a missed poisoner costs real cache savings; a false flag costs one spurious line).
 
 ## Shipped since (research-driven, `docs/RESEARCH-ROADMAP.md`)
 
