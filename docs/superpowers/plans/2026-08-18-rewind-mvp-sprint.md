@@ -25,8 +25,10 @@ stdio server (all local agents), and a Claude Code plugin. Harvest, don't rebuil
   `module`/`moduleResolution` = `nodenext`, `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`;
   import sibling modules WITH the `.ts` extension.
 - Test runner: `node --test` (node:test). No vitest/jest.
-- Packages `@rewind/core` and `@rewind/mcp`, licence MIT; npm workspaces; open-core boundary — no
-  hosted/enterprise code in these packages.
+- Packages `@rewind/core` and `@rewind/mcp` are **PROPRIETARY / CLOSED SOURCE — NOT MIT**.
+  `package.json` `"license": "UNLICENSED"`; proprietary EULA `LICENSE` file (final text from the licence
+  decision, workflow `wlwjzoq7a`). Source repo private; any public npm artifact is a compiled/obfuscated
+  build. npm workspaces. Paid access is gated by a license key + entitlement/metering backend (later).
 - The effect barrier and the evidence chain read ONLY the effect log / trace, NEVER the filesystem.
   Exactly one real barrier implementation (this TypeScript one).
 - Harvest read-only from `/home/reuben/projects/qm-athena/.claude/worktrees/mvp-golden-path/` (branch
@@ -120,7 +122,7 @@ rewind/
   "name": "@rewind/core",
   "version": "0.0.0",
   "type": "module",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "exports": { ".": "./src/index.ts" }
 }
 ```
@@ -440,7 +442,7 @@ handle→state store (a JSON file under `.rewind/`), keyed by checkpoint id.
 
 ```json
 {
-  "name": "@rewind/mcp", "version": "0.0.0", "type": "module", "license": "MIT",
+  "name": "@rewind/mcp", "version": "0.0.0", "type": "module", "license": "UNLICENSED",
   "bin": { "rewind": "./src/cli.ts" },
   "dependencies": { "@rewind/core": "0.0.0", "@modelcontextprotocol/sdk": "^1.29.0" }
 }

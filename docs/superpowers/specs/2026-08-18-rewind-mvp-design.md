@@ -46,9 +46,12 @@ calculator (already built as a standalone page, no code dependency).
   — no bundler; import with `.ts` extensions; `tsconfig` `module`/`moduleResolution` `nodenext`,
   `verbatimModuleSyntax`, `allowImportingTsExtensions`. Test runner: `node --test` (node:test).
 - **MCP:** official `@modelcontextprotocol/sdk` ^1.29.
-- **Packaging:** npm workspaces; `@rewind/core` and `@rewind/mcp` are separate packages, licence
-  **MIT or Apache-2.0**; any future hosted/enterprise code stays in separate packages (open-core
-  boundary from commit one).
+- **Packaging & licence:** npm workspaces; `@rewind/core` and `@rewind/mcp` are separate packages.
+  **PROPRIETARY / CLOSED SOURCE — NOT MIT/Apache.** `package.json` `"license": "UNLICENSED"`; a
+  proprietary EULA `LICENSE` file (exact text set by the licence decision, workflow `wlwjzoq7a`). The
+  SOURCE repo stays private; any public npm artifact is a compiled/obfuscated build, not the source.
+  Athena consumes `@rewind/core` via a private channel (private registry or git), never a public MIT
+  package. This is a commercial product (sold inside Athena; later metered on customer savings).
 - **The barrier and the hash chain NEVER read the filesystem** — only the effect log and the trace.
   Exactly ONE real barrier implementation (the TypeScript one). Any Python probe is a conformance model.
 - **Harvest, don't rebuild.** Port from the qm-athena `deploy-latest` worktree
