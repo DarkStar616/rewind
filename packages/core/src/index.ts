@@ -1,3 +1,4 @@
+export { canonicalize, CanonicalJsonError } from "./audit/canonical-json.ts";
 export {
   createMemoryEvidenceLedger,
   computeEntryHash,

@@ -1,0 +1,10 @@
+{
+  "name": "@rewind/gateway",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@rewind/core": "0.0.0"
+  }
+}
