@@ -1,0 +1,3 @@
+node_modules/
+# Rewind's own per-workspace control directory (snapshot repo + durable evidence store).
+.rewind/

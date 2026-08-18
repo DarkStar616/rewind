@@ -98,6 +98,12 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
       if (rel && !rel.startsWith("..")) lines.push(`${rel}/`);
     }
     lines.push(".git", "**/.git");
+    // Rewind's own control directory — the snapshot repo AND any durable adapter state (the CLI's
+    // evidence chain, handle store) live under `<cwd>/.rewind/`. It must never enter a snapshot: if
+    // it did, a `restore` (read-tree + `clean -fd`) would roll the evidence chain back with the tree,
+    // and an effect already spent before the rewind would look unspent again — silently defeating the
+    // refuse-across-rewind guarantee. `.rewind/` is rewind's reserved namespace; exclude it wholesale.
+    lines.push(".rewind/");
     for (const d of HEAVY_DIRS) lines.push(`${d}/`);
     return lines.join("\n") + "\n";
   };
