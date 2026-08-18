@@ -155,13 +155,17 @@ const GIT_IDENTITY = {
 } as const;
 
 export function createGitBackend(opts: GitBackendOptions): WorldBackend {
-  const cwd = opts.cwd;
-  // Normalise gitDir to a canonical ABSOLUTE path. This is what keys GLOBAL_MUTATE, so two backends
+  // Normalise the workspace path to a canonical ABSOLUTE path FIRST, then derive gitDir from it, so the
+  // two are always compared in the same normal form. gitDir is what keys GLOBAL_MUTATE, so two backends
   // pointing at the SAME repo via different spellings — the absolute default vs an explicit relative
   // `.rewind/snapshots.git` — must resolve to the same key, or their mutations (a snapshot racing a
   // restore, which the CAS does NOT cover) would run concurrently and could commit a partially-restored
-  // tree. `resolve(cwd, …)` collapses `.`/`..`, trailing slashes and relative-vs-absolute; symlink
-  // aliasing is a documented residual (realpath would need the dir to already exist).
+  // tree. Normalising cwd too is essential for the info/exclude containment check below
+  // (`gitDir.startsWith(cwd)`): if only gitDir were normalised, an aliased cwd (e.g. `/work/x/..`) would
+  // fail that check and the snapshot repo would not be excluded — capturing its own object store.
+  // `resolve` collapses `.`/`..`, trailing slashes and relative-vs-absolute; symlink aliasing is a
+  // documented residual (realpath would need the dir to already exist).
+  const cwd = resolve(opts.cwd);
   const gitDir = resolve(cwd, opts.gitDir ?? join(cwd, ".rewind", "snapshots.git"));
   const emit = opts.log ?? ((m: string) => console.warn(m));
 

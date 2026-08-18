@@ -46,9 +46,12 @@ test("two backend instances on the same git dir serialize — concurrent snapsho
   try {
     await writeFile(join(dir, "a.txt"), "seed");
     const be1 = createGitBackend({ cwd: dir, log: () => {} });
-    // be2 names the SAME repo via a different path spelling (a `..` segment). Normalisation must map it
-    // to the same queue key as be1's default gitDir, or the two would race despite the global queue.
-    const be2 = createGitBackend({ cwd: dir, gitDir: join(dir, "x", "..", ".rewind", "snapshots.git"), log: () => {} });
+    // be2 names the SAME repo via a genuinely DIFFERENT spelling: a RELATIVE gitDir (git resolves it
+    // against cwd, and so does our normalisation). This is not pre-collapsed by path.join, so without
+    // the resolve() normalisation be2's raw queue key (".rewind/snapshots.git") differs from be1's
+    // absolute key, the two race, and the CAS makes the second snapshot throw — i.e. this test fails
+    // pre-fix. With normalisation both map to the same absolute key and both snapshots survive.
+    const be2 = createGitBackend({ cwd: dir, gitDir: join(".rewind", "snapshots.git"), log: () => {} });
     // Fire both snapshots concurrently against the SAME git dir (spelled two ways).
     const [s1, s2] = await Promise.all([be1.snapshot("from-1"), be2.snapshot("from-2")]);
     assert.notEqual(s1.id, s2.id, "the two snapshots are distinct commits");
