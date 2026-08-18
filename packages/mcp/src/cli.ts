@@ -16,16 +16,9 @@
  */
 import { writeSync } from "node:fs";
 import { argv, cwd, exit } from "node:process";
-import { join } from "node:path";
-import {
-  createEngine,
-  createGitBackend,
-  createMemoryReplaySavings,
-  EFFECT_EMITTED,
-  EFFECT_REPLAY_REFUSED,
-} from "@rewind/core";
 import type { Engine, ExternalEffect } from "@rewind/core";
-import { createFileEvidenceLedger } from "./store.ts";
+import { buildAdapterEngine } from "./build-engine.ts";
+import { runStdioServer } from "./server.ts";
 
 const USAGE =
   "usage: rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | savings [scope] | mcp>";
@@ -41,17 +34,9 @@ function errline(message: string): void {
 }
 
 function buildEngine(workdir: string): Engine {
-  const rewindDir = join(workdir, ".rewind");
-  const backend = createGitBackend({ cwd: workdir, log: (m) => errline(m) });
-  // The barrier owns exactly two actions; the durable ledger's vocabulary admits precisely those.
-  const store = createFileEvidenceLedger({
-    path: join(rewindDir, "evidence.json"),
-    vocabulary: [EFFECT_EMITTED, EFFECT_REPLAY_REFUSED],
-  });
-  // Savings accounting is in-memory for the CLI floor; the durable honest-metering receipt is a
-  // later slice. `replay`/`savings` therefore report the current process's recorded savings only.
-  const savings = createMemoryReplaySavings();
-  return createEngine({ cwd: workdir, store, backend, savings });
+  // Both adapters build the world identically; the shared builder owns the git backend + durable
+  // evidence chain + savings sink wiring (see build-engine.ts).
+  return buildAdapterEngine(workdir, (m) => errline(m)).engine;
 }
 
 async function run(cmd: string | undefined, rest: readonly string[], engine: Engine): Promise<number> {
@@ -102,8 +87,12 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       return 0;
     }
     case "mcp": {
-      errline("the stdio MCP server is wired in a later slice (Task 10); `rewind mcp` is not available yet");
-      return 1;
+      // Launch the stdio MCP server over the same workspace. It owns its own engine (built from the
+      // durable store), so the throwaway `engine` above is unused here. Resolves when the client
+      // closes the pipe (stdin ends); until then the process stays alive serving JSON-RPC on stdout.
+      errline("starting the stdio MCP server (five tools: checkpoint, list, rewind, replay, guard_effect)");
+      await runStdioServer({ cwd: cwd(), log: (m) => errline(m) });
+      return 0;
     }
     default: {
       errline(`unknown subcommand ${JSON.stringify(cmd)}`);
