@@ -138,7 +138,24 @@ export function verifyChain(entries: readonly AuditEntry[]): VerifyResult {
         reason: `prevHash at seq ${entry.seq} does not link to the preceding entry`,
       };
     }
-    if (computeEntryHash(entry) !== entry.hash) {
+    // A tampered entry can carry content that has no canonical form (a non-finite number injected
+    // into detail, a stripped-out authorityChain, a non-plain object). Re-hashing it must be
+    // reported as a broken chain, never allowed to throw out of verify: a verdict function that
+    // crashes lets an attacker turn "the ledger is broken" into an uncaught exception in the caller.
+    let recomputed: string;
+    try {
+      recomputed = computeEntryHash(entry);
+    } catch (err) {
+      return {
+        ok: false,
+        length: entries.length,
+        brokenAtSeq: entry.seq,
+        reason: `the entry at seq ${entry.seq} is structurally invalid and cannot be re-hashed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
+    if (recomputed !== entry.hash) {
       return {
         ok: false,
         length: entries.length,
@@ -199,7 +216,13 @@ function buildEntry(input: AuditEntryInput, seq: number, prevHash: string, confi
 }
 
 function idempotencyMapKey(scopeLabel: ScopeId, action: string, idempotencyKey: string): string {
-  return `${scopeLabel}\0${action}\0${idempotencyKey}`;
+  // JSON-encode the tuple rather than joining on a separator byte: any separator (NUL included) can
+  // itself appear inside a scope label, an action, or a caller-supplied idempotency key, and a
+  // delimited join lets two different triples collide onto one map key — e.g. ("s","a\0b","k") and
+  // ("s","a","b\0k"). A collision would dedupe an append against an entirely unrelated entry, across
+  // scopes and actions. JSON string escaping is injective over the triple, so no forged boundary can
+  // manufacture a collision.
+  return JSON.stringify([scopeLabel, action, idempotencyKey]);
 }
 
 export function createMemoryEvidenceLedger(opts: LedgerOptions = {}): EvidenceLedger {
