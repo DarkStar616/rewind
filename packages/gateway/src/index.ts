@@ -24,3 +24,7 @@ export {
   DEFAULT_PRICE_TABLE,
 } from "./meter.ts";
 export type { PriceTable, ComponentRates, MeteredAvoidance } from "./meter.ts";
+export { extractUsage } from "./usage.ts";
+export type { ExtractedUsage } from "./usage.ts";
+export { startProxy } from "./proxy.ts";
+export type { ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
