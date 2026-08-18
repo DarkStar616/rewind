@@ -36,3 +36,5 @@ export { pruneToolOutputs } from "./prune.ts";
 export type { PruneOptions, PruneResult } from "./prune.ts";
 export { billableSavedTokens } from "./billable.ts";
 export type { BillableSavings } from "./billable.ts";
+export { redactValue, redactedExportView, DEFAULT_REDACTORS, DROP } from "./redact.ts";
+export type { RedactFn, RedactContext } from "./redact.ts";
