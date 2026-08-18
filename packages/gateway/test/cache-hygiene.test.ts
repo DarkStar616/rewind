@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
+
+import { createMemoryReplaySavings } from "@rewind/core";
 
 import { analyzeCacheHygiene } from "../src/cache-hygiene.ts";
+import { createMemoryRecordStore } from "../src/record-store.ts";
+import { createReplayer } from "../src/replay.ts";
+import { startProxy } from "../src/proxy.ts";
 
 /**
  * The analyzer flags dynamic content in the STABLE prefix (which silently forfeits ~78-80% of possible
@@ -96,4 +102,41 @@ test("cache_control markers themselves are not mistaken for content poisoners", 
   });
   assert.equal(r.cacheable, true);
   assert.equal(r.breakpointCount, 1);
+});
+
+test("the proxy logs a cache-hygiene advisory for a prefix-poisoning request (never blocks it)", async () => {
+  const stub = createServer((req, res) => {
+    let n = "";
+    req.on("data", (c) => (n += c));
+    req.on("end", () => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ type: "message", usage: { input_tokens: 1 } }));
+    });
+  });
+  await new Promise<void>((r) => stub.listen(0, "127.0.0.1", r));
+  const addr = stub.address();
+  const base = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}`;
+
+  const logs: string[] = [];
+  const store = createMemoryRecordStore();
+  const replayer = createReplayer(store, createMemoryReplaySavings());
+  const proxy = await startProxy({ upstreamBase: base, replayer, store, log: (m) => logs.push(m) });
+  try {
+    const body = JSON.stringify({
+      model: "m",
+      system: "You are helpful. The time is 2026-08-18T14:30:00Z.",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    const r = await fetch(`${proxy.url}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    assert.equal(r.status, 200, "the request is forwarded normally — hygiene is advisory, never blocking");
+    await r.text();
+    assert.ok(logs.some((l) => /cache-hygiene/.test(l)), "an advisory was logged");
+  } finally {
+    await proxy.close();
+    await new Promise<void>((r) => stub.close(() => r()));
+  }
 });

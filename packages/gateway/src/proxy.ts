@@ -27,6 +27,7 @@ import type { Replayer } from "./replay.ts";
 import { StrictReplayMissError } from "./replay.ts";
 import { extractUsage } from "./usage.ts";
 import { planCacheBreakpoints } from "./cache-preserve.ts";
+import { analyzeCacheHygiene } from "./cache-hygiene.ts";
 
 /** The stored form of a recorded response: opaque bytes + just enough to replay them faithfully. */
 export interface RecordedHttpResponse {
@@ -165,8 +166,24 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           }
           log(`proxy: replay record malformed for key ${decision.keyed.slice(0, 12)}; forwarding live instead`);
         }
-        // MISS → optionally add a cache breakpoint (opt-in), then forward, tee, record under the
-        // key the replayer already computed (the key is over the ORIGINAL body, unaffected by the hint).
+        // MISS → the request will hit the provider, so cache friendliness matters here. Advisory only:
+        // warn (never mutate/block) when the agent's own request poisons its cacheable prefix.
+        if (parsed) {
+          try {
+            const hygiene = analyzeCacheHygiene(parsed);
+            if (!hygiene.cacheable) {
+              const first = hygiene.prefixPoisoners[0];
+              log(
+                `proxy: cache-hygiene scope=${scope} — ${hygiene.recommendation}` +
+                  (first ? ` (e.g. ${first.path}: ${first.detail})` : ""),
+              );
+            }
+          } catch {
+            /* advisory only; never let hygiene analysis affect the forward */
+          }
+        }
+        // Optionally add a cache breakpoint (opt-in), then forward, tee, record under the key the
+        // replayer already computed (the key is over the ORIGINAL body, unaffected by the hint).
         let forwardBody = rawBody;
         if (options.preserveCache && parsed) {
           try {

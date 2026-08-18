@@ -96,3 +96,25 @@ test("rewind CLI: an unknown subcommand is refused non-zero", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("rewind CLI: cache-report prints the hygiene report and exits 1 on a poisoned prefix", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-cli-"));
+  try {
+    const clean = JSON.stringify({ model: "m", system: "static", messages: [{ role: "user", content: "hi" }] });
+    const rClean = runCli(dir, ["cache-report", clean]);
+    assert.equal(rClean.status, 0, "a clean prefix exits 0");
+    assert.equal((rClean.json as { cacheable: boolean }).cacheable, true);
+
+    const poisoned = JSON.stringify({
+      model: "m",
+      system: "time is 2026-08-18T14:30:00Z",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    const rBad = runCli(dir, ["cache-report", poisoned]);
+    assert.equal(rBad.status, 1, "a poisoned prefix exits 1 so a script can gate on it");
+    assert.equal((rBad.json as { cacheable: boolean }).cacheable, false);
+    assert.equal((rBad.json as { prefixPoisoners: unknown[] }).prefixPoisoners.length >= 1, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

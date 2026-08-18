@@ -19,7 +19,7 @@ import { writeSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 import type { Engine, ExternalEffect } from "@rewind/core";
-import { createMemoryRecordStore, createReplayer, startProxy } from "@rewind/gateway";
+import { createMemoryRecordStore, createReplayer, startProxy, analyzeCacheHygiene } from "@rewind/gateway";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
 import { runStdioServer } from "./server.ts";
@@ -27,7 +27,8 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 
 const USAGE =
   "usage: rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
-  "savings [--scope <id>] [--since <window>] [--json] | gateway [--port <n>] [--upstream <url>] | mcp>";
+  "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | " +
+  "gateway [--port <n>] [--upstream <url>] | mcp>";
 
 const DEFAULT_GATEWAY_PORT = 8788;
 const DEFAULT_UPSTREAM = "https://api.anthropic.com";
@@ -136,6 +137,25 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       const upsell = upsellLine(engine.savings().tokens);
       if (upsell) writeSync(1, `${upsell}\n`);
       return 0;
+    }
+    case "cache-report": {
+      // Static prompt-cache hygiene for a request body: does its stable prefix cache, or does dynamic
+      // content poison it? Advisory — helps a user debug why their agent's requests do/don't cache.
+      if (!rest[0]) {
+        errline("cache-report requires a JSON request body");
+        return 1;
+      }
+      let body: unknown;
+      try {
+        body = JSON.parse(rest[0]);
+      } catch {
+        errline(`cache-report: the request body is not valid JSON: ${rest[0]}`);
+        return 1;
+      }
+      const report = analyzeCacheHygiene(body);
+      out(report);
+      // A non-cacheable prefix exits 1 so a script can gate on it; the report is still printed.
+      return report.cacheable ? 0 : 1;
     }
     case "gateway": {
       // The token-saving proxy. Point your agent's ANTHROPIC_BASE_URL at it: a byte-equivalent
