@@ -32,3 +32,5 @@ export { createGitBackend, RevertIndeterminateError } from "./world/git-backend.
 export type { GitBackendOptions } from "./world/git-backend.ts";
 export { refId } from "./world/world-backend.ts";
 export type { WorldBackend, WorldRef, RestoreResult, Change } from "./world/world-backend.ts";
+export { createMemoryReplaySavings } from "./replay/replay-savings.ts";
+export type { ReplaySavingsSink, ReplaySaving, ReplaySavingsTotal } from "./replay/replay-savings.ts";
