@@ -170,6 +170,36 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
     /** Forward the raw body upstream, stream the response back live, and (on a messages 2xx) record it. */
     function forward(rawBody: Buffer, record: { scope: string; replayKey?: string } | undefined): Promise<void> {
       return new Promise((resolve) => {
+        // Exactly one terminal path settles: a stream can emit both an upstream `error` and, on the
+        // request object, an `error`, and the client can disconnect — without this guard two of them
+        // would each call res.end() and the second throws ERR_STREAM_WRITE_AFTER_END inside an event
+        // handler, crashing the proxy. Fail-open means the proxy stays up no matter what.
+        let settled = false;
+        const done = (): void => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const endQuietly = (): void => {
+          try {
+            res.end();
+          } catch {
+            /* already ended by an earlier terminal path */
+          }
+        };
+        const fail502 = (message: string): void => {
+          if (settled) return;
+          try {
+            if (!res.headersSent) res.writeHead(502, { "content-type": "application/json" });
+            res.end(JSON.stringify({ error: { type: "rewind_upstream_error", message } }));
+          } catch {
+            /* headers/body already flowed; nothing more we can safely send */
+          }
+          done();
+        };
+        // A client that hangs up mid-flight must not leave this promise pending forever.
+        res.on("error", () => done());
+
         const upReq = client(
           {
             protocol: upstream.protocol,
@@ -192,10 +222,14 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             const chunks: Buffer[] = [];
             upRes.on("data", (c: Buffer) => {
               chunks.push(c); // buffer a copy for metering...
-              res.write(c); // ...while streaming live for TTFT
+              try {
+                res.write(c); // ...while streaming live for TTFT (client may have gone — ignore)
+              } catch {
+                /* client write failed; the res 'error'/'close' path will settle */
+              }
             });
             upRes.on("end", () => {
-              res.end();
+              endQuietly();
               const full = Buffer.concat(chunks);
               // Record only a genuine success on the replay-able endpoint, keyed as the replayer keyed it.
               if (record?.replayKey && status >= 200 && status < 300) {
@@ -206,20 +240,20 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
                   log(`proxy: record failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
                 }
               }
-              resolve();
+              done();
             });
             upRes.on("error", () => {
-              res.end();
-              resolve();
+              // Mid-stream upstream failure after headers were sent — we can't 502 now; just close.
+              endQuietly();
+              done();
             });
           },
         );
         upReq.on("error", (err) => {
-          // Upstream genuinely unreachable: surface a 502; never fabricate a model response.
+          // Upstream genuinely unreachable (or errored before any response): surface a 502 if we still
+          // can, else close. Never fabricate a model response.
           log(`proxy: upstream error: ${err instanceof Error ? err.message : String(err)}`);
-          if (!res.headersSent) res.writeHead(502, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: { type: "rewind_upstream_error", message: "upstream request failed" } }));
-          resolve();
+          fail502("upstream request failed");
         });
         upReq.write(rawBody);
         upReq.end();

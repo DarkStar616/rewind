@@ -158,6 +158,50 @@ test("a non-2xx upstream response is forwarded but NOT recorded (no frozen error
   }
 });
 
+test("a client that aborts mid-flight does not crash or wedge the proxy", async () => {
+  // A deliberately slow upstream so the client can abort before the response completes.
+  const slow = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write("{"); // partial body, then stall
+      setTimeout(() => res.end('"ok":true}'), 200);
+    });
+  });
+  await new Promise<void>((r) => slow.listen(0, "127.0.0.1", r));
+  const slowAddr = slow.address();
+  const slowBase = `http://127.0.0.1:${typeof slowAddr === "object" && slowAddr ? slowAddr.port : 0}`;
+
+  const store = createMemoryRecordStore();
+  const replayer = createReplayer(store, createMemoryReplaySavings());
+  const proxy = await startProxy({ upstreamBase: slowBase, replayer, store });
+  try {
+    const ac = new AbortController();
+    const body = JSON.stringify({ model: "m", messages: [{ role: "user", content: "hi" }] });
+    const p = fetch(`${proxy.url}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+      signal: ac.signal,
+    }).catch(() => "aborted");
+    ac.abort(); // hang up before the slow upstream finishes
+    assert.equal(await p, "aborted");
+
+    // The proxy must still be alive and serve a fresh request to completion.
+    const r = await fetch(`${proxy.url}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    assert.equal(r.status, 200);
+    await r.text();
+  } finally {
+    await proxy.close();
+    await new Promise<void>((r) => slow.close(() => r()));
+  }
+});
+
 test("non-messages traffic is forwarded transparently and never recorded", async () => {
   const stub = await startStub({ body: () => JSON.stringify({ ok: true }) });
   const store = createMemoryRecordStore();
