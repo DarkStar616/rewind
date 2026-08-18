@@ -21,6 +21,18 @@ test("DEFAULT_REDACTORS masks an sk- token by VALUE even under an innocuous key"
   assert.ok(!String((out as any).note).includes("sk-ant-api03-abcdefgh"), "the token substring is gone");
 });
 
+test("EVERY secret in a multi-credential string is masked, not just the first", () => {
+  const out = redactValue(
+    { note: "sk-ant-aaaaaa then ghp_12345678901234567890 and xoxb-abcdef done" },
+    DEFAULT_REDACTORS,
+    { path: "$", kind: "response" },
+  );
+  const note = String((out as any).note);
+  assert.ok(!note.includes("sk-ant-aaaaaa"), "first token gone");
+  assert.ok(!note.includes("ghp_12345678901234567890"), "second (github) token gone");
+  assert.ok(!note.includes("xoxb-abcdef"), "third (slack) token gone");
+});
+
 test("a DROP return replaces the value with a redaction marker, not the original", () => {
   const drop = (v: unknown) => (typeof v === "string" && v.includes("SECRET") ? DROP : v);
   const out = redactValue({ a: "keep", b: "SECRET-payload" }, drop, { path: "$", kind: "request" });

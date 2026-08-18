@@ -130,11 +130,19 @@ test("rewind CLI: analyze prints a verifiable, redacted savings report and exits
     const input = JSON.stringify([call("hello"), call("hello"), call("unique")]);
     const r = runCli(dir, ["analyze", input]);
     assert.equal(r.status, 0, `analyze should exit 0; stderr=${r.stderr}`);
-    const j = r.json as { analysis: { total: { calls: number; replayableCalls: number } }; rootHash: string; verified: boolean };
+    const j = r.json as {
+      analysis: { total: { calls: number; replayableCalls: number } };
+      chain: AuditEntry[];
+      rootHash: string;
+    };
     assert.equal(j.analysis.total.calls, 3);
     assert.equal(j.analysis.total.replayableCalls, 1, "the 2nd identical call is byte-replayable");
-    assert.equal(j.verified, true, "the attested report verifies");
+    // The recipient can INDEPENDENTLY verify the emitted chain — not just trust a producer verdict.
+    assert.equal(verifyChain(j.chain).ok, true, "the emitted chain must verify on the consumer's side");
     assert.match(j.rootHash, /^[0-9a-f]{64}$/);
+    // Tampering with the emitted analysis must break that independent verification.
+    (j.chain[0].detail as any).total = { calls: 9999 };
+    assert.equal(verifyChain(j.chain).ok, false, "an edited report must fail the recipient's verification");
     // The secret must not survive into the shareable report.
     assert.equal(r.stdout.includes("sk-ant-secret01xyz"), false, "the api key must be redacted from the report");
   } finally {

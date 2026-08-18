@@ -29,7 +29,6 @@ import {
   attestAnalysis,
   type AnalyzedCall,
 } from "@rewind/gateway";
-import { verifyChain } from "@rewind/core";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
 import { runStdioServer } from "./server.ts";
@@ -206,7 +205,10 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
         return 1;
       }
       const attested = attestAnalysis(analyzeTraffic(parsed as AnalyzedCall[]));
-      out({ analysis: attested.analysis, rootHash: attested.rootHash, verified: verifyChain(attested.chain).ok });
+      // Emit the full evidence CHAIN, not just a producer-asserted verdict: the recipient must be able
+      // to run verifyChain over this artifact themselves and detect any edit to the analysis. rootHash
+      // is a convenience; the chain is what makes the report independently verifiable.
+      out({ analysis: attested.analysis, chain: attested.chain, rootHash: attested.rootHash });
       return 0;
     }
     case "gateway": {

@@ -32,6 +32,21 @@ test("scopes are isolated — an identical body in a different scope is not a re
   assert.equal(a.perScope.length, 2);
 });
 
+test("same body but a different anthropic-beta header is NOT a replay (no over-credit)", () => {
+  const mk = (beta: string) => ({
+    scope: "s",
+    body: { model: "claude-haiku-4-5", max_tokens: 10, messages: [{ role: "user", content: "hi" }] },
+    usage: { input_tokens: 100, output_tokens: 100 },
+    model: "claude-haiku-4-5",
+    headers: { "anthropic-beta": beta },
+  });
+  const a = analyzeTraffic([mk("v1"), mk("v2")]);
+  assert.equal(a.total.replayableCalls, 0, "different output-affecting header => different key => not a replay");
+  // Whereas the SAME beta on both is a genuine replay.
+  const b = analyzeTraffic([mk("v1"), mk("v1")]);
+  assert.equal(b.total.replayableCalls, 1);
+});
+
 test("the attested report verifies as a tamper-evident chain", () => {
   const a = analyzeTraffic([call("s", "hi", 10), call("s", "hi", 10)]);
   const { chain, rootHash } = attestAnalysis(a);

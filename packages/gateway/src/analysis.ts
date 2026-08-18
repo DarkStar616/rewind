@@ -31,6 +31,13 @@ export interface AnalyzedCall {
   body: unknown;
   usage: ProviderUsage;
   model: string;
+  /**
+   * The request's headers, if known. The output-affecting subset (`anthropic-version`, `anthropic-beta`
+   * — see canonical-request.ts KEY_HEADERS) is folded into the replay key exactly as the live gateway
+   * does, so two calls with the same body but a different API version/beta are NOT counted as a replay.
+   * Omitting them can only ever UNDER-count (a stricter key), never over-credit.
+   */
+  headers?: Record<string, string | string[] | undefined>;
 }
 
 export interface ScopeAnalysis {
@@ -103,7 +110,7 @@ export function analyzeTraffic(calls: readonly AnalyzedCall[], opts: AnalyzeOpti
     }
     scope.calls += 1;
 
-    const key = canonicalizeRequest(c.body);
+    const key = canonicalizeRequest(c.body, c.headers);
     const seen = seenByScope.get(c.scope)!;
     if (seen.has(key)) {
       // A byte-replayable repeat: the whole upstream call is avoidable on replay.

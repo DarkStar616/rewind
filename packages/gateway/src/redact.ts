@@ -32,8 +32,11 @@ const REDACTED_MARKER = Object.freeze({ "[redacted]": true });
 
 /** Key names whose VALUE is a secret regardless of content. Matched against the value's own key. */
 const SECRET_KEY = /(?:^|[._-])(?:api[_-]?key|authorization|auth[_-]?token|password|passwd|secret|token|client[_-]?secret|access[_-]?token|refresh[_-]?token|cookie|set[_-]?cookie)$/i;
-/** Secret-shaped VALUES caught even under an innocuous key (provider keys, bearer tokens). */
-const SECRET_VALUE = /\b(?:sk-(?:ant-)?[A-Za-z0-9_-]{6,}|Bearer\s+[A-Za-z0-9._-]{6,}|xox[baprs]-[A-Za-z0-9-]{6,}|gh[pousr]_[A-Za-z0-9]{20,})\b/;
+/** Secret-shaped VALUES caught even under an innocuous key (provider keys, bearer tokens). GLOBAL so a
+ *  string carrying MORE THAN ONE secret has every one masked — a non-global replace would leak the
+ *  second and later tokens into a supposedly-shareable report. Used only with `.replace()` (which is
+ *  stateless w.r.t. lastIndex), never with `.test()`, so the `g` flag carries no lastIndex footgun. */
+const SECRET_VALUE = /\b(?:sk-(?:ant-)?[A-Za-z0-9_-]{6,}|Bearer\s+[A-Za-z0-9._-]{6,}|xox[baprs]-[A-Za-z0-9-]{6,}|gh[pousr]_[A-Za-z0-9]{20,})\b/g;
 
 /** The last `.`-separated segment of a path, e.g. `$.a.b.api_key` -> `api_key` (array indices stripped). */
 function lastSegment(path: string): string {
@@ -50,7 +53,9 @@ function lastSegment(path: string): string {
 export const DEFAULT_REDACTORS: RedactFn = (value, ctx) => {
   if (typeof value === "string") {
     if (SECRET_KEY.test(lastSegment(ctx.path))) return "[redacted]";
-    if (SECRET_VALUE.test(value)) return value.replace(SECRET_VALUE, "[redacted]");
+    // Global replace — masks EVERY secret-shaped token in the string, not just the first.
+    const masked = value.replace(SECRET_VALUE, "[redacted]");
+    if (masked !== value) return masked;
   }
   return value;
 };
