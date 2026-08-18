@@ -1,4 +1,5 @@
 import type { ScopeId } from "../types.ts";
+import { createKeyedQueue } from "../util/async.ts";
 import { EvidenceLedgerError, type AuditEntry, type EvidenceLedger } from "./evidence-ledger.ts";
 
 // The effect barrier owns exactly two actions. These are the GENERIC values (no product-specific
@@ -42,6 +43,14 @@ function keyOf(entry: AuditEntry): string | undefined {
 }
 
 export function createEffectLedger(ledger: EvidenceLedger, _opts: EffectLedgerOptions = {}): EffectLedger {
+  // The barrier owns its OWN keyed queue — a separate instance from the evidence ledger's internal
+  // one, so gating an emit here never contends with (and cannot self-deadlock against) the ledger's
+  // per-scope append serialization. This closes the TOCTOU: the harvested `emit` read `spentAt`
+  // (a list scan) and then `append`ed across two independent awaits, so two concurrent emits of the
+  // same key both observed "unspent" and both admitted. Serializing the whole check-and-append per
+  // scope makes the second emit see the first's spent entry and refuse.
+  const gate = createKeyedQueue<string>();
+
   async function spentAt(scopeLabel: ScopeId, effectKey: string): Promise<number | undefined> {
     const entries = await ledger.list({ scopeLabel, action: EFFECT_EMITTED });
     for (const entry of entries) {
@@ -56,30 +65,35 @@ export function createEffectLedger(ledger: EvidenceLedger, _opts: EffectLedgerOp
       if (!effect.effectKey.trim()) {
         throw new EvidenceLedgerError("an external effect requires a non-empty effectKey");
       }
-      const already = await spentAt(effect.scopeLabel, effect.effectKey);
-      if (already !== undefined) {
+      return gate(String(effect.scopeLabel), async () => {
+        const already = await spentAt(effect.scopeLabel, effect.effectKey);
+        if (already !== undefined) {
+          await ledger.append({
+            scopeLabel: effect.scopeLabel,
+            action: EFFECT_REPLAY_REFUSED,
+            ...(effect.actorId ? { actorId: effect.actorId } : {}),
+            ...(effect.objectId ? { objectId: effect.objectId } : {}),
+            detail: {
+              effectKey: effect.effectKey,
+              kind: effect.kind,
+              firstEmittedSeq: already,
+              reason: "the effect materialised outside the workspace and is not replayable across a revert",
+            },
+          });
+          return { refused: true, effectKey: effect.effectKey, firstEmittedSeq: already };
+        }
         await ledger.append({
           scopeLabel: effect.scopeLabel,
-          action: EFFECT_REPLAY_REFUSED,
+          action: EFFECT_EMITTED,
           ...(effect.actorId ? { actorId: effect.actorId } : {}),
           ...(effect.objectId ? { objectId: effect.objectId } : {}),
-          detail: {
-            effectKey: effect.effectKey,
-            kind: effect.kind,
-            firstEmittedSeq: already,
-            reason: "the effect materialised outside the workspace and is not replayable across a revert",
-          },
+          // The (scope, effectKey) uniqueness guarantee: the evidence ledger already dedupes on
+          // idempotencyKey, so a future durable backend enforces one spent entry per effect too.
+          idempotencyKey: `${effect.scopeLabel}:${effect.effectKey}`,
+          detail: { effectKey: effect.effectKey, kind: effect.kind, detail: effect.detail ?? null },
         });
-        return { refused: true, effectKey: effect.effectKey, firstEmittedSeq: already };
-      }
-      await ledger.append({
-        scopeLabel: effect.scopeLabel,
-        action: EFFECT_EMITTED,
-        ...(effect.actorId ? { actorId: effect.actorId } : {}),
-        ...(effect.objectId ? { objectId: effect.objectId } : {}),
-        detail: { effectKey: effect.effectKey, kind: effect.kind, detail: effect.detail ?? null },
+        return { refused: false, effectKey: effect.effectKey };
       });
-      return { refused: false, effectKey: effect.effectKey };
     },
   };
 }

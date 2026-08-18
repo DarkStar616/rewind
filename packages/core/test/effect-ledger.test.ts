@@ -15,3 +15,16 @@ test("first emit is admitted; a second emit of the same key is refused and recor
   assert.equal(refusals.length, 1);
   assert.equal((await led.verify("s")).ok, true);
 });
+
+test("concurrent double-emit of the same key yields exactly one admission and one spent entry", async () => {
+  const led = createMemoryEvidenceLedger({ vocabulary: ["effect_emitted", "effect_replay_refused"] });
+  const eff = createEffectLedger(led);
+  const [a, b] = await Promise.all([
+    eff.emit({ effectKey: "charge:99", scopeLabel: "s", kind: "http" }),
+    eff.emit({ effectKey: "charge:99", scopeLabel: "s", kind: "http" }),
+  ]);
+  const admitted = [a, b].filter((r) => r.refused === false);
+  assert.equal(admitted.length, 1, "exactly one emit may be admitted");
+  const emitted = await led.list({ scopeLabel: "s", action: "effect_emitted" });
+  assert.equal(emitted.length, 1, "exactly one spent entry may exist");
+});
