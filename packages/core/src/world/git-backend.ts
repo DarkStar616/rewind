@@ -17,7 +17,7 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import type { Change, RestoreResult, WorldBackend, WorldRef } from "./world-backend.ts";
 import { refId } from "./world-backend.ts";
 import { createKeyedQueue } from "../util/async.ts";
@@ -156,7 +156,13 @@ const GIT_IDENTITY = {
 
 export function createGitBackend(opts: GitBackendOptions): WorldBackend {
   const cwd = opts.cwd;
-  const gitDir = opts.gitDir ?? join(cwd, ".rewind", "snapshots.git");
+  // Normalise gitDir to a canonical ABSOLUTE path. This is what keys GLOBAL_MUTATE, so two backends
+  // pointing at the SAME repo via different spellings — the absolute default vs an explicit relative
+  // `.rewind/snapshots.git` — must resolve to the same key, or their mutations (a snapshot racing a
+  // restore, which the CAS does NOT cover) would run concurrently and could commit a partially-restored
+  // tree. `resolve(cwd, …)` collapses `.`/`..`, trailing slashes and relative-vs-absolute; symlink
+  // aliasing is a documented residual (realpath would need the dir to already exist).
+  const gitDir = resolve(cwd, opts.gitDir ?? join(cwd, ".rewind", "snapshots.git"));
   const emit = opts.log ?? ((m: string) => console.warn(m));
 
   // `extraEnv` lets a caller scope a single git invocation to a throwaway index via GIT_INDEX_FILE

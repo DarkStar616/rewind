@@ -46,8 +46,10 @@ test("two backend instances on the same git dir serialize — concurrent snapsho
   try {
     await writeFile(join(dir, "a.txt"), "seed");
     const be1 = createGitBackend({ cwd: dir, log: () => {} });
-    const be2 = createGitBackend({ cwd: dir, log: () => {} });
-    // Fire both snapshots concurrently against the SAME git dir.
+    // be2 names the SAME repo via a different path spelling (a `..` segment). Normalisation must map it
+    // to the same queue key as be1's default gitDir, or the two would race despite the global queue.
+    const be2 = createGitBackend({ cwd: dir, gitDir: join(dir, "x", "..", ".rewind", "snapshots.git"), log: () => {} });
+    // Fire both snapshots concurrently against the SAME git dir (spelled two ways).
     const [s1, s2] = await Promise.all([be1.snapshot("from-1"), be2.snapshot("from-2")]);
     assert.notEqual(s1.id, s2.id, "the two snapshots are distinct commits");
     const log = await be1.log();

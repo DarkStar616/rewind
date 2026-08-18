@@ -185,12 +185,19 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       return 0;
     }
     case "analyze": {
-      // Free Savings Analysis: read a JSON array of observed calls ({scope, body, usage, model}), report
-      // how many were byte-replayable and what that would have cost, and attest the report on the hash
-      // chain so the reader can verify it. No upstream calls — this is a read-only shadow analysis. The
-      // surfaced sample is redacted by default, so the printed report is safe to share.
+      // Free Savings Analysis: read a JSON array of observed calls ({scope, body, usage, model, headers}),
+      // report how many were byte-replayable and what that would have cost, and attest the report on the
+      // hash chain so the reader can verify it. `headers` must be present ({} when there are none) for a
+      // call to be eligible as a replay — omitting it means UNKNOWN headers, conservatively never a
+      // replay. No upstream calls — this is a read-only shadow analysis. The surfaced sample is redacted
+      // by default, so the printed report is safe to share.
       if (!rest[0]) {
-        errline("analyze requires a JSON array of calls: [{scope, body, usage, model}, ...]");
+        errline(
+          "analyze requires a JSON array of calls: [{scope, body, usage, model, headers}, ...]. Include " +
+            "`headers` on each call (use {} when there are no anthropic-version/anthropic-beta headers) — a " +
+            "call that omits headers is treated as UNKNOWN and never counted as a replay, so duplicates " +
+            "would report zero savings.",
+        );
         return 1;
       }
       let parsed: unknown;
