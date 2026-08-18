@@ -2,7 +2,7 @@
   "name": "@rewind/mcp",
   "version": "0.0.0",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "FSL-1.1-ALv2",
   "bin": { "rewind": "./src/cli.ts" },
   "dependencies": {
     "@rewind/core": "0.0.0",
