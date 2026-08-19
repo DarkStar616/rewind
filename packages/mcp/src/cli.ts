@@ -49,7 +49,7 @@ function out(value: unknown): void {
 
 /** A diagnostic line to stderr (never mixed into the machine-readable stdout stream). */
 function errline(message: string): void {
-  writeSync(2, `rewind: ${message}\n`);
+  writeSync(2, `agent-rewind: ${message}\n`);
 }
 
 /** Parse the `savings` subcommand flags: `--scope <id>`, `--since <window>`, `--json` (order-free). */

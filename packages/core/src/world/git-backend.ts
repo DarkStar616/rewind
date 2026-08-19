@@ -239,7 +239,7 @@ export function createGitBackend(opts: GitBackendOptions): WorldBackend {
     execFile("sh", ["-c", `printf x > "${src}" && cp --reflink=always "${src}" "${dst}"; rc=$?; rm -f "${src}" "${dst}"; exit $rc`], (err) => {
       if (err) {
         emit(
-          "agent-rewind: copy-on-write (reflink) not available on this filesystem — snapshots use a full git checkout " +
+          "copy-on-write (reflink) not available on this filesystem — snapshots use a full git checkout " +
             "(correct, just not CoW-accelerated). Fast on APFS/btrfs/XFS/ReFS.",
         );
       }
