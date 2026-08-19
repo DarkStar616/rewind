@@ -121,20 +121,40 @@ function pickKeyHeaders(headers: Record<string, string | string[] | undefined> |
 }
 
 /**
- * Reduce a request URL to the output-affecting part of its target: the pathname, with the query
- * string dropped. Folded into the replay identity so two requests whose OUTPUT-AFFECTING target
- * differs — but whose bodies are byte-identical — never collide onto one key. Gemini is the motivating
- * case: two models named only in the URL (…/gemini-2.5-pro:generateContent vs …:flash) send the SAME
- * body, and without the path in the identity the second would false-hit the first model reply — the
- * exact correctness disaster this module exists to prevent. Anthropic/OpenAI carry the model in the
- * body, so this only distinguishes genuinely different endpoints for them. The QUERY is stripped: it
- * carries auth material for some providers (Gemini `?key=<API_KEY>`) that must never be hashed, and
- * dropping it can only WIDEN reuse, never cause a false hit.
+ * Query-string parameters that are AUTH material and must never enter the key: Gemini passes its API
+ * key as `?key=<API_KEY>`, and some gateways accept `access_token`/`api_key`. Dropping them keeps
+ * secrets out of the hash and stops a rotated key from busting an otherwise-identical request.
  */
-function keyPath(url: string | undefined): string {
-  if (!url) return "";
-  const q = url.indexOf("?");
-  return q === -1 ? url : url.slice(0, q);
+const QUERY_AUTH_NOISE: ReadonlySet<string> = new Set(["key", "access_token", "api_key", "apikey"]);
+
+/**
+ * Reduce a request URL to its output-affecting target: the pathname plus the NON-auth query params.
+ * Folded into the replay identity so two requests whose OUTPUT-AFFECTING target differs — but whose
+ * bodies are byte-identical — never collide onto one key.
+ *
+ * Gemini is the motivating case on BOTH axes: the model lives only in the path
+ * (…/gemini-2.5-pro:generateContent vs …:flash), and the JSON-vs-SSE wire choice can live only in the
+ * query (`?alt=sse`). Keeping the pathname stops two models colliding; keeping the non-auth query
+ * stops an SSE response being replayed to a caller that asked for JSON (byte-exact replay would break).
+ * The AUTH params are dropped (QUERY_AUTH_NOISE) so secrets are never hashed. Anthropic/OpenAI carry
+ * the model in the body, so this only distinguishes genuinely different endpoints for them. Per the
+ * module deny-list discipline: an unknown query param is KEPT, so it forces a miss, never a false hit.
+ */
+function keyTarget(url: string | undefined): { path: string; query: Record<string, string> } {
+  if (!url) return { path: "", query: {} };
+  const qIdx = url.indexOf("?");
+  const path = qIdx === -1 ? url : url.slice(0, qIdx);
+  const query: Record<string, string> = {};
+  if (qIdx !== -1) {
+    const params = new URLSearchParams(url.slice(qIdx + 1));
+    // Distinct param NAMES; each maps to its sorted value list joined, so multi-valued params are
+    // order-insensitive. canonicalize() sorts the object keys, so param order never changes the key.
+    for (const name of new Set(params.keys())) {
+      if (QUERY_AUTH_NOISE.has(name.toLowerCase())) continue;
+      query[name] = params.getAll(name).sort().join(",");
+    }
+  }
+  return { path, query };
 }
 
 /**
@@ -143,9 +163,10 @@ function keyPath(url: string | undefined): string {
  * @returns a 64-char lowercase hex SHA-256 over the request's normal form. When `headers` is provided,
  * the output-affecting subset (see KEY_HEADERS) is folded in under a reserved slot, so the same body
  * with a different `anthropic-beta`/`anthropic-version` produces a different key. When `url` is
- * provided, its pathname (query stripped) is folded the same way, so the same body sent to a different
- * endpoint/model target (e.g. two Gemini models named only in the URL) produces a different key and can
- * never false-hit. Provider-NEUTRAL: the same fold runs for every provider; no adapter touches the key.
+ * provided, its pathname AND its non-auth query params are folded the same way, so the same body sent to
+ * a different endpoint/model target (two Gemini models named only in the URL) — or the same target with
+ * a different wire choice (`?alt=sse`) — produces a different key and can never false-hit. Auth query
+ * params are dropped. Provider-NEUTRAL: the same fold runs for every provider; no adapter touches the key.
  */
 export function canonicalizeRequest(
   body: unknown,
@@ -156,6 +177,10 @@ export function canonicalizeRequest(
   // The reserved key uses a ` ` prefix that no real top-level body field can collide with.
   const normal: Record<string, unknown> = { " headers": keyHeaders, body: project(body) };
   // Only present when a url was supplied, so existing callers that pass none keep their exact keys.
-  if (url !== undefined) normal[" path"] = keyPath(url);
+  if (url !== undefined) {
+    const target = keyTarget(url);
+    normal[" path"] = target.path;
+    normal[" query"] = target.query;
+  }
   return createHash("sha256").update(canonicalize(normal)).digest("hex");
 }

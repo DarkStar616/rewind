@@ -50,16 +50,26 @@ test("replay identity folds the URL path: two Gemini models (named only in the U
   // Same target, same body → same key (replay still works within one model).
   const proAgain = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent");
   assert.equal(pro, proAgain);
-  // The query string is stripped from the key: an API key or rotated `?key=` never busts (or leaks into) it.
-  const proKeyed = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent?key=SECRET&alt=sse");
-  assert.equal(pro, proKeyed, "query (auth material) is not part of the key");
+  // Auth query material is dropped from the key: a rotated `?key=` never busts (or leaks into) it.
+  const proAuth = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent?key=SECRET");
+  assert.equal(pro, proAuth, "auth query params (key/access_token) are not part of the key");
+  const proAuth2 = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent?key=ROTATED");
+  assert.equal(pro, proAuth2, "a rotated API key does not change the replay key");
 });
 
 test("stream vs non-stream Gemini targets key differently (SSE and JSON wire formats must not cross)", () => {
   const body = { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
+  // The wire choice can live in the method suffix...
   const json = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent");
   const sse = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:streamGenerateContent");
   assert.notEqual(json, sse);
+  // ...or ONLY in the query (`?alt=sse`): a NON-auth output-affecting param is kept, so JSON and SSE
+  // to the same method never collide (else an SSE body would be replayed to a JSON parser).
+  const sseAlt = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent?alt=sse");
+  assert.notEqual(json, sseAlt, "?alt=sse must key differently from JSON — non-auth query is output-affecting");
+  // Query order/auth mix is normalised: same non-auth params, different order + an auth param → same key.
+  const sseAltKeyed = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent?key=SECRET&alt=sse");
+  assert.equal(sseAlt, sseAltKeyed, "auth dropped, non-auth retained regardless of order");
 });
 
 test("omitting the url keeps the legacy key stable (backward-compatible addition)", () => {

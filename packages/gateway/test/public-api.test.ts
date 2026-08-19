@@ -15,7 +15,10 @@ import { fileURLToPath } from "node:url";
 
 const INDEX = fileURLToPath(new URL("../src/index.ts", import.meta.url));
 
-/** All names exported from an index module's `export { ... }` / `export type { ... }` blocks. */
+/** All names exported from an index module's `export { ... }` / `export type { ... }` blocks.
+ *  For an aliased re-export (`X as Y`) the PUBLIC name is `Y` — the alias the consumer imports — so we
+ *  record that, not the internal source name. (Otherwise swapping the impl behind an alias would leave
+ *  the snapshot unchanged and silently pass while the public surface changed.) */
 function exportedNames(path: string): string[] {
   const src = readFileSync(path, "utf8");
   const re = /export\s+(?:type\s+)?\{([^}]*)\}/g;
@@ -23,8 +26,10 @@ function exportedNames(path: string): string[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
     for (const part of m[1].split(",")) {
-      const name = part.trim();
-      if (name) out.add(name.replace(/\s+as\s+\w+$/, "").trim());
+      const raw = part.trim();
+      if (!raw) continue;
+      const alias = raw.match(/\bas\s+(\w+)\s*$/); // `Source as Public` → the public name is the alias
+      out.add(alias ? alias[1] : raw);
     }
   }
   return [...out].sort();
@@ -35,7 +40,8 @@ const FROZEN = [
   "ADAPTERS", "AnalysisTotals", "AnalyzeOptions", "AnalyzedCall", "AttestedAnalysis", "BillableSavings",
   "CacheHygieneReport", "CachePlan", "CachePreservationCredit", "ComponentRates", "DEFAULT_PRICE_TABLE",
   "DEFAULT_REDACTORS", "DROP", "Divergence", "DivergenceKind", "DivergenceReport", "ExtractedUsage",
-  "HygieneIssue", "HygieneReason", "MeteredAvoidance", "NOISE_FIELDS", "PriceTable", "ProviderAdapter",
+  "HygieneIssue", "HygieneReason", "MeteredAvoidance", "NOISE_FIELDS", "OpenAiUsageAggregate",
+  "OpenAiUsageBucket", "OpenAiUsageResult", "PriceTable", "ProviderAdapter",
   "ProviderUsage", "ProviderUsageFetcher", "ProxyOptions", "PruneOptions", "PruneResult",
   "ReconciliationReport", "RecordKey", "RecordStore", "RecordedCall", "RecordedHttpResponse",
   "RedactContext", "RedactFn", "ReplayOutcome", "ReplayOutcomeLive", "ReplayOutcomeReplay", "Replayer",
@@ -43,8 +49,10 @@ const FROZEN = [
   "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
-  "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage", "openaiAdapter",
+  "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage",
+  "openAiUsageFetcher", "openaiAdapter",
   "pickUsageFields", "planCacheBreakpoints", "pruneToolOutputs", "reconcileAgainstProviderBill",
+  "reconcileAgainstProviderBillWith",
   "redactValue", "redactedExportView", "selectAdapter", "startProxy", "totalRecordedTokens",
   "totalUsageTokens",
 ].sort();
@@ -56,8 +64,10 @@ const FROZEN_VALUES = [
   "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
-  "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage", "openaiAdapter",
+  "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage",
+  "openAiUsageFetcher", "openaiAdapter",
   "pickUsageFields", "planCacheBreakpoints", "pruneToolOutputs", "reconcileAgainstProviderBill",
+  "reconcileAgainstProviderBillWith",
   "redactValue", "redactedExportView", "selectAdapter", "startProxy", "totalRecordedTokens",
   "totalUsageTokens",
 ].sort();

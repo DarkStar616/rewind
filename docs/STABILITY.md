@@ -66,16 +66,18 @@ Values (runtime):
 `attestAnalysis`, `avoidedCostMicros`, `billableSavedTokens`, `canonicalizeRequest`,
 `createMemoryRecordStore`, `createReplayer`, `divergeMessages`, `extractUsage`,
 `extractUsageFor`, `geminiAdapter`, `hasCacheControl`, `isRecordableSuccessFor`,
-`meterAvoidance`, `meterCachePreservation`, `normalizeUsage`, `openaiAdapter`, `pickUsageFields`,
-`planCacheBreakpoints`, `pruneToolOutputs`, `reconcileAgainstProviderBill`, `redactValue`,
-`redactedExportView`, `selectAdapter`, `startProxy`, `totalRecordedTokens`, `totalUsageTokens`
+`meterAvoidance`, `meterCachePreservation`, `normalizeUsage`, `openAiUsageFetcher`, `openaiAdapter`,
+`pickUsageFields`, `planCacheBreakpoints`, `pruneToolOutputs`, `reconcileAgainstProviderBill`,
+`reconcileAgainstProviderBillWith`, `redactValue`, `redactedExportView`, `selectAdapter`, `startProxy`,
+`totalRecordedTokens`, `totalUsageTokens`
 
 Types:
 
 `AnalysisTotals`, `AnalyzeOptions`, `AnalyzedCall`, `AttestedAnalysis`, `BillableSavings`,
 `CacheHygieneReport`, `CachePlan`, `CachePreservationCredit`, `ComponentRates`, `Divergence`,
 `DivergenceKind`, `DivergenceReport`, `ExtractedUsage`, `HygieneIssue`, `HygieneReason`,
-`MeteredAvoidance`, `PriceTable`, `ProviderAdapter`, `ProviderUsage`, `ProviderUsageFetcher`,
+`MeteredAvoidance`, `OpenAiUsageAggregate`, `OpenAiUsageBucket`, `OpenAiUsageResult`, `PriceTable`,
+`ProviderAdapter`, `ProviderUsage`, `ProviderUsageFetcher`,
 `ProxyOptions`, `PruneOptions`, `PruneResult`, `ReconciliationReport`, `RecordKey`, `RecordStore`,
 `RecordedCall`, `RecordedHttpResponse`, `RedactContext`, `RedactFn`, `ReplayOutcome`,
 `ReplayOutcomeLive`, `ReplayOutcomeReplay`, `Replayer`, `ReplayerOptions`, `RunningProxy`,

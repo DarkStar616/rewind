@@ -44,12 +44,26 @@ function usableBaseline(providerBilledTokens: number): number {
 }
 
 /**
- * The OpenAI Usage API aggregate shape (the fields we consume). OpenAI reports billed usage as a
- * period aggregate; we sum input + output into a single billed-token baseline, exactly as the
- * Anthropic path yields one aggregate number. Fields we do not read are ignored.
+ * The OpenAI Usage API response shape (the fields we consume). The organization usage endpoints
+ * (`GET /v1/organization/usage/completions`) return time BUCKETS, each holding a `results` array whose
+ * entries carry `input_tokens`/`output_tokens` — NOT a top-level `total_usage`. We sum input + output
+ * across every result in every bucket into a single billed-token baseline, exactly as the Anthropic
+ * path yields one aggregate number. Fields we do not read are ignored.
+ *
+ * PAGINATION: the endpoint paginates (`has_more`/`next_page`). The injected `fetchRaw` is responsible
+ * for following the cursor and returning the FULLY-PAGED response — i.e. `data` concatenated across all
+ * pages for the period — so this pure adapter sums whatever buckets it is handed. That keeps the
+ * network (and its retry/paging policy) out of this offline-testable seam.
  */
+export interface OpenAiUsageResult {
+  input_tokens?: number;
+  output_tokens?: number;
+}
+export interface OpenAiUsageBucket {
+  results?: OpenAiUsageResult[];
+}
 export interface OpenAiUsageAggregate {
-  total_usage: { input_tokens?: number; output_tokens?: number };
+  data?: OpenAiUsageBucket[];
 }
 
 /** A finite, non-negative token field, else 0 — so a missing/garbage field fails closed, never inflates. */
@@ -59,16 +73,25 @@ function usableTokens(n: number | undefined): number {
 
 /**
  * Adapt an OpenAI Usage API fetch into a generic {@link ProviderUsageFetcher}. `fetchRaw` performs the
- * (async, networked) call and returns the raw OpenAI aggregate; this wrapper sums input + output into
- * the single billed-token baseline reconciliation consumes. No network here — inject `fetchRaw` so the
- * adapter is testable offline. The Anthropic path is unchanged: it already yields one aggregate number.
+ * (async, networked, paginated) call and returns the raw OpenAI response; this wrapper sums input +
+ * output across every bucket's results into the single billed-token baseline reconciliation consumes.
+ * No network here — inject `fetchRaw` so the adapter is testable offline. The Anthropic path is
+ * unchanged: it already yields one aggregate number.
  */
 export function openAiUsageFetcher(
   fetchRaw: (period: { since: string; until: string }) => Promise<OpenAiUsageAggregate>,
 ): ProviderUsageFetcher {
   return async (period) => {
-    const u = (await fetchRaw(period)).total_usage;
-    return usableTokens(u?.input_tokens) + usableTokens(u?.output_tokens);
+    const raw = await fetchRaw(period);
+    const buckets = Array.isArray(raw?.data) ? raw.data : [];
+    let total = 0;
+    for (const bucket of buckets) {
+      const results = Array.isArray(bucket?.results) ? bucket.results : [];
+      for (const r of results) {
+        total += usableTokens(r?.input_tokens) + usableTokens(r?.output_tokens);
+      }
+    }
+    return total;
   };
 }
 
