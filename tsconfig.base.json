@@ -5,6 +5,7 @@
     "moduleResolution": "nodenext",
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
+    "customConditions": ["development"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true

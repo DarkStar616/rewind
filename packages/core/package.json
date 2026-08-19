@@ -1,7 +1,45 @@
 {
   "name": "@rewind/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Reversible execution for AI agents: whole-workspace checkpoint/rewind, a refuse-and-record effect barrier, and a tamper-evident SHA-256 evidence chain — pure logic over logs and traces.",
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "exports": { ".": "./src/index.ts" }
+  "keywords": [
+    "ai-agents",
+    "rewind",
+    "checkpoint",
+    "reversible-execution",
+    "effect-barrier",
+    "tamper-evident",
+    "mcp"
+  ],
+  "homepage": "https://github.com/DarkStar616/rewind",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DarkStar616/rewind.git",
+    "directory": "packages/core"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  }
 }

@@ -1,10 +1,48 @@
 {
   "name": "@rewind/gateway",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Local byte-exact record/replay LLM proxy for AI coding agents: zero-cost replay after a rewind, prompt-cache preservation, deterministic tool-output pruning, and verifiable token-savings accounting.",
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "exports": { ".": "./src/index.ts" },
+  "keywords": [
+    "llm",
+    "proxy",
+    "record-replay",
+    "prompt-cache",
+    "token-savings",
+    "anthropic",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/DarkStar616/rewind",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DarkStar616/rewind.git",
+    "directory": "packages/gateway"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  },
   "dependencies": {
-    "@rewind/core": "0.0.0"
+    "@rewind/core": "^0.1.0"
   }
 }
