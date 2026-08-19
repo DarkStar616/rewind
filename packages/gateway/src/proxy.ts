@@ -25,10 +25,15 @@ import { request as httpsRequest } from "node:https";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
 import { StrictReplayMissError } from "./replay.ts";
-import { extractUsage } from "./usage.ts";
 import { planCacheBreakpoints } from "./cache-preserve.ts";
 import { analyzeCacheHygiene } from "./cache-hygiene.ts";
 import { pruneToolOutputs } from "./prune.ts";
+import { selectAdapter, type ProviderAdapter } from "./providers/provider-adapter.ts";
+import { anthropicAdapter } from "./providers/anthropic.ts";
+
+// Re-exported for backward compatibility: the Anthropic terminal-detection now lives in the anthropic
+// adapter, but callers (and proxy-hardening.test.ts) import it from here.
+export { isRecordableSuccess } from "./providers/anthropic.ts";
 
 /** The stored form of a recorded response: opaque bytes + just enough to replay them faithfully. */
 export interface RecordedHttpResponse {
@@ -48,6 +53,13 @@ export interface ProxyOptions {
   store: RecordStore;
   /** The request path treated as a replay-able messages endpoint. Default "/v1/messages". */
   messagesPath?: string;
+  /**
+   * Which provider's record/replay adapter to use. Default: AUTO-DETECT by request path (the first
+   * adapter whose endpoint matches — Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, Gemini
+   * `…:generateContent`). Set it to pin one provider. When nothing auto-detects but the request hits
+   * the legacy `messagesPath`, the Anthropic adapter is used, so existing callers are unaffected.
+   */
+  provider?: ProviderAdapter["id"];
   /** Header naming the isolation scope for records. Default "x-rewind-scope"; absent → "default". */
   scopeHeader?: string;
   /**
@@ -133,11 +145,18 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
 
     async function handle(): Promise<void> {
       const rawBody = await readBody(req);
-      const isMessages = req.method === "POST" && (req.url ?? "").split("?")[0] === messagesPath;
+      // Pick the provider adapter for this request. Explicit options.provider wins; otherwise the
+      // first adapter whose endpoint matches the path. As a legacy fallback, a request hitting the
+      // configured messagesPath that no adapter path-matched is treated as Anthropic — so existing
+      // callers (and a customised messagesPath) keep recording exactly as before.
+      const selected = selectAdapter({ provider: options.provider }, req.method, req.url);
+      const pathMatches = selected?.matchPath(req.method, req.url) ?? false;
+      const legacyMessages = req.method === "POST" && (req.url ?? "").split("?")[0] === messagesPath;
+      const adapter: ProviderAdapter | undefined = pathMatches ? selected : legacyMessages ? anthropicAdapter : undefined;
 
-      // Decide replay ONLY for the messages endpoint, and only when the body parses. Any failure here
-      // falls through to a plain forward — Rewind never blocks a call it cannot help.
-      if (isMessages) {
+      // Decide replay ONLY for a recordable model endpoint, and only when the body parses. Any failure
+      // here falls through to a plain forward — Rewind never blocks a call it cannot help.
+      if (adapter) {
         const scopeRaw = req.headers[scopeHeader];
         const scope = (Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw) || "default";
         let parsed: Record<string, unknown> | undefined;
@@ -225,7 +244,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             log(`proxy: cache-preserve skipped (${err instanceof Error ? err.message : String(err)})`);
           }
         }
-        await forward(forwardBody, { scope, replayKey: decision?.keyed });
+        await forward(forwardBody, { scope, replayKey: decision?.keyed, adapter });
         return;
       }
 
@@ -234,7 +253,10 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
     }
 
     /** Forward the raw body upstream, stream the response back live, and (on a messages 2xx) record it. */
-    function forward(rawBody: Buffer, record: { scope: string; replayKey?: string } | undefined): Promise<void> {
+    function forward(
+      rawBody: Buffer,
+      record: { scope: string; replayKey?: string; adapter: ProviderAdapter } | undefined,
+    ): Promise<void> {
       return new Promise((resolve) => {
         // Exactly one terminal path settles: a stream can emit both an upstream `error` and, on the
         // request object, an `error`, and the client can disconnect — without this guard two of them
@@ -299,9 +321,9 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
               const full = Buffer.concat(chunks);
               // Record only a genuine, COMPLETE success on the replay-able endpoint. A 2xx that carries
               // an SSE error or a truncated stream is transient and must never be frozen into a replay.
-              if (record?.replayKey && status >= 200 && status < 300 && isRecordableSuccess(full, contentType)) {
+              if (record?.replayKey && status >= 200 && status < 300 && record.adapter.isRecordableSuccess(full, contentType)) {
                 try {
-                  recordResponse(options.store, record.scope, record.replayKey, full, contentType, status);
+                  recordResponse(options.store, record.adapter, record.scope, record.replayKey, full, contentType, status);
                   log(`proxy: LIVE recorded scope=${record.scope} key=${record.replayKey.slice(0, 12)}`);
                 } catch (err) {
                   log(`proxy: record failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
@@ -345,44 +367,17 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   });
 }
 
-/**
- * Whether a 2xx response body is a genuine, COMPLETE success worth freezing into a replay. Anthropic
- * can return HTTP 200 and then deliver an error or a truncated stream — those must NOT be recorded, or
- * a transient failure would be replayed forever (and any partial usage credited as a saving).
- *
- *   - SSE: require a terminal `message_stop` and reject any `error` event. An incomplete stream (no
- *     stop) or an error frame is transient, not a cacheable answer.
- *   - JSON: reject a body whose `type` is `"error"`.
- *   - Anything we cannot parse: do NOT record (fail closed on the recording side — a miss just costs a
- *     redundant call, whereas recording garbage would serve garbage forever).
- */
-export function isRecordableSuccess(body: Buffer, contentType: string): boolean {
-  const text = body.toString("utf8");
-  const ct = (contentType ?? "").toLowerCase();
-  const looksSse = ct.includes("event-stream") || /^\s*event:|^\s*data:\s*\{/m.test(text);
-  if (looksSse) {
-    const hasStop = text.includes('"type":"message_stop"') || /^\s*event:\s*message_stop/m.test(text);
-    const hasError = text.includes('"type":"error"') || /^\s*event:\s*error/m.test(text);
-    return hasStop && !hasError;
-  }
-  try {
-    const parsed = JSON.parse(text) as { type?: unknown };
-    return parsed?.type !== "error";
-  } catch {
-    return false; // unparseable JSON → not a success we can safely replay
-  }
-}
-
 /** Parse usage + model out of a live response and store it for future replay (validated caller-side). */
 function recordResponse(
   store: RecordStore,
+  adapter: ProviderAdapter,
   scope: string,
   replayKey: string,
   body: Buffer,
   contentType: string,
   status: number,
 ): void {
-  const { usage, model } = extractUsage(body, contentType);
+  const { usage, model } = adapter.extractUsage(body, contentType);
   const response: RecordedHttpResponse = { status, contentType, bodyBase64: body.toString("base64") };
   const record: RecordedCall = { response, usage, model: model ?? "unknown" };
   store.put({ scope, replayKey }, record);

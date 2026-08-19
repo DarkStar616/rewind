@@ -24,8 +24,18 @@ export {
   DEFAULT_PRICE_TABLE,
 } from "./meter.ts";
 export type { PriceTable, ComponentRates, MeteredAvoidance } from "./meter.ts";
-export { extractUsage } from "./usage.ts";
+export { extractUsage, pickUsageFields, normalizeUsage } from "./usage.ts";
 export type { ExtractedUsage } from "./usage.ts";
+export {
+  selectAdapter,
+  isRecordableSuccessFor,
+  extractUsageFor,
+  ADAPTERS,
+} from "./providers/provider-adapter.ts";
+export type { ProviderAdapter } from "./providers/provider-adapter.ts";
+export { anthropicAdapter } from "./providers/anthropic.ts";
+export { openaiAdapter } from "./providers/openai.ts";
+export { geminiAdapter } from "./providers/gemini.ts";
 export { startProxy } from "./proxy.ts";
 export type { ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
 export { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from "./cache-preserve.ts";

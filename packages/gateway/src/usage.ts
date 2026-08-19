@@ -32,7 +32,8 @@ const ZERO: ProviderUsage = {
 
 /** Copy only the numeric usage fields we price; ignore anything else the provider includes.
  *
- *  Handles BOTH shapes so the gateway meters any provider:
+ *  Handles ALL THREE provider vocabularies so the gateway meters any provider from ONE field-picker
+ *  (each adapter folds its own stream, but they all normalise usage through here):
  *   - **Anthropic:** `input_tokens` (uncached) / `output_tokens` / `cache_read_input_tokens` /
  *     `cache_creation_input_tokens`.
  *   - **OpenAI-compatible** (OpenAI, Nebius, Together, Groq, …): `prompt_tokens` / `completion_tokens`,
@@ -40,8 +41,14 @@ const ZERO: ProviderUsage = {
  *     INCLUDES the cached tokens, so we map the UNCACHED remainder to `input_tokens` and the cached
  *     count to `cache_read_input_tokens` — matching Anthropic's semantics so the meter prices both the
  *     same way and never double-counts the cached tokens.
+ *   - **Gemini** (`usageMetadata`): `promptTokenCount` / `candidatesTokenCount`, with
+ *     `cachedContentTokenCount` for the cached portion. Gemini's `promptTokenCount` INCLUDES the
+ *     cached tokens (same as OpenAI), so it splits the same way.
+ *
+ *  Fallbacks fire ONLY when the higher-priority field is absent, so a provider that reports more than
+ *  one vocabulary is never double-mapped.
  */
-function pickUsage(u: unknown): ProviderUsage {
+export function pickUsageFields(u: unknown): ProviderUsage {
   if (!u || typeof u !== "object") return {};
   const o = u as Record<string, unknown>;
   const out: ProviderUsage = {};
@@ -66,7 +73,24 @@ function pickUsage(u: unknown): ProviderUsage {
   if (out.output_tokens === undefined && typeof o.completion_tokens === "number") {
     out.output_tokens = o.completion_tokens;
   }
+
+  // Gemini usageMetadata fallbacks — only when nothing above supplied the field.
+  const cachedG = typeof o.cachedContentTokenCount === "number" ? o.cachedContentTokenCount : 0;
+  if (out.input_tokens === undefined && typeof o.promptTokenCount === "number") {
+    // Split Gemini's all-inclusive promptTokenCount into uncached (input) + cached (cache_read).
+    out.input_tokens = Math.max(0, o.promptTokenCount - cachedG);
+    if (out.cache_read_input_tokens === undefined && cachedG > 0) out.cache_read_input_tokens = cachedG;
+  }
+  if (out.output_tokens === undefined && typeof o.candidatesTokenCount === "number") {
+    out.output_tokens = o.candidatesTokenCount;
+  }
   return out;
+}
+
+/** Normalise a partial usage block to a complete one (absent fields → 0) so metering sees every
+ *  field. Shared by every adapter's fold. */
+export function normalizeUsage(u: ProviderUsage): ProviderUsage {
+  return mergeUsage(ZERO, u);
 }
 
 /** Merge b onto a, field by field, so streaming start (input/cache) + delta (output) compose. */
@@ -82,7 +106,7 @@ function mergeUsage(a: ProviderUsage, b: ProviderUsage): ProviderUsage {
 function extractJson(text: string): ExtractedUsage {
   try {
     const body = JSON.parse(text) as Record<string, unknown>;
-    const usage = pickUsage(body.usage);
+    const usage = pickUsageFields(body.usage);
     const model = typeof body.model === "string" ? body.model : undefined;
     return { usage, model };
   } catch {
@@ -112,10 +136,10 @@ function extractSse(text: string): ExtractedUsage {
     }
     if (evt.type === "message_start" && evt.message && typeof evt.message === "object") {
       const msg = evt.message as Record<string, unknown>;
-      usage = mergeUsage(usage, pickUsage(msg.usage));
+      usage = mergeUsage(usage, pickUsageFields(msg.usage));
       if (typeof msg.model === "string") model = msg.model;
     } else if (evt.type === "message_delta") {
-      usage = mergeUsage(usage, pickUsage(evt.usage));
+      usage = mergeUsage(usage, pickUsageFields(evt.usage));
     }
   }
   return { usage, model };

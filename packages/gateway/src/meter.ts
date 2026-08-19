@@ -63,6 +63,19 @@ export const DEFAULT_PRICE_TABLE: PriceTable = {
     "claude-opus-4-8": { input: 15_000_000, output: 75_000_000, cacheWrite: 18_750_000, cacheRead: 1_500_000 },
     "claude-sonnet-4-5": { input: 3_000_000, output: 15_000_000, cacheWrite: 3_750_000, cacheRead: 300_000 },
     "claude-haiku-4-5": { input: 1_000_000, output: 5_000_000, cacheWrite: 1_250_000, cacheRead: 100_000 },
+    // OpenAI public list prices (per MTok), captured 2026-08-18. OpenAI has no separate cache-WRITE
+    // charge (caching is automatic and free to create), so cacheWrite mirrors the input rate as a
+    // conservative placeholder — the usage mapper never populates cache_creation for OpenAI, so this
+    // never actually prices anything. cacheRead is the discounted cached-input rate.
+    "gpt-4o": { input: 2_500_000, output: 10_000_000, cacheWrite: 2_500_000, cacheRead: 1_250_000 },
+    "gpt-4o-mini": { input: 150_000, output: 600_000, cacheWrite: 150_000, cacheRead: 75_000 },
+    "gpt-4.1": { input: 2_000_000, output: 8_000_000, cacheWrite: 2_000_000, cacheRead: 500_000 },
+    "gpt-4.1-mini": { input: 400_000, output: 1_600_000, cacheWrite: 400_000, cacheRead: 100_000 },
+    // Google Gemini public list prices (per MTok), captured 2026-08-18 (the ≤200k-token context tier).
+    // Gemini bills cached content at a discounted read rate and has no separate write charge; cacheWrite
+    // mirrors input as a placeholder (never populated for Gemini).
+    "gemini-2.5-pro": { input: 1_250_000, output: 10_000_000, cacheWrite: 1_250_000, cacheRead: 310_000 },
+    "gemini-2.5-flash": { input: 300_000, output: 2_500_000, cacheWrite: 300_000, cacheRead: 75_000 },
     // Conservative default = the CHEAPEST rate Anthropic has ever charged (Haiku-3-class, $0.25/$1.25
     // per MTok), NOT the cheapest currently-listed tier. An exact-but-unlisted model id (e.g. an older
     // snapshot) must under-bill, never over-bill — so the floor, not a mid-tier, is the fallback.
