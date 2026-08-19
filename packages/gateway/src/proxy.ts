@@ -264,7 +264,12 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         // keeping the key STABLE across the preserveCache flag — a record made with preserveCache on
         // still replays for the same caller request with it off, and never yields a false hit.
         let forwardBody = pruned && parsed ? Buffer.from(JSON.stringify(parsed), "utf8") : rawBody;
-        if (options.preserveCache && parsed) {
+        // Cache-breakpoint injection is ANTHROPIC-ONLY: planCacheBreakpoints appends Anthropic's
+        // `cache_control` object to the static prefix (tools/system). OpenAI caches automatically (no
+        // such field) and Gemini uses a different explicit-cache mechanism — injecting `cache_control`
+        // into their tool/message objects would make an otherwise-valid live request fail upstream. So
+        // gate it on the anthropic adapter; other providers forward untouched.
+        if (options.preserveCache && parsed && adapter.id === "anthropic") {
           try {
             const plan = planCacheBreakpoints(parsed);
             if (plan.injected) {

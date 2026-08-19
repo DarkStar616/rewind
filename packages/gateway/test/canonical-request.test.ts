@@ -117,6 +117,19 @@ test("a nested `ttl` inside tool input is NOT stripped (only cache_control's ttl
   assert.notEqual(canonicalizeRequest(a), canonicalizeRequest(b));
 });
 
+test("a USER tool-schema property named cache_control is NOT stripped — only a recognized hint shape is", () => {
+  // A tool JSON Schema may legitimately define a property named cache_control (e.g. enum on/off). Two
+  // requests differing only in that schema are materially different and must key differently — stripping
+  // it would let the second replay an answer generated under a different tool contract (false hit).
+  const withOn = { model: "m", messages: [{ role: "user", content: "hi" }], tools: [{ name: "t", input_schema: { properties: { cache_control: { type: "string", enum: ["on"] } } } }] };
+  const withOff = { model: "m", messages: [{ role: "user", content: "hi" }], tools: [{ name: "t", input_schema: { properties: { cache_control: { type: "string", enum: ["off"] } } } }] };
+  assert.notEqual(canonicalizeRequest(withOn), canonicalizeRequest(withOff), "a user cache_control schema property is part of identity");
+  // Whereas the REAL Anthropic hint shape ({type:'ephemeral'}) is still stripped as output-neutral noise.
+  const hint = { model: "m", messages: [{ role: "user", content: "hi" }], system: [{ type: "text", text: "s", cache_control: { type: "ephemeral" } }] };
+  const noHint = { model: "m", messages: [{ role: "user", content: "hi" }], system: [{ type: "text", text: "s" }] };
+  assert.equal(canonicalizeRequest(hint), canonicalizeRequest(noHint), "a recognized cache hint is still stripped");
+});
+
 test("output-affecting headers change the key; noise headers do not", () => {
   const body = baseRequest();
   const none = canonicalizeRequest(body, {});

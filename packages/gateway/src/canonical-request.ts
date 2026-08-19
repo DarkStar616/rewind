@@ -56,8 +56,31 @@ export const NOISE_FIELDS: ReadonlySet<string> = new Set([
  * `ttl` field inside a tool's input schema or a tool result, colliding two materially different
  * requests onto one key (a false hit → wrong answer). Likewise `prompt_cache_key` is a TOP-LEVEL
  * noise field (in NOISE_FIELDS), never stripped from nested content it may legitimately name.
+ *
+ * But `cache_control` is stripped ONLY where its value is a RECOGNIZED Anthropic cache hint (see
+ * isCacheHint). A tool's JSON Schema may legitimately DEFINE a property literally named `cache_control`
+ * (e.g. an enum `on`/`off`); blindly stripping every `cache_control` key would erase that schema
+ * difference, collide two different tool contracts onto one key, and let the second replay an answer
+ * generated under the other contract. Recognizing the hint SHAPE strips the real (output-neutral) hint
+ * while keeping a user schema property — and an unknown-shaped `cache_control` is KEPT, so it forces a
+ * miss rather than a false hit (the module's standing asymmetry).
  */
 const DEEP_STRIPPED_KEYS: ReadonlySet<string> = new Set(["cache_control"]);
+
+/** The known Anthropic cache-control hint types (the value shape `{ type: "ephemeral" | "persistent", ttl? }`). */
+const CACHE_HINT_TYPES: ReadonlySet<string> = new Set(["ephemeral", "persistent"]);
+
+/**
+ * Is this value a recognized Anthropic `cache_control` HINT (output-neutral, safe to strip), as opposed
+ * to a user-defined tool-schema property that merely shares the name? A hint is an object whose `type`
+ * is a known cache-control type. Anything else (a JSON Schema fragment like `{type:"string",enum:[…]}`,
+ * a primitive, an array) is NOT a hint and is retained, so a genuine contract difference keeps its key.
+ */
+function isCacheHint(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const t = (value as Record<string, unknown>).type;
+  return typeof t === "string" && CACHE_HINT_TYPES.has(t);
+}
 
 function deepStrip(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -67,7 +90,7 @@ function deepStrip(value: unknown): unknown {
     const source = value as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(source)) {
-      if (DEEP_STRIPPED_KEYS.has(key)) continue;
+      if (DEEP_STRIPPED_KEYS.has(key) && isCacheHint(source[key])) continue;
       out[key] = deepStrip(source[key]);
     }
     return out;
@@ -88,8 +111,9 @@ function project(body: unknown): unknown {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(source)) {
     if (NOISE_FIELDS.has(key.toLowerCase())) continue;
-    // Cache hints are noise wherever they sit — strip them at the top level too, not just when nested.
-    if (DEEP_STRIPPED_KEYS.has(key)) continue;
+    // A recognized cache HINT is noise wherever it sits — strip it at the top level too. A top-level
+    // `cache_control` that is NOT a hint shape is retained (it forces a miss, never a false hit).
+    if (DEEP_STRIPPED_KEYS.has(key) && isCacheHint(source[key])) continue;
     if (source[key] === undefined) continue;
     out[key] = deepStrip(source[key]);
   }

@@ -135,6 +135,24 @@ test("a SHARED store never cross-serves between two different upstream origins (
   }
 });
 
+test("preserveCache never injects Anthropic cache_control into an OpenAI request (would break upstream)", async () => {
+  const openaiJson = (n: number) => JSON.stringify({ id: `c${n}`, model: "gpt-4o", choices: [{ message: { role: "assistant", content: "hi" } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+  const stub = await startStub({ body: openaiJson });
+  const store = createMemoryRecordStore();
+  const replayer = createReplayer(store, createMemoryReplaySavings());
+  const proxy = await startProxy({ upstreamBase: stub.base, replayer, store, preserveCache: true });
+  try {
+    // An OpenAI chat request WITH tools + a static prefix that would tempt breakpoint injection.
+    const body = JSON.stringify({ model: "gpt-4o", messages: [{ role: "system", content: "you are helpful" }, { role: "user", content: "hi" }], tools: [{ type: "function", function: { name: "t", parameters: {} } }] });
+    await post(proxy, "/v1/chat/completions", body);
+    const forwarded = stub.lastBody?.toString("utf8") ?? "";
+    assert.doesNotMatch(forwarded, /cache_control/, "Anthropic cache_control must NOT be injected into an OpenAI request");
+  } finally {
+    await proxy.close();
+    await stub.close();
+  }
+});
+
 test("an explicit provider pin is honoured: a proxy pinned to openai does NOT record /v1/messages as anthropic", async () => {
   const stub = await startStub({ body: anthropicJson });
   const store = createMemoryRecordStore();
