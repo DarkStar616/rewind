@@ -140,18 +140,20 @@ const QUERY_AUTH_NOISE: ReadonlySet<string> = new Set(["key", "access_token", "a
  * the model in the body, so this only distinguishes genuinely different endpoints for them. Per the
  * module deny-list discipline: an unknown query param is KEPT, so it forces a miss, never a false hit.
  */
-function keyTarget(url: string | undefined): { path: string; query: Record<string, string> } {
+function keyTarget(url: string | undefined): { path: string; query: Record<string, string[]> } {
   if (!url) return { path: "", query: {} };
   const qIdx = url.indexOf("?");
   const path = qIdx === -1 ? url : url.slice(0, qIdx);
-  const query: Record<string, string> = {};
+  const query: Record<string, string[]> = {};
   if (qIdx !== -1) {
     const params = new URLSearchParams(url.slice(qIdx + 1));
-    // Distinct param NAMES; each maps to its sorted value list joined, so multi-valued params are
-    // order-insensitive. canonicalize() sorts the object keys, so param order never changes the key.
+    // Distinct param NAMES; each maps to its sorted value LIST (an array), so multi-valued params are
+    // order-insensitive and unambiguous. canonicalize() sorts the object keys, so param order is moot.
     for (const name of new Set(params.keys())) {
       if (QUERY_AUTH_NOISE.has(name.toLowerCase())) continue;
-      query[name] = params.getAll(name).sort().join(",");
+      // Store the sorted value LIST as an array, not a joined string: comma-joining would let
+      // `?p=a&p=b` collide with `?p=a,b`. An array keeps repeated values unambiguous in the key.
+      query[name] = params.getAll(name).sort();
     }
   }
   return { path, query };

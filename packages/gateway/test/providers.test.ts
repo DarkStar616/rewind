@@ -22,6 +22,36 @@ for (const f of [ANTHROPIC_SSE, OPENAI_SSE, GEMINI_SSE]) {
   });
 }
 
+test("gemini default JSON stream (a JSON ARRAY of chunks, no ?alt=sse) is recordable and meters non-zero", () => {
+  const a = selectAdapter({ provider: "gemini" }, "POST", "/v1beta/models/gemini-2.5-pro:streamGenerateContent")!;
+  // Default streamGenerateContent returns a JSON array of GenerateContentResponse chunks.
+  const arr = JSON.stringify([
+    { candidates: [{ content: { parts: [{ text: "he" }] } }], modelVersion: "gemini-2.5-pro" },
+    {
+      candidates: [{ content: { parts: [{ text: "llo" }] }, finishReason: "STOP" }],
+      usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 8, cachedContentTokenCount: 4 },
+      modelVersion: "gemini-2.5-pro",
+    },
+  ]);
+  assert.equal(a.isRecordableSuccess(Buffer.from(arr), "application/json"), true);
+  const { usage, model } = a.extractUsage(arr, "application/json");
+  const metered = meterAvoidance(usage, model ?? "gemini-2.5-pro");
+  assert.ok(metered.tokensAvoided > 0, "usage folded from the JSON array");
+  assert.ok(metered.costMicros > 0);
+});
+
+test("gemini JSON-array stream with NO finishReason (truncated) is NOT recordable", () => {
+  const a = selectAdapter({ provider: "gemini" }, "POST", "/v1beta/models/gemini-2.5-pro:streamGenerateContent")!;
+  const arr = JSON.stringify([{ candidates: [{ content: { parts: [{ text: "he" }] } }] }]);
+  assert.equal(a.isRecordableSuccess(Buffer.from(arr), "application/json"), false);
+});
+
+test("gemini JSON-array stream carrying an error element is NOT recordable", () => {
+  const a = selectAdapter({ provider: "gemini" }, "POST", "/v1beta/models/gemini-2.5-pro:streamGenerateContent")!;
+  const arr = JSON.stringify([{ candidates: [{ finishReason: "STOP" }] }, { error: { code: 500 } }]);
+  assert.equal(a.isRecordableSuccess(Buffer.from(arr), "application/json"), false);
+});
+
 test("auto-detect: an OpenAI chat path selects the openai adapter, not anthropic", () => {
   const a = selectAdapter({}, "POST", "/v1/chat/completions");
   assert.equal(a?.id, "openai");
@@ -70,6 +100,17 @@ test("stream vs non-stream Gemini targets key differently (SSE and JSON wire for
   // Query order/auth mix is normalised: same non-auth params, different order + an auth param → same key.
   const sseAltKeyed = canonicalizeRequest(body, undefined, "/v1beta/models/gemini-2.5-pro:generateContent?key=SECRET&alt=sse");
   assert.equal(sseAlt, sseAltKeyed, "auth dropped, non-auth retained regardless of order");
+});
+
+test("repeated query values are unambiguous: ?p=a&p=b never collides with ?p=a,b", () => {
+  const body = { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
+  const base = "/v1beta/models/gemini-2.5-pro:generateContent";
+  const repeated = canonicalizeRequest(body, undefined, `${base}?p=a&p=b`);
+  const commaJoined = canonicalizeRequest(body, undefined, `${base}?p=a%2Cb`);
+  assert.notEqual(repeated, commaJoined, "distinct multi-value targets must not share a key");
+  // But value ORDER within a repeated param does not matter (a=... then b=... == b=... then a=...).
+  const reordered = canonicalizeRequest(body, undefined, `${base}?p=b&p=a`);
+  assert.equal(repeated, reordered, "repeated-value order is normalised");
 });
 
 test("omitting the url keeps the legacy key stable (backward-compatible addition)", () => {

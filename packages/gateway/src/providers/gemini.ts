@@ -5,6 +5,12 @@
  * Terminal detection: a success carries at least one candidate with a `finishReason`, and no
  * top-level `error`. (A truncated stream has candidates but no finishReason yet.) Usage comes from the
  * `usageMetadata` block, read through the shared field-picker; the model is `modelVersion`.
+ *
+ * THREE wire shapes are handled, because Gemini streams two different ways:
+ *   - SSE (`streamGenerateContent?alt=sse`): `data:` frames — folded frame by frame.
+ *   - Default JSON stream (`streamGenerateContent` with no `alt`): a JSON ARRAY of
+ *     GenerateContentResponse chunks — iterated element by element.
+ *   - Single JSON object (`generateContent`): one GenerateContentResponse.
  */
 import type { ProviderAdapter } from "./provider-adapter.ts";
 import { pickUsageFields, normalizeUsage, type ExtractedUsage } from "../usage.ts";
@@ -65,9 +71,25 @@ export const geminiAdapter: ProviderAdapter = {
       return finished && !hasError;
     }
     try {
-      const parsed = JSON.parse(text) as Record<string, unknown>;
-      if (parsed?.error) return false;
-      return hasFinished(parsed);
+      const parsed = JSON.parse(text) as unknown;
+      // Default streamGenerateContent (no ?alt=sse) returns a JSON ARRAY of response chunks; a
+      // non-streamed generateContent returns a single object. Any element carrying an `error` makes the
+      // whole response non-recordable; at least one candidate must have finished.
+      if (Array.isArray(parsed)) {
+        let finished = false;
+        let hasError = false;
+        for (const el of parsed) {
+          if (el && typeof el === "object") {
+            const o = el as Record<string, unknown>;
+            if ("error" in o && o.error) hasError = true;
+            if (hasFinished(o)) finished = true;
+          }
+        }
+        return finished && !hasError;
+      }
+      const obj = parsed as Record<string, unknown>;
+      if (obj?.error) return false;
+      return hasFinished(obj);
     } catch {
       return false;
     }
@@ -76,16 +98,21 @@ export const geminiAdapter: ProviderAdapter = {
     const text = typeof raw === "string" ? raw : raw.toString("utf8");
     let usage: ProviderUsage = {};
     let model: string | undefined;
+    const foldOne = (o: Record<string, unknown>): void => {
+      if (o.usageMetadata) usage = { ...usage, ...pickUsageFields(o.usageMetadata) };
+      if (typeof o.modelVersion === "string") model = o.modelVersion;
+    };
     if (looksLikeSse(text, contentType)) {
-      for (const evt of sseFrames(text)) {
-        if (evt.usageMetadata) usage = { ...usage, ...pickUsageFields(evt.usageMetadata) };
-        if (typeof evt.modelVersion === "string") model = evt.modelVersion;
-      }
+      for (const evt of sseFrames(text)) foldOne(evt);
     } else {
       try {
-        const body = JSON.parse(text) as Record<string, unknown>;
-        usage = pickUsageFields(body.usageMetadata);
-        if (typeof body.modelVersion === "string") model = body.modelVersion;
+        const body = JSON.parse(text) as unknown;
+        // A JSON array (default JSON stream) folds every chunk; a single object folds itself.
+        if (Array.isArray(body)) {
+          for (const el of body) if (el && typeof el === "object") foldOne(el as Record<string, unknown>);
+        } else if (body && typeof body === "object") {
+          foldOne(body as Record<string, unknown>);
+        }
       } catch {
         /* unparseable → all-zero usage below */
       }
