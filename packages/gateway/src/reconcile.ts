@@ -44,6 +44,49 @@ function usableBaseline(providerBilledTokens: number): number {
 }
 
 /**
+ * The OpenAI Usage API aggregate shape (the fields we consume). OpenAI reports billed usage as a
+ * period aggregate; we sum input + output into a single billed-token baseline, exactly as the
+ * Anthropic path yields one aggregate number. Fields we do not read are ignored.
+ */
+export interface OpenAiUsageAggregate {
+  total_usage: { input_tokens?: number; output_tokens?: number };
+}
+
+/** A finite, non-negative token field, else 0 — so a missing/garbage field fails closed, never inflates. */
+function usableTokens(n: number | undefined): number {
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Adapt an OpenAI Usage API fetch into a generic {@link ProviderUsageFetcher}. `fetchRaw` performs the
+ * (async, networked) call and returns the raw OpenAI aggregate; this wrapper sums input + output into
+ * the single billed-token baseline reconciliation consumes. No network here — inject `fetchRaw` so the
+ * adapter is testable offline. The Anthropic path is unchanged: it already yields one aggregate number.
+ */
+export function openAiUsageFetcher(
+  fetchRaw: (period: { since: string; until: string }) => Promise<OpenAiUsageAggregate>,
+): ProviderUsageFetcher {
+  return async (period) => {
+    const u = (await fetchRaw(period)).total_usage;
+    return usableTokens(u?.input_tokens) + usableTokens(u?.output_tokens);
+  };
+}
+
+/**
+ * Fetch the provider's aggregate with an injected {@link ProviderUsageFetcher}, then reconcile against
+ * it. The async seam over the pure {@link reconcileAgainstProviderBill}: works for either provider
+ * (Anthropic or OpenAI via {@link openAiUsageFetcher}); the reconciliation math stays in one place.
+ */
+export async function reconcileAgainstProviderBillWith(
+  savings: readonly ReplaySaving[],
+  fetcher: ProviderUsageFetcher,
+  period: { since: string; until: string },
+): Promise<ReconciliationReport> {
+  const providerBilledTokens = await fetcher(period);
+  return reconcileAgainstProviderBill(savings, providerBilledTokens);
+}
+
+/**
  * Reconcile chain-attested billable savings against the provider's independently-reported aggregate.
  * Pure and synchronous — the provider number is passed in (fetch it with a ProviderUsageFetcher).
  */
