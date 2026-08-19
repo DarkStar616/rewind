@@ -21,7 +21,7 @@ export interface ProviderAdapter {
   readonly id: "anthropic" | "openai" | "gemini";
   /** Is this a recordable model call for this provider?
    *  anthropic: POST /v1/messages
-   *  openai:    POST /v1/chat/completions (also /v1/responses)
+   *  openai:    POST /v1/chat/completions (Responses API /v1/responses is deferred post-1.0)
    *  gemini:    POST /v1beta/models/<model>:generateContent|:streamGenerateContent */
   matchPath(method: string | undefined, url: string | undefined): boolean;
   /** COMPLETE, non-error 2xx worth freezing? Per-provider terminal:

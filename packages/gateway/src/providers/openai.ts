@@ -1,11 +1,19 @@
 /**
  * openai adapter — OpenAI and OpenAI-compatible providers (Nebius, Together, Groq, …). Recordable
- * endpoints: POST /v1/chat/completions and POST /v1/responses.
+ * endpoint: POST /v1/chat/completions.
  *
  * Terminal detection: a streamed success ends with `data: [DONE]`, carries ≥1 chunk with a `choices`
  * array, and no frame carries a top-level `error` object. A non-streamed success is a JSON body with
  * a `choices` array and no top-level `error`. Usage comes from the final chunk's `usage` block (or the
  * body's `usage` for JSON), read through the shared field-picker.
+ *
+ * The newer Responses API (POST /v1/responses) is DELIBERATELY not matched here (deferred post-1.0):
+ * its wire format is different — a non-streamed success carries `status`/`output` (not `choices`), a
+ * streamed one terminates with a `response.completed` event (not `data: [DONE]`), and its usage block
+ * uses `input_tokens`/`output_tokens` with `input_tokens_details.cached_tokens`. Matching it without
+ * implementing those shapes would reject every real Responses result as non-recordable and mis-price
+ * cached input, so we do not advertise it until the terminal + usage folds are built. Chat Completions
+ * remains the OpenAI-compatible surface these providers all speak.
  */
 import type { ProviderAdapter } from "./provider-adapter.ts";
 import { pickUsageFields, normalizeUsage, type ExtractedUsage } from "../usage.ts";
@@ -37,7 +45,9 @@ export const openaiAdapter: ProviderAdapter = {
   matchPath(method: string | undefined, url: string | undefined): boolean {
     if (method !== "POST") return false;
     const path = (url ?? "").split("?")[0];
-    return path === "/v1/chat/completions" || path === "/v1/responses";
+    // Only Chat Completions. The Responses API (/v1/responses) is deferred post-1.0 — see the header
+    // comment: matching it without its distinct terminal/usage shapes would reject every real result.
+    return path === "/v1/chat/completions";
   },
   isRecordableSuccess(body: Buffer, contentType: string): boolean {
     const text = body.toString("utf8");

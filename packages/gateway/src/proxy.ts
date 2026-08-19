@@ -174,7 +174,10 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
               log(`proxy: pruned ${pr.elided} duplicate tool output(s) (~${pr.charsSaved} chars) scope=${scope}`);
             }
           }
-          decision = options.replayer.handle(scope, parsed, req.headers);
+          // Pass the request URL so its pathname co-determines the key: providers that name the model
+          // (or the JSON-vs-SSE choice) in the URL rather than the body — Gemini — must not collide two
+          // different targets onto one record. The replayer strips the query (auth material) itself.
+          decision = options.replayer.handle(scope, parsed, req.headers, req.url);
         } catch (err) {
           // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
           // NOT fall through to a paid upstream forward. Surface it; forward only on real parse faults.
