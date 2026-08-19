@@ -18,6 +18,12 @@ Provides:
   + `attestAnalysis`, `reconcileAgainstProviderBill`) — priced from the provider's own usage, floored,
   never over-crediting; reports fold into a verifiable hash chain.
 
+**Provider-neutral.** Three built-in adapters cover **Anthropic** (`/v1/messages`), **OpenAI**
+(`/v1/chat/completions`), and **Google Gemini** (`:generateContent`), auto-selected per request or pinned
+explicitly. Any **OpenAI-compatible** endpoint (Kimi / Moonshot, DeepSeek, Together, Fireworks, Groq,
+OpenRouter, Nebius, xAI, vLLM, Ollama, …) is handled by the OpenAI adapter. The byte-exact replay key is
+provider-agnostic; unlisted models meter against a conservative default rate (under-bills, never over).
+
 ```bash
 npm install @agent-rewind/gateway
 ```

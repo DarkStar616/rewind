@@ -63,6 +63,19 @@ export const DEFAULT_PRICE_TABLE: PriceTable = {
     "claude-opus-4-8": { input: 15_000_000, output: 75_000_000, cacheWrite: 18_750_000, cacheRead: 1_500_000 },
     "claude-sonnet-4-5": { input: 3_000_000, output: 15_000_000, cacheWrite: 3_750_000, cacheRead: 300_000 },
     "claude-haiku-4-5": { input: 1_000_000, output: 5_000_000, cacheWrite: 1_250_000, cacheRead: 100_000 },
+    // OpenAI public list prices (per MTok), captured 2026-08-18. OpenAI has no separate cache-WRITE
+    // charge (caching is automatic and free to create), so cacheWrite mirrors the input rate as a
+    // conservative placeholder — the usage mapper never populates cache_creation for OpenAI, so this
+    // never actually prices anything. cacheRead is the discounted cached-input rate.
+    "gpt-4o": { input: 2_500_000, output: 10_000_000, cacheWrite: 2_500_000, cacheRead: 1_250_000 },
+    "gpt-4o-mini": { input: 150_000, output: 600_000, cacheWrite: 150_000, cacheRead: 75_000 },
+    "gpt-4.1": { input: 2_000_000, output: 8_000_000, cacheWrite: 2_000_000, cacheRead: 500_000 },
+    "gpt-4.1-mini": { input: 400_000, output: 1_600_000, cacheWrite: 400_000, cacheRead: 100_000 },
+    // Google Gemini public list prices (per MTok), captured 2026-08-18 (the ≤200k-token context tier).
+    // Gemini bills cached content at a discounted read rate and has no separate write charge; cacheWrite
+    // mirrors input as a placeholder (never populated for Gemini).
+    "gemini-2.5-pro": { input: 1_250_000, output: 10_000_000, cacheWrite: 1_250_000, cacheRead: 310_000 },
+    "gemini-2.5-flash": { input: 300_000, output: 2_500_000, cacheWrite: 300_000, cacheRead: 75_000 },
     // Conservative default = the CHEAPEST rate Anthropic has ever charged (Haiku-3-class, $0.25/$1.25
     // per MTok), NOT the cheapest currently-listed tier. An exact-but-unlisted model id (e.g. an older
     // snapshot) must under-bill, never over-bill — so the floor, not a mid-tier, is the fallback.
@@ -70,9 +83,29 @@ export const DEFAULT_PRICE_TABLE: PriceTable = {
   },
 };
 
-/** Resolve the rates for a model, falling back to the table's `default`. `undefined` if neither exists. */
+/**
+ * Resolve the rates for a model, falling back to the table's `default`. `undefined` if neither exists.
+ *
+ * Providers report a SNAPSHOT/versioned id on the response (OpenAI `gpt-4o-2024-08-06`, Anthropic
+ * `claude-opus-4-8-20260101`, Gemini `gemini-2.5-pro-002`), while the table is keyed by the base family
+ * (`gpt-4o`). An exact-only lookup would silently drop every real response onto the cheap `default`,
+ * materially UNDER-reporting avoided cost. So on a miss we strip trailing PURE-NUMERIC segments (dates,
+ * snapshot numbers) one at a time, checking the table after each strip, and stop at the FIRST hit — the
+ * most specific base family. Only digit-only tail segments are removed, so a non-numeric family suffix
+ * (`-mini`, `-flash`) is never crossed and a mini/non-mini or pro/flash pair can never be conflated.
+ */
 function ratesFor(model: string, table: PriceTable): ComponentRates | undefined {
-  return table.rates[model] ?? table.rates.default;
+  const exact = table.rates[model];
+  if (exact) return exact;
+  let id = model;
+  for (let idx = id.lastIndexOf("-"); idx !== -1; idx = id.lastIndexOf("-")) {
+    const tail = id.slice(idx + 1);
+    if (!/^\d+$/.test(tail)) break; // stop at the first non-numeric segment — never cross a family suffix
+    id = id.slice(0, idx);
+    const hit = table.rates[id];
+    if (hit) return hit;
+  }
+  return table.rates.default;
 }
 
 /**

@@ -305,8 +305,8 @@ the events," never "the metric is cryptographically unforgeable."
 
 ## 7. Testing & verification results (Agent Rewind's own numbers)
 
-- **289 automated tests, 100% passing; typecheck clean** **[PROVEN]** — `npm run check` → `tests 289,
-  pass 285, fail 0`. Split: core 101, gateway 142, mcp 42.
+- **334 automated tests, 100% passing; typecheck clean** **[PROVEN]** — `npm run check` → `tests 334,
+  pass 334, fail 0`. Split: core 103, gateway 184, mcp 47.
 - **Stability:** the full suite was run **10 times in a row on four separate occasions (40 runs) — every
   run fully green, zero flakiness**, including the concurrency-sensitive git-backend tests.
 - **Property-based tests** on the two most safety-critical functions: the replay key (200 randomized
@@ -396,7 +396,7 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 ## 11. Distribution & integration
 
 > **Availability: LIVE on npm.** `@agent-rewind/core`, `@agent-rewind/gateway`, `@agent-rewind/mcp` are
-> published (0.1.1) and **verified installable + runnable from the public registry**. The CLI ships
+> published (1.0.0) and **verified installable + runnable from the public registry**. The CLI ships
 > **scoped** (the unscoped `rewind` name is taken), so install is `npx -y @agent-rewind/mcp`, not a bare
 > `npx rewind`.
 
@@ -416,7 +416,7 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 | Claim | Status |
 |---|---|
-| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 289 tests |
+| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 334 tests |
 | Never serves a stale/wrong answer on a near-match | **[PROVEN]** — deny-list + bench gate |
 | Never over-credits savings (floors, dedupes, counterfactuals impossible) | **[PROVEN]** — meter/billable/bench |
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |

@@ -40,9 +40,9 @@ Everything runs **locally**. No account, no API key, no data leaves the machine.
 Published on the public npm registry and **verified end-to-end from the registry** (installed fresh and
 run, not just "publish reported success"):
 
-- `@agent-rewind/core@0.1.0` — the reversible-execution engine + effect barrier + hash chain
-- `@agent-rewind/gateway@0.1.0` — the token-saving record/replay LLM proxy
-- `@agent-rewind/mcp@0.1.0` — the CLI + MCP server people install
+- `@agent-rewind/core@1.0.0` — the reversible-execution engine + effect barrier + hash chain
+- `@agent-rewind/gateway@1.0.0` — the token-saving record/replay LLM proxy
+- `@agent-rewind/mcp@1.0.0` — the CLI + MCP server people install
 
 **Source:** https://github.com/DarkStar616/rewind · **Licence:** FSL-1.1-ALv2 (source-available, becomes
 Apache-2.0 after 2 years).
@@ -169,8 +169,8 @@ future work. Don't attribute those research numbers to Agent Rewind directly.
 ## What's proven vs. honest limits (do not overclaim)
 
 **Proven** (automated tests + live verification): the checkpoint/rewind/effect-barrier/hash-chain
-guarantees are covered by **289 passing tests** (run `npm run check`), ran green **40+ times with zero flakiness**, went
-through **five rounds of independent (different-AI-vendor) code review that converged clean**, and the
+guarantees are covered by **334 passing tests** (run `npm run check`), ran green **40+ times with zero flakiness**, went
+through **repeated rounds of independent (different-AI-vendor) code review that converged clean**, and the
 published package was **installed from npm and run end-to-end**.
 
 **Honest limits — state these, don't hide them:**
@@ -206,7 +206,7 @@ published package was **installed from npm and run end-to-end**.
 | Price | Free, local, open (FSL-1.1-ALv2). Planned paid layer: a share of *verified* token savings. |
 | Works with | Claude Code, Cursor, Codex CLI, Cline, Windsurf (any MCP client) |
 | Requires | Node ≥ 20. No account, no API key. |
-| npm | @agent-rewind/core, @agent-rewind/gateway, @agent-rewind/mcp (all 0.1.0) |
+| npm | @agent-rewind/core, @agent-rewind/gateway, @agent-rewind/mcp (all 1.0.0) |
 | Repo | https://github.com/DarkStar616/rewind |
 | One-line pitch | "An undo button for AI coding agents — that can't accidentally re-charge a card." |
 

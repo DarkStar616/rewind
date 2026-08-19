@@ -24,8 +24,18 @@ export {
   DEFAULT_PRICE_TABLE,
 } from "./meter.ts";
 export type { PriceTable, ComponentRates, MeteredAvoidance } from "./meter.ts";
-export { extractUsage } from "./usage.ts";
+export { extractUsage, pickUsageFields, normalizeUsage } from "./usage.ts";
 export type { ExtractedUsage } from "./usage.ts";
+export {
+  selectAdapter,
+  isRecordableSuccessFor,
+  extractUsageFor,
+  ADAPTERS,
+} from "./providers/provider-adapter.ts";
+export type { ProviderAdapter } from "./providers/provider-adapter.ts";
+export { anthropicAdapter } from "./providers/anthropic.ts";
+export { openaiAdapter } from "./providers/openai.ts";
+export { geminiAdapter } from "./providers/gemini.ts";
 export { startProxy } from "./proxy.ts";
 export type { ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
 export { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from "./cache-preserve.ts";
@@ -38,8 +48,14 @@ export { billableSavedTokens } from "./billable.ts";
 export type { BillableSavings } from "./billable.ts";
 export { redactValue, redactedExportView, DEFAULT_REDACTORS, DROP } from "./redact.ts";
 export type { RedactFn, RedactContext } from "./redact.ts";
-export { reconcileAgainstProviderBill } from "./reconcile.ts";
-export type { ReconciliationReport, ProviderUsageFetcher } from "./reconcile.ts";
+export { reconcileAgainstProviderBill, reconcileAgainstProviderBillWith, openAiUsageFetcher } from "./reconcile.ts";
+export type {
+  ReconciliationReport,
+  ProviderUsageFetcher,
+  OpenAiUsageAggregate,
+  OpenAiUsageBucket,
+  OpenAiUsageResult,
+} from "./reconcile.ts";
 export { divergeMessages } from "./diverge.ts";
 export type { DivergenceReport, Divergence, DivergenceKind } from "./diverge.ts";
 export { analyzeTraffic, attestAnalysis } from "./analysis.ts";

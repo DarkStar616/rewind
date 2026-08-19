@@ -17,7 +17,7 @@ a local, byte-transparent LLM proxy an agent points `ANTHROPIC_BASE_URL` at.
 | **G8** cache-preserve | Mechanism B: injects a breakpoint on the static prefix when the agent set none; credits only what it caused; **opt-in**, separate meter (never double-counts A) | cache-preserve tests |
 | **BP1** secrets excluded | A rewind can never revert a live `.env`/key (AgentRewind "excluded" class) | 7 secret-exclusion tests |
 
-Run `npm run check` for the current count (289 tests + `tsc --noEmit`, all green).
+Run `npm run check` for the current count (334 tests + `tsc --noEmit`, all green).
 
 ## The two mechanisms, kept separate
 

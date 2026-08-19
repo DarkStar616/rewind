@@ -22,6 +22,7 @@
  * evidence chain read ONLY the effect log / trace, never the filesystem — `chainHash` and the
  * spent-effect count come from `store` reads (head/list), not from inspecting files.
  */
+import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -46,6 +47,22 @@ function nowMs(): number {
 }
 
 const TIER0_HONESTY = "Tier 0 is REVERSIBILITY, not isolation or security.";
+
+/**
+ * The MCP server's advertised version, DERIVED from package.json so the server identity can never drift
+ * from the published release (codex round 11: a hard-coded "0.1.3" survived the 1.0.0 bump). Resolves in
+ * BOTH dev and bundled form: `src/server.ts` and the bundled `dist/cli.js` each sit one directory below
+ * the package root, so `../package.json` is the package's own manifest either way, and npm always ships
+ * package.json in the tarball. The fallback is a visible sentinel — never a silent wrong version.
+ */
+const SERVER_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
 
 export interface RewindMcpServerOptions {
   /** The workspace the server snapshots and guards. */
@@ -73,7 +90,7 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   // connect, so the agent learns the WORKFLOW up front instead of reverse-engineering it from tool
   // descriptions. Keep it tight and actionable.
   const server = new McpServer(
-    { name: "agent-rewind", version: "0.1.3" },
+    { name: "agent-rewind", version: SERVER_VERSION },
     {
       instructions:
         "Agent Rewind gives you reversible execution for this workspace. Use it like this:\n" +
