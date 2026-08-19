@@ -73,7 +73,7 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   // connect, so the agent learns the WORKFLOW up front instead of reverse-engineering it from tool
   // descriptions. Keep it tight and actionable.
   const server = new McpServer(
-    { name: "agent-rewind", version: "0.0.0" },
+    { name: "agent-rewind", version: "0.1.1" },
     {
       instructions:
         "Agent Rewind gives you reversible execution for this workspace. Use it like this:\n" +
