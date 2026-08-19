@@ -42,6 +42,18 @@ export interface AnalyzedCall {
    * mean "I checked, there are no output-affecting headers."
    */
   headers?: Record<string, string | string[] | undefined>;
+  /**
+   * The request's URL/target. Its pathname (query stripped) is folded into the replay key EXACTLY as the
+   * live gateway does, so two calls with the same body but a different endpoint/model target — the case
+   * that matters for providers naming the model in the URL, e.g. Gemini's
+   * `…/gemini-2.5-pro:generateContent` vs `…:flash` — are NOT counted as a replay.
+   *
+   * Absence is UNKNOWN, exactly like `headers`: omitting `url` means the target is unknown, and an
+   * unknown-target call is never counted as a replay (the live gateway keys on the URL, so a repeat can
+   * only be proven when the target matched too — over-crediting is the one thing a savings report must
+   * never do). Declare it (e.g. `"/v1/messages"`) for the call to be eligible as a replay.
+   */
+  url?: string;
 }
 
 export interface ScopeAnalysis {
@@ -116,13 +128,18 @@ export function analyzeTraffic(calls: readonly AnalyzedCall[], opts: AnalyzeOpti
     }
     scope.calls += 1;
 
-    // A call whose headers are UNKNOWN (the field is absent) cannot be PROVEN byte-replayable: two such
-    // calls may have differed in an output-affecting header (anthropic-version / anthropic-beta) that the
-    // live gateway keys on but we cannot see here. Give it a key that can never match another call, so it
-    // is never counted as a replay — over-crediting is the one thing a savings report must never do. A
-    // call that DECLARES its headers (even `{}` = "I checked, no output-affecting headers") is keyed
-    // normally and can match. The `unknown-headers:` key can never collide with a 64-hex canonical key.
-    const key = c.headers === undefined ? `unknown-headers:${callIndex}` : canonicalizeRequest(c.body, c.headers);
+    // A call whose headers OR url are UNKNOWN (the field is absent) cannot be PROVEN byte-replayable:
+    // two such calls may have differed in an output-affecting header (anthropic-version / anthropic-beta)
+    // OR in the endpoint/model target (Gemini names the model in the URL) that the live gateway keys on
+    // but we cannot see here. Give it a key that can never match another call, so it is never counted as
+    // a replay — over-crediting is the one thing a savings report must never do. A call that DECLARES
+    // both (even `headers:{}` = "I checked, no output-affecting headers") is keyed exactly as the live
+    // gateway keys it — over body + headers + url path. The `unknown-target:` key can never collide with
+    // a 64-hex canonical key.
+    const key =
+      c.headers === undefined || c.url === undefined
+        ? `unknown-target:${callIndex}`
+        : canonicalizeRequest(c.body, c.headers, c.url);
     const seen = seenByScope.get(c.scope)!;
     if (seen.has(key)) {
       // A byte-replayable repeat: the whole upstream call is avoidable on replay. A malformed call

@@ -26,6 +26,25 @@ const TEST_TABLE: PriceTable = {
   },
 };
 
+test("a versioned/snapshot model id resolves to its base family rate, not the cheap default", () => {
+  const u: ProviderUsage = { input_tokens: 1_000_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  // OpenAI snapshot: gpt-4o-2024-08-06 must price as gpt-4o ($2.50/MTok input), not the $0.25 default.
+  assert.equal(avoidedCostMicros(u, "gpt-4o-2024-08-06", DEFAULT_PRICE_TABLE), 2_500_000);
+  // gpt-4.1-2025-04-14 → gpt-4.1 ($2.00/MTok).
+  assert.equal(avoidedCostMicros(u, "gpt-4.1-2025-04-14", DEFAULT_PRICE_TABLE), 2_000_000);
+  // Gemini snapshot number: gemini-2.5-flash-002 → gemini-2.5-flash ($0.30/MTok input).
+  assert.equal(avoidedCostMicros(u, "gemini-2.5-flash-002", DEFAULT_PRICE_TABLE), 300_000);
+});
+
+test("normalization never crosses a non-numeric family suffix (mini stays mini, flash stays flash)", () => {
+  const u: ProviderUsage = { input_tokens: 1_000_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  // gpt-4o-mini-2024-07-18 must resolve to gpt-4o-mini ($0.15), NOT gpt-4o ($2.50) — the date strips,
+  // but `mini` (non-numeric) halts the strip, so the cheaper mini family is preserved.
+  assert.equal(avoidedCostMicros(u, "gpt-4o-mini-2024-07-18", DEFAULT_PRICE_TABLE), 150_000);
+  // An entirely unknown family still floors to the conservative default, never a wrong (dearer) family.
+  assert.equal(avoidedCostMicros(u, "some-unknown-model-99", DEFAULT_PRICE_TABLE), 250_000);
+});
+
 test("golden-negative: zero/empty usage prices to EXACTLY 0", () => {
   assert.equal(avoidedCostMicros({}, "model-x", TEST_TABLE), 0);
   assert.equal(

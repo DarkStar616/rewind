@@ -10,6 +10,7 @@ const call = (scope: string, prompt: string, tokens: number) => ({
   usage: { input_tokens: tokens, output_tokens: tokens },
   model: "claude-haiku-4-5",
   headers: {}, // declared: no output-affecting headers, so identical calls are genuine replays
+  url: "/v1/messages", // declared target — keyed exactly as the live gateway does
 });
 
 test("analysis counts byte-replayable repeats and prices the avoided cost", () => {
@@ -40,6 +41,7 @@ test("same body but a different anthropic-beta header is NOT a replay (no over-c
     usage: { input_tokens: 100, output_tokens: 100 },
     model: "claude-haiku-4-5",
     headers: { "anthropic-beta": beta },
+    url: "/v1/messages",
   });
   const a = analyzeTraffic([mk("v1"), mk("v2")]);
   assert.equal(a.total.replayableCalls, 0, "different output-affecting header => different key => not a replay");
@@ -49,7 +51,7 @@ test("same body but a different anthropic-beta header is NOT a replay (no over-c
 });
 
 test("a malformed call missing usage is tolerated as zero, never a crash (under-counts, never over-credits)", () => {
-  const noUsage = { scope: "s", body: { model: "m", messages: [{ role: "user", content: "hi" }] }, model: "m", headers: {} } as never;
+  const noUsage = { scope: "s", body: { model: "m", messages: [{ role: "user", content: "hi" }] }, model: "m", headers: {}, url: "/v1/messages" } as never;
   const a = analyzeTraffic([noUsage, noUsage]);
   assert.equal(a.total.replayableCalls, 1, "still detected as a replay");
   assert.equal(a.total.avoidedTokens, 0, "missing usage avoids zero tokens, not a throw");
@@ -63,6 +65,32 @@ test("calls with UNKNOWN headers (field omitted) are never counted as replayable
   assert.equal(a.total.calls, 2);
   assert.equal(a.total.replayableCalls, 0, "unknown-headers calls never match each other");
   assert.equal(a.total.avoidedCostMicros, 0, "and so credit nothing");
+});
+
+test("two calls to different URL-addressed models (same body) are NOT a replay — matches the live key", () => {
+  // Gemini names the model in the URL, not the body. The live gateway keys on the URL path, so two
+  // identical bodies to pro vs flash are distinct calls; the analysis must agree or it over-credits.
+  const body = { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
+  const mk = (model: string) => ({
+    scope: "s",
+    body,
+    usage: { input_tokens: 100, output_tokens: 50 },
+    model,
+    headers: {},
+    url: `/v1beta/models/${model}:generateContent`,
+  });
+  const a = analyzeTraffic([mk("gemini-2.5-pro"), mk("gemini-2.5-flash")]);
+  assert.equal(a.total.replayableCalls, 0, "different model target => different key => not a replay");
+  // The SAME model target twice IS a genuine replay.
+  const b = analyzeTraffic([mk("gemini-2.5-pro"), mk("gemini-2.5-pro")]);
+  assert.equal(b.total.replayableCalls, 1);
+});
+
+test("calls with UNKNOWN url (field omitted) are never counted as replayable — no over-credit", () => {
+  const c = { scope: "s", body: { model: "m", messages: [{ role: "user", content: "hi" }] }, usage: { input_tokens: 9, output_tokens: 9 }, model: "m", headers: {} };
+  const a = analyzeTraffic([c, c]);
+  assert.equal(a.total.replayableCalls, 0, "unknown-target calls never match each other");
+  assert.equal(a.total.avoidedCostMicros, 0);
 });
 
 test("an empty traffic batch analyses and attests cleanly (no sample, still verifiable)", () => {

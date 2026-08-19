@@ -127,6 +127,7 @@ test("rewind CLI: analyze prints a verifiable, redacted savings report and exits
       usage: { input_tokens: 100, output_tokens: 100 },
       model: "claude-haiku-4-5",
       headers: {}, // declared: no output-affecting headers
+      url: "/v1/messages", // declared target — keyed exactly as the live gateway does
     });
     const input = JSON.stringify([call("hello"), call("hello"), call("unique")]);
     const r = runCli(dir, ["analyze", input]);

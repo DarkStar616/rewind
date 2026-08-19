@@ -83,9 +83,29 @@ export const DEFAULT_PRICE_TABLE: PriceTable = {
   },
 };
 
-/** Resolve the rates for a model, falling back to the table's `default`. `undefined` if neither exists. */
+/**
+ * Resolve the rates for a model, falling back to the table's `default`. `undefined` if neither exists.
+ *
+ * Providers report a SNAPSHOT/versioned id on the response (OpenAI `gpt-4o-2024-08-06`, Anthropic
+ * `claude-opus-4-8-20260101`, Gemini `gemini-2.5-pro-002`), while the table is keyed by the base family
+ * (`gpt-4o`). An exact-only lookup would silently drop every real response onto the cheap `default`,
+ * materially UNDER-reporting avoided cost. So on a miss we strip trailing PURE-NUMERIC segments (dates,
+ * snapshot numbers) one at a time, checking the table after each strip, and stop at the FIRST hit — the
+ * most specific base family. Only digit-only tail segments are removed, so a non-numeric family suffix
+ * (`-mini`, `-flash`) is never crossed and a mini/non-mini or pro/flash pair can never be conflated.
+ */
 function ratesFor(model: string, table: PriceTable): ComponentRates | undefined {
-  return table.rates[model] ?? table.rates.default;
+  const exact = table.rates[model];
+  if (exact) return exact;
+  let id = model;
+  for (let idx = id.lastIndexOf("-"); idx !== -1; idx = id.lastIndexOf("-")) {
+    const tail = id.slice(idx + 1);
+    if (!/^\d+$/.test(tail)) break; // stop at the first non-numeric segment — never cross a family suffix
+    id = id.slice(0, idx);
+    const hit = table.rates[id];
+    if (hit) return hit;
+  }
+  return table.rates.default;
 }
 
 /**
