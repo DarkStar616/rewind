@@ -24,7 +24,7 @@ Agent Rewind fixes exactly that gap, for **every** agent:
 
 1. **Whole-workspace checkpoints** — snapshot the entire working tree at any step, *including* changes
    made by shell commands, not just the agent's edit tools.
-2. **Rewind to any checkpoint** — resume from where it went wrong instead of starting over. History is
+2. **Agent Rewind to any checkpoint** — resume from where it went wrong instead of starting over. History is
    kept, so you can go forward again too.
 3. **A refuse-and-record effect barrier** — the first time the agent fires an irreversible external
    effect (a payment, an email, a provisioning call), it's recorded on a tamper-evident log. If the
@@ -78,7 +78,7 @@ Requires Node ≥ 20. Nothing to sign up for.
 - **Checkpoints** are whole-workspace snapshots stored in a private, side git repository (`.rewind/`),
   separate from your project's own git — so it captures *everything*, including bash-made changes, and
   never touches your real git history. Fast (copy-on-write) on modern filesystems.
-- **Rewind** restores the entire working tree to a checkpoint but keeps the history, so you can replay
+- **Agent Rewind** restores the entire working tree to a checkpoint but keeps the history, so you can replay
   forward again — the undo is all-or-nothing (it rolls back cleanly even if interrupted).
 - **The effect barrier** records each external effect under a stable key on an **append-only,
   tamper-evident SHA-256 hash chain**. Re-firing a spent effect after a rewind is refused, with a
@@ -135,7 +135,7 @@ So the honest headline is **"recover up to 41.2% of the tokens a *late-failing* 
 condition (late failure) must ride with the number. **Do not** state a bare "41.2%" with no condition;
 the same benchmark is 9.1% for an early failure. Two more caveats the benchmark itself declares: the
 ceiling for a *single* interruption is **50%**, and it's a deterministic workload (temperature 0), so it
-does not yet capture real run-to-run variance. *(An independent in-repo bench of the same replay
+does not yet capture real run-to-run variance. *(An independent in-repo (synthetic) bench of the same replay
 mechanism corroborates the curve — ~28% at a step-5 rewind, scaling to ~39% on a deep rewind.)*
 
 ## How accuracy improves (the mechanism)
@@ -151,7 +151,7 @@ Accuracy improves because rewind makes **recovery cheap and safe**:
 
 *Honest note:* the big accuracy figures you'll see (e.g. agent task-success jumping from ~44% to ~88%
 with environment rewind) come from **published research that motivates the design — not from Agent
-Rewind's own benchmark.** Agent Rewind ships the *mechanism*; measuring its own accuracy uplift is
+Agent Rewind's own benchmark.** Agent Rewind ships the *mechanism*; measuring its own accuracy uplift is
 future work. Don't attribute those research numbers to Agent Rewind directly.
 
 ## Use cases
@@ -169,7 +169,7 @@ future work. Don't attribute those research numbers to Agent Rewind directly.
 ## What's proven vs. honest limits (do not overclaim)
 
 **Proven** (automated tests + live verification): the checkpoint/rewind/effect-barrier/hash-chain
-guarantees are covered by **286 passing tests**, ran green **40+ times with zero flakiness**, went
+guarantees are covered by **289 passing tests** (run `npm run check`), ran green **40+ times with zero flakiness**, went
 through **five rounds of independent (different-AI-vendor) code review that converged clean**, and the
 published package was **installed from npm and run end-to-end**.
 
@@ -215,7 +215,7 @@ published package was **installed from npm and run end-to-end**.
 ## Suggested angles (for whoever writes the doc/email)
 
 - **The hook:** *AI agents are great until they aren't — and "just retry" can re-send the email.* Agent
-  Rewind is the safe undo.
+  Agent Rewind is the safe undo.
 - **For developers:** one line to install, works with the agent you already use, nothing leaves your
   machine.
 - **For the skeptical/technical reader:** every safety claim is test-backed and the log is

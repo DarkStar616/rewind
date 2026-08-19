@@ -47,7 +47,7 @@ divides it by their actual invoice.
 
 Default human line (the shareable thing):
 ```
-Rewind recovered 4.2M tokens this week (~$63 saved).
+Agent Rewind recovered 4.2M tokens this week (~$63 saved).
 ```
 - Token count from the summed `ReplaySaving` records in the window; `$` via the recorded per-model
   rate (ship a small static rate table, note it is an estimate, let it be overridden).

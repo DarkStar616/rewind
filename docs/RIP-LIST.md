@@ -1,7 +1,7 @@
-# Rewind — rip-list (what to harvest from the competitive scan)
+# Agent Rewind — rip-list (what to harvest from the competitive scan)
 
 Derived 2026-08-18 from the competitive `/deep-prospect` (see `deep-prospect-log.md`) via a 4-agent
-verify-and-synthesize workflow. Every item is graded against **what Rewind already ships**, so nothing
+verify-and-synthesize workflow. Every item is graded against **what Agent Rewind already ships**, so nothing
 here re-builds the moat. Sacred invariant throughout: **exact-replay determinism**.
 
 ## Direct answer: "can we add agenticstash in as well?"
@@ -20,7 +20,7 @@ obligation-free once we write our own implementation.)
 
 | # | Rip | Source | Take | Effort | Note |
 |---|-----|--------|------|--------|------|
-| 1 | **Rollback-safe two-phase restore** | Cline (Apache-2.0, model only) | Capture the current worktree into an implicit Rewind snapshot *before* a destructive restore; on `read-tree`/`clean` failure auto-roll-back instead of leaving a half-applied tree. All-or-nothing rewind. | S–M | **VERIFIED real gap:** `git-backend.ts:252-271` throws `RevertIndeterminateError` with no rollback today. `snapshot()` already exists → capture is nearly free. Zero tension with exact-replay. Capture into Rewind's own chain, not the user repo's git. |
+| 1 | **Rollback-safe two-phase restore** | Cline (Apache-2.0, model only) | Capture the current worktree into an implicit Agent Rewind snapshot *before* a destructive restore; on `read-tree`/`clean` failure auto-roll-back instead of leaving a half-applied tree. All-or-nothing rewind. | S–M | **VERIFIED real gap:** `git-backend.ts:252-271` throws `RevertIndeterminateError` with no rollback today. `snapshot()` already exists → capture is nearly free. Zero tension with exact-replay. Capture into Agent Rewind's own chain, not the user repo's git. |
 | 2 | **Record-time redaction hook** (`RedactFn` + `DROP` sentinel) | agenticstash (design only) | `redact(value,{kind}) => value \| DROP` applied to recorded bodies before they hit disk. | S (design-gated) | `record-store.ts` persists full request/response bodies with **no redaction** — tapes carry API keys/PII/prompts. **Tension to resolve first:** redacting the primary tape breaks byte-exact replay. Resolve by redacting only the shareable *analysis/report export* copy + encrypting the full replay tape at rest; never redact the replay key or primary tape. **Unblocks the Free Savings Analysis funnel (#7).** |
 | 7 | **Free Savings Analysis funnel** | ProsperOps | Read-only "analysis mode": point the fail-open proxy at recent/live traffic in shadow, replay-match + prune-simulate, emit a **hash-attested report** ("X% of your calls were byte-replayable, $ figure, verifiable against your own bill") *before any contract*. | M | Prove-then-charge collapses the trust barrier for a novel pricing model. High reuse — proxy/record-store/canonical-request/prune/meter/verifyChain already supply everything; missing piece is analysis mode + report artifact. **Depends on #2** to be safe on customer prompts. |
 

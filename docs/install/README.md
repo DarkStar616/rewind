@@ -34,7 +34,7 @@ claude mcp add agent-rewind -- npx -y @agent-rewind/mcp mcp
 ```json
 {
   "mcpServers": {
-    "rewind": {
+    "agent-rewind": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@agent-rewind/mcp", "mcp"]
@@ -84,7 +84,7 @@ cursor://anysphere.cursor-deeplink/mcp/install?name=agent-rewind&config=eyJ0eXBl
 ```json
 {
   "mcpServers": {
-    "rewind": {
+    "agent-rewind": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@agent-rewind/mcp", "mcp"]
@@ -103,7 +103,7 @@ client's MCP settings file (Cline: the MCP servers settings JSON; Windsurf: `~/.
 ```json
 {
   "mcpServers": {
-    "rewind": {
+    "agent-rewind": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@agent-rewind/mcp", "mcp"]

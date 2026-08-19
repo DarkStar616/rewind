@@ -1,4 +1,4 @@
-# Rewind — licence & code-protection decision (research-grounded 2026-08-18)
+# Agent Rewind — licence & code-protection decision (research-grounded 2026-08-18)
 
 Four-lane research (protectability · empirical licence models · licence menu · theft/moat) + a running
 deep-research pass. Findings are unanimous and well-sourced. **This corrects the earlier "publish an
@@ -28,9 +28,9 @@ change the goal (proprietary, defensible, sell access, bill on savings); it chan
   Every breakout is permissively licensed (Context7 MIT 61k★/4.6M dl-mo; Playwright MCP Apache 36k★;
   Cline Apache 66k★; OpenHands MIT 84k★; Codex CLI Apache; …).
 - **The two closed exceptions (Cursor, Claude Code) monetize a captive paid MODEL**, not hidden code.
-  Rewind ships no model, so it can't borrow that moat.
+  Agent Rewind ships no model, so it can't borrow that moat.
 - **Warp is the cautionary tale:** a closed, login-required *terminal* (same "touches everything" trust
-  profile as Rewind) — "a dealbreaker for a tool this sensitive"; it reversed and open-sourced (2026).
+  profile as Agent Rewind) — "a dealbreaker for a tool this sensitive"; it reversed and open-sourced (2026).
 - **Closing a shell+write tool is audit- and procurement-hostile** (SBOM/supply-chain review flags
   opaque packages with filesystem reach) — you'd earn the friction without earning the secrecy.
 
@@ -59,7 +59,7 @@ Everything you actually want survives, and gets *stronger*, when the protection 
 | BSL-1.1 | any production use unless granted | Yes | FSL fixes its 4-yr clock + bespoke-grant friction |
 | SSPL | offer as a service w/o releasing all service source | Yes | toxic/enterprise-banned; wrong threat |
 
-**Legal facts confirmed:** shepherd being MIT imposes only attribution — Rewind may license itself any
+**Legal facts confirmed:** shepherd being MIT imposes only attribution — Agent Rewind may license itself any
 way. Under common ownership, the **hosted tier and Athena stay fully closed under EVERY option** (the
 licensor isn't bound by its own outbound licence). A private npm registry is optional, not required.
 
@@ -92,5 +92,5 @@ binaries are extracted wholesale (Claude Code's own was), and client-side licenc
 3. **Access sold server-side** — free tier = local + FSL; paid tier = server-gated.
 
 Business model + pricing (gainshare, hybrid base + 10–15% of verified savings, the counterfactual risk,
-Rewind's measured-avoided-re-spend edge): `docs/BUSINESS-MODEL.md`. Superseded: the earlier
+Agent Rewind's measured-avoided-re-spend edge): `docs/BUSINESS-MODEL.md`. Superseded: the earlier
 "UNLICENSED + obfuscated closed binary" and any "hide the source" framing — refuted by the evidence above.

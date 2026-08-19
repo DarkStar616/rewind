@@ -1,6 +1,6 @@
-# Rewind: build instructions for this session
+# Agent Rewind: build instructions for this session
 
-You are building **Rewind**, a standalone, open-core reversible-execution SDK and MCP server for
+You are building **Agent Rewind**, a standalone, source-available reversible-execution SDK and MCP server for
 AI agents. This file is the standing brief. Read `docs/PLAN.md` for the slice to build, and
 `docs/ARCHITECTURE.md` for the shape. `docs/RESEARCH.md` is the evidence; do not re-derive it.
 
@@ -89,8 +89,8 @@ a general-purpose SDK:
 
 ## Naming and licence to confirm early
 
-- Confirm the name "Rewind" is usable (there is at least one unrelated product using it); pick the
-  npm scope accordingly. This is a day-one check, not a blocker for building.
+- Name RESOLVED: the product is **Agent Rewind** (the bare "Rewind" was taken by unrelated products),
+  published under the `@agent-rewind/*` npm scope.
 - Licence is **FSL-1.1-ALv2** (Functional Source License 1.1, converting to Apache-2.0 two years after
   each release) — source-available, not MIT/open-source. Keep the hosted and enterprise layers separate
   from the core packages from the first commit, so the commercial boundary is clean.

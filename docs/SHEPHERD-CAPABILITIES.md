@@ -1,4 +1,4 @@
-# Shepherd capabilities vs. Rewind MVP — grounded inventory (2026-08-18)
+# Shepherd capabilities vs. Agent Rewind MVP — grounded inventory (2026-08-18)
 
 From two grounded sweeps of `/home/reuben/projects/shepherd` (docs + code). Purpose: answer "what did we
 skip, and what's worth harvesting for a later tier." **Correction to earlier framing:** shepherd's *code*
@@ -6,7 +6,7 @@ is far larger than its 0.3.0 docs suggest — `vcs-core` ("provenance-native ver
 worlds") is a real, substantial reversibility+isolation engine, not just git snapshots. So "use full
 shepherd" has genuine substance — with the caveats at the bottom.
 
-## What Rewind's MVP has (TypeScript, shipped + verified)
+## What Agent Rewind's MVP has (TypeScript, shipped + verified)
 Git checkpoint/rewind (`WorldBackend` + Tier-0 git backend, reflink-CoW with copy fallback); the
 refuse-and-record **effect barrier with cross-rewind idempotency** (spent effect refused across a
 rewind — see the "our edge" note below); the tamper-evident SHA-256 hash chain; the replay-savings sink;
@@ -14,7 +14,7 @@ the engine + CLI + stdio MCP server. Injected action vocabulary + no-op authorit
 
 ## Capability map
 
-| Capability | In shepherd (package) | In Rewind MVP? | Verdict |
+| Capability | In shepherd (package) | In Agent Rewind MVP? | Verdict |
 |---|---|---|---|
 | **OS syscall jail** (Linux Landlock, macOS Seatbelt; podman container device) | `vcs-core/_landlock_containment`, `_seatbelt_containment`, `_containment`; `shepherd-runtime/device/container` | **No** (reversibility only, no isolation) | **Tier-1 harvest target — the big one.** Real enforced containment. |
 | **Multi-carrier CoW** (clonefile/FUSE-overlay/copy + runtime detection + fallback) | `vcs-core/_clonefile_carrier`, `_fuse_overlay`, `_copy_carrier`, `substrates.detect_*` | Partial (git + reflink probe + copy fallback) | Tier-1 enhancement (richer carriers than git). |
@@ -40,7 +40,7 @@ the engine + CLI + stdio MCP server. Injected action vocabulary + no-op authorit
 2. **Our cross-rewind idempotency barrier is the one thing shepherd-core lacks.** Shepherd has tool-call
    validation that refuses+records (`Provider._build_composite_validator` → `ToolCallRejected`) and a
    content-addressed event chain — but not the specific "refuse re-firing a **spent effect across a
-   restore/rewind**" semantic (the ACRFence/authority-resurrection case). That remains Rewind's edge, and
+   restore/rewind**" semantic (the ACRFence/authority-resurrection case). That remains Agent Rewind's edge, and
    it sits *above* whatever backend you choose.
 
 ## The decision this informs

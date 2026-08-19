@@ -1,4 +1,4 @@
-# Rewind — business model & protection (research-grounded 2026-08-18)
+# Agent Rewind — business model & protection (research-grounded 2026-08-18)
 
 Grounded in two verified research passes (licence/protectability `wlwjzoq7a`; deep-research
 `wuoiazto1`, 22/25 claims confirmed by 3-vote adversarial verification). Licence rationale is in
@@ -43,14 +43,14 @@ of the 10–50% gainshare band; little room to discount. Consider **10–15%**.
 **Structure it as a HYBRID, not pure %-of-savings.** Pure outcome-pricing is rare (4 of 65 companies);
 **72% run hybrids** (base + usage). Recommended:
 - A **modest base fee** (cuts cash volatility, underwrites capacity) **+ ~10–15% of verified savings**.
-- **Caps** (protect the buyer from a runaway bill) + **floors** (protect Rewind) + **tiered collars**
+- **Caps** (protect the buyer from a runaway bill) + **floors** (protect Agent Rewind) + **tiered collars**
   (lower share at small savings, higher as impact scales).
 - **Self-serve (npx) = flat/capped tier; gainshare reserved for contracted enterprise accounts** —
   audit rights / true-ups only bite in a signed agreement (open question from the research).
 
-## The hard, honest risk — and Rewind's edge
+## The hard, honest risk — and Agent Rewind's edge
 
-**"Savings" = baseline − actual, and the counterfactual baseline (what they'd have spent WITHOUT Rewind)
+**"Savings" = baseline − actual, and the counterfactual baseline (what they'd have spent WITHOUT Agent Rewind)
 is unobservable and gameable by both sides.** The canonical warning is Medicare ACOs: large shared-savings
 payouts on savings that counterfactual analysis found "modest to non-existent." Buyers are incentivized to
 **under-report** value to lower the bill (L.E.K.).
@@ -60,7 +60,7 @@ payouts on savings that counterfactual analysis found "modest to non-existent." 
   counterfactual baseline (refuted 0-3 — do not claim the metric is "cryptographically unforgeable").
 - **So baseline integrity is a governance problem:** locked/normalized baseline under change control,
   server-side computation, audit rights, third-party assurance, periodic true-ups.
-- **Rewind's genuine advantage:** unlike cloud-cost tools, Rewind's savings are **measured avoided
+- **Agent Rewind's genuine advantage:** unlike cloud-cost tools, Agent Rewind's savings are **measured avoided
   re-spend**, not a hypothetical — a replay cache-hit is a *real* avoided API call with a *real* token
   count (recorded response returned without calling the provider). **Count ONLY provably-avoided
   re-spend** (never a whole failed run) and the number becomes far more defensible. The tamper-evident

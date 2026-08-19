@@ -1,4 +1,4 @@
-# Rewind standalone: research
+# Agent Rewind standalone: research
 
 This is the grounded research the plan rests on, gathered August 2026 from the current state of
 MCP, the coding-agent clients, the web-chat surfaces, the sandbox providers, and a read of the
@@ -12,7 +12,7 @@ existing implementation. Each section ends with the decision it drives.
 MCP specification revision of 2026-07-28 deliberately moved the protocol core to stateless: it
 removed the connection handshake and the transport-level session id. The specification's own
 guidance for a server that needs to carry state across calls is to mint an explicit handle from a
-tool and have the model pass it back as an argument. That is exactly Rewind's natural shape:
+tool and have the model pass it back as an argument. That is exactly Agent Rewind's natural shape:
 `checkpoint()` returns a checkpoint id, and `rewind(id)`, `replay(id)`, `diff(id)` take it back. A
 stateful checkpoint tool is now a first-class, blessed pattern, not something fighting the protocol.
 
@@ -23,11 +23,11 @@ no auth and the lowest latency, and it runs co-located with the workspace it has
 That is the correct transport for a local reversible substrate, and it reaches all five clients for
 the cost of one binary plus a documented config line each.
 
-**Rewind complements the built-in rewind, it does not duplicate it.** Claude Code ships its own
+**Agent Rewind complements the built-in rewind, it does not duplicate it.** Claude Code ships its own
 checkpoint feature that auto-snapshots before every edit and restores on demand. Its documented,
 load-bearing limitation is that it tracks only the agent's own file-editing tools. Files changed by
 a shell command, and any non-file side effect, are neither tracked nor undone. That gap is precisely
-Rewind's territory: whole-workspace snapshots that include shell-driven state, plus the effect barrier
+Agent Rewind's territory: whole-workspace snapshots that include shell-driven state, plus the effect barrier
 for external effects, plus deterministic replay, and it works across agents that have no built-in
 rewind at all. State this complementarity explicitly in the docs to pre-empt the "why not just
 `/rewind`" objection.
@@ -57,7 +57,7 @@ machine. A connector is a remote server you host, and the agent drives it purely
 UI renders in a sandboxed frame with no filesystem or process access. There is no local working tree
 to snapshot, no local process to jail, no host to protect. So the jail, the local world snapshot and
 the local deterministic replay are all inapplicable to web as-is. The only piece that travels is the
-effect barrier, applied to state that a workspace Rewind itself hosts. On web, Rewind is not rollback
+effect barrier, applied to state that a workspace Agent Rewind itself hosts. On web, Agent Rewind is not rollback
 of what the agent did on your laptop; it is a hosted sandboxed workspace exposed as a connector, with
 checkpoint, rewind and an effect barrier over the state that workspace owns. Do not pitch local
 rollback on web; it is false there, and overclaiming contradicts the honesty positioning.
@@ -66,7 +66,7 @@ rollback on web; it is false there, and overclaiming contradicts the honesty pos
 sandbox-workspace service, which is a large, security-critical infra build and the exact
 over-engineering trap to avoid at MVP. Separately, fully write-capable custom connectors on ChatGPT
 are gated to Business, Enterprise and Education workspaces today, so the addressable audience for a
-mutating web Rewind is thin right now.
+mutating web Agent Rewind is thin right now.
 
 **Decision:** ship nothing web-facing in the MVP, but design the MCP tool contract to be
 transport-agnostic so the identical server later re-hosts as a Claude.ai connector and a ChatGPT app
@@ -77,7 +77,7 @@ claim that is both true and unique there.
 
 ## 3. Extracting the moat, and keeping it in the larger product
 
-**Rewind is a two-layer system split across a process boundary that already exists.** The upper layer
+**Agent Rewind is a two-layer system split across a process boundary that already exists.** The upper layer
 is the control and policy moat, in TypeScript: the git-snapshot sandbox decorator, the effect barrier,
 the tamper-evident hash chain, the correlation identity, the canonical JSON, the replay and cost
 accounting, and the jail-enforcement gate. The lower layer is the substrate adapters, in Python, which
@@ -103,7 +103,7 @@ approval and domain model with it. This is the single most important extraction 
 
 **Keeping it in the larger product:** the larger product depends on the extracted `@agent-rewind/core` as a
 published package, and injects its own store, action vocabulary and authority resolver. You develop
-Rewind once, and the product consumes it. Do not maintain a fork; a fork recreates the drift the whole
+Agent Rewind once, and the product consumes it. Do not maintain a fork; a fork recreates the drift the whole
 method exists to avoid.
 
 **Decision:** extract `@agent-rewind/core` (TypeScript) as git-snapshot decorator, effect barrier, hash
@@ -138,8 +138,8 @@ The three tiers, mapped to what exists in 2026:
   fork and revert with the least lock-in; add a memory-snapshot provider second for byte-identical
   running state. Treat any recently closed-source provider as hosted-only and optional.
 
-**Distribution:** runnable as `npx rewind` for the TypeScript control layer, with the Python substrate
-available through `uvx` when a later tier needs it. `npx rewind init` in any git repo yields a
+**Distribution:** runnable as `npx -y @agent-rewind/mcp` for the TypeScript control layer, with the Python substrate
+available through `uvx` when a later tier needs it. `npx -y @agent-rewind/mcp` in any git repo yields a
 reversible session immediately, with no account and no privilege.
 
 **Honest limits to bake in:** Tier 0 gives reversibility but not containment, and a git worktree
@@ -186,6 +186,6 @@ botching a long multi-step task, or by an agent re-firing a side effect on a ret
 demo is a ten-step task interrupted at step eight that resumes instead of restarting, and an agent
 that is refused when it tries to re-send a spent effect after a rewind.
 
-**Licence and shape:** open-core. The core SDK and MCP server are FSL-1.1-ALv2 (Apache-2.0 future grant), harvested from the MIT
+**Licence and shape:** source-available (FSL-1.1-ALv2). The core SDK and MCP server are FSL-1.1-ALv2 (Apache-2.0 future grant), harvested from the MIT
 substrate, and the hosted and enterprise features are the commercial layer. Keep that boundary clean
 from the first commit.

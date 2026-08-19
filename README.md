@@ -9,7 +9,7 @@ have on its own:
 
 1. **Whole-workspace checkpoints** — a copy-on-write snapshot of the working tree at each step,
    including changes made by shell commands, not just the agent's file-edit tools.
-2. **Rewind to any checkpoint** — resume a multi-step run from where it went wrong instead of
+2. **Agent Rewind to any checkpoint** — resume a multi-step run from where it went wrong instead of
    starting over.
 3. **An effect barrier** — a refuse-and-record guard so that when a run is rewound, an external
    effect that already happened (a payment, an email, a provisioning call) cannot be silently
@@ -77,7 +77,7 @@ default as a security boundary. Honesty about that line is part of the product.
 - [`@agent-rewind/core`](https://www.npmjs.com/package/@agent-rewind/core) — the reversible-execution engine, effect barrier, and hash chain
 - [`@agent-rewind/gateway`](https://www.npmjs.com/package/@agent-rewind/gateway) — the token-saving record/replay proxy
 
-Backed by 286 tests (green, run repeatedly with zero flakiness) and five rounds of independent
+Backed by 289 tests (green, run repeatedly with zero flakiness) and five rounds of independent
 cross-vendor code review. See [`docs/AGENT-REWIND-BRIEF.md`](docs/AGENT-REWIND-BRIEF.md) for the full
 plain-English breakdown (how token savings and accuracy work, use cases, and honest limits),
 [`docs/PRODUCT-BREAKDOWN.md`](docs/PRODUCT-BREAKDOWN.md) for the evidence-tagged technical breakdown,

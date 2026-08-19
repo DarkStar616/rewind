@@ -1,4 +1,4 @@
-# Rewind standalone: build plan
+# Agent Rewind standalone: build plan
 
 Appetite for the MVP: a couple of focused build sessions, not a quarter. If the design does not fit
 that, cut the design, not the appetite. The MVP is three slices. Everything after them is explicitly
@@ -25,7 +25,7 @@ the sprint-critical pieces are pulled into the slices below.
 Build the portable moat with one world backend and no substrate dependency.
 
 - Scaffold the repo: a small npm workspace, TypeScript, one test runner, FSL-1.1-ALv2 licence, a
-  clean split between the open core packages and any future commercial packages.
+  clean split between the source-available core packages and any future commercial packages.
 - `WorldBackend` interface + the Tier 0 git and reflink copy-on-write worktree backend
   (`snapshot`, `fork`, `restore`, `diff`, `log`). Detect copy-on-write support and fall back to a
   plain checkout with a clear message where reflink is unavailable.
@@ -79,7 +79,7 @@ replay). Full spec: `docs/SAVINGS-RECEIPT.md`.
 
 - A `rewind savings` CLI command (and an MCP `savings` tool) that reads the accumulated
   `ReplaySaving` records for a scope and prints one honest line:
-  `Rewind recovered 4.2M tokens this week (~$63 saved).`
+  `Agent Rewind recovered 4.2M tokens this week (~$63 saved).`
 - **Honest counterfactual metering is the acceptance bar, not a nicety.** "Saved" counts ONLY tokens
   that would provably have been re-spent and were not: replay cache-hits (a recorded turn returned with
   `modelCalls:0`) and re-executions avoided by rewinding to a checkpoint with a real prior. It must
@@ -137,7 +137,7 @@ a zero marginal cost into a real bill.
 
 **The one path back to Athena** is a single button in the (paid) team view: *"See who authorised these
 runs."* That button is not a bolt-on — it is the **authority resolver** coupling point
-(`ARCHITECTURE.md` #2). Free Rewind ships the **no-op default resolver** (no authority, no button);
+(`ARCHITECTURE.md` #2). Free Agent Rewind ships the **no-op default resolver** (no authority, no button);
 Athena injects its **real resolver** and the button lights up. Same `@agent-rewind/core`, no fork. Do not
 mention Athena anywhere else in the product.
 
@@ -166,10 +166,10 @@ later moat surface and is not part of the standalone SDK's near-term path.
 
 ## Cross-cutting, do these early and cheaply
 
-- **Name — escalated to a publish blocker (2026-08-18).** "Rewind" is crowded in exactly this niche:
-  `khalilbalaree/Rewind-MCP` (a checkpoint MCP server), `nicobailon/pi-rewind-hook` (161★),
-  `adi-suresh01/rewind`. Pick a distinctive name + npm scope **before the first npm publish / plugin
-  listing.** See `POSITIONING.md` §4.
+- **Name — RESOLVED.** The bare name "Rewind" was crowded in this niche (`khalilbalaree/Rewind-MCP`, a
+  checkpoint MCP server; `nicobailon/pi-rewind-hook` 161★; `adi-suresh01/rewind`; and an unrelated
+  unscoped `rewind` npm package). The product is now **Agent Rewind**, published under the
+  `@agent-rewind/*` npm scope. See `POSITIONING.md` §4.
 - **Open-core boundary from the first commit.** Core packages FSL-1.1-ALv2; keep any hosted or
   enterprise code in separate packages so the boundary never has to be untangled later.
 - **Honesty guardrails, in the docs and the tool descriptions.** Tier 0 is reversibility, not
@@ -179,7 +179,7 @@ later moat surface and is not part of the standalone SDK's near-term path.
   each plainly.
 - **Positioning — pressure-tested (DONE, see `POSITIONING.md`).** Finding: the effect-barrier *concept*
   is NOT novel (ACRFence arxiv:2603.20625; `rune0-dev/agent-ledger` on PyPI; LangGraph #8464 building
-  it), but the *combination* Rewind ships is unshipped and the *implementation* is defensible. New
+  it), but the *combination* Agent Rewind ships is unshipped and the *implementation* is defensible. New
   headline: "the only deterministic, filesystem-independent, TypeScript-native effect barrier +
   tamper-evident chain — in a space the research has proven every framework gets wrong." Reversibility's
   value is strongly evidenced (AgentRewind 30% vs 8% recovery); the token-saving $ number is a

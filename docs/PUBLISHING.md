@@ -25,7 +25,7 @@ npm whoami         # confirm
 
 ```bash
 npm run build      # tsup → dist/ for all three packages (also runs automatically on publish)
-npm run check      # 285 tests + typecheck, all green
+npm run check      # 289 tests + typecheck, all green
 ```
 
 ## 3. Publish — in dependency order

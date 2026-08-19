@@ -1,4 +1,4 @@
-# Rewind — research-grounded roadmap: more savings, more accuracy (2026)
+# Agent Rewind — research-grounded roadmap: more savings, more accuracy (2026)
 
 Source: deep-research pass, 28 sources → 135 claims → 24 confirmed / 1 refuted (3-vote adversarial
 verification). All figures are 2025-2026 primary sources; **caveats at the bottom are load-bearing** —
@@ -6,11 +6,11 @@ several key numbers are single self-reported preprints on non-Claude models.
 
 ## The strategic insight: savings and accuracy are the SAME lever
 
-The two things we want reinforce each other, and Rewind is uniquely positioned to exploit it:
+The two things we want reinforce each other, and Agent Rewind is uniquely positioned to exploit it:
 
 - Backtracking/rewind is the biggest **accuracy** win (AgentRewind: **+25.6pp** task success).
 - Backtracking's cost is the **extra tokens** it spends re-exploring after a rewind.
-- Rewind's **Mechanism A (exact replay)** serves the unchanged prefix of that re-exploration at
+- Agent Rewind's **Mechanism A (exact replay)** serves the unchanged prefix of that re-exploration at
   **zero upstream cost**, and **Mechanism B (cache preservation)** serves the rest at **~0.1× input**.
 
 → **We can afford more accuracy-boosting backtracking than anyone else, because our replay makes the
@@ -75,7 +75,7 @@ tree-search cheap." Don't sell savings and accuracy as two features — sell the
   78.7%). MettleBench is the authors' own 82-task benchmark on GPT-5.4. **Do not quote +25.6pp bare.**
 - **The real moat is COST, not just accuracy:** AgentRewind gets long-horizon recovery gains at **~1×
   tokens** because rewind + replay replaces re-exploration — whereas tree-search (LATS) buys comparable
-  coding gains at **10–40× tokens**. That cost asymmetry is Rewind's defensible edge.
+  coding gains at **10–40× tokens**. That cost asymmetry is Agent Rewind's defensible edge.
 - **Key design lesson:** naive environment-**reset restart can be WORSE than just continuing**;
   **selective** rewind-to-checkpoint (carrying the failure experience forward) beats both.
 - **Why cheap for us specifically:** it maps directly onto our whole-workspace checkpoint/rewind

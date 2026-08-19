@@ -56,7 +56,7 @@ Three moves, in plain terms:
 1. **Checkpoint before risky work.** Ask the agent (or let it decide) to `checkpoint` before a
    multi-step change. It snapshots the *whole* workspace — including anything `bash` touches — and
    returns an `id`.
-2. **Rewind to undo.** If it goes wrong, `rewind <id>` restores the entire workspace to that point.
+2. **Agent Rewind to undo.** If it goes wrong, `rewind <id>` restores the entire workspace to that point.
    History is kept, so you can `replay` forward again.
 3. **Guard real-world effects.** Before an irreversible action (a payment, an email, a deploy), the
    agent calls `guard_effect` with a stable key. The first call is recorded; a retry of the *same*

@@ -1,4 +1,4 @@
-# Rewind: positioning & distribution (grounded 2026-08-18)
+# Agent Rewind: positioning & distribution (grounded 2026-08-18)
 
 This is the pressure-tested positioning the plan asked for. It is sourced from a five-lane research
 pass (HuggingFace, GitHub, web/papers, distribution mechanics) plus a read of shepherd's own docs.
@@ -8,7 +8,7 @@ Where a claim is unsourced, it says so. **Read this before writing marketing cop
 
 ## 1. The honest one-line finding
 
-**The effect barrier is not a novel concept — but the *combination* Rewind ships is genuinely
+**The effect barrier is not a novel concept — but the *combination* Agent Rewind ships is genuinely
 unshipped, and the correct *implementation* of it is defensible.** Lead with the combination and the
 implementation discipline, never with "we invented refuse-and-record."
 
@@ -19,7 +19,7 @@ implementation discipline, never with "we invented refuse-and-record."
 | Claim | External support | Honest positioning |
 |---|---|---|
 | **Reversibility raises recovery / accuracy** | **STRONG.** AgentRewind (arxiv:2608.14380): **30% recovery vs 8%** for plain "continue"; **87.8% vs 43.9%** task success with vs without environment rewind. "Confident and Wrong" (arxiv:2603.25764): GPT-5 submits a patch **100%** of runs, resolves only **44%**. Coherence Collapse (arxiv:2603.24631): 60–69% of failures "edit the correct functions yet still produce incorrect patches" — right state, then wrecked it. | **Cite freely.** This is our strongest evidence-backed claim. It is the *value*, even though the *mechanism* (rewind) is now commodity. |
-| **Saves tokens / cost** | **PARTIAL.** Prompt-caching gives 59–90% but that's provider-side prefix caching, **not ours** — don't borrow it. "Fail-Fast, Restart-Smart" (arxiv:2608.03222): early-stopping saves **28–64% of tokens on failed trajectories** for a 1.6–4.2pt success cost. Replay-on-rewind is mechanistically sound but **no public $ number exists.** | Plausible-but-unsourced *for Rewind specifically*. **Opportunity: publish the first real replay-savings number** and own it. Do not claim caching's 90% as ours. |
+| **Saves tokens / cost** | **PARTIAL.** Prompt-caching gives 59–90% but that's provider-side prefix caching, **not ours** — don't borrow it. "Fail-Fast, Restart-Smart" (arxiv:2608.03222): early-stopping saves **28–64% of tokens on failed trajectories** for a 1.6–4.2pt success cost. Replay-on-rewind is mechanistically sound but **no public $ number exists.** | Plausible-but-unsourced *for Agent Rewind specifically*. **Opportunity: publish the first real replay-savings number** and own it. Do not claim caching's 90% as ours. |
 | **Lightweight / zero-config git+reflink** | Mechanism real but **commodity.** Every major agent already ships rewind: Claude Code `/rewind`, Cline Checkpoints, OpenCode `/undo`, Gemini CLI `/rewind`, Replit App History. DeltaBox/Crab are faster. | True but **not differentiating.** Don't market Tier 0 as the moat (CLAUDE.md already warns this). |
 | **Effect barrier = novel headline moat** | **NOT novel.** ACRFence (arxiv:2603.20625, UCSC, Mar 2026) is the thesis formalized — "semantic rollback attacks," effect log, "replay-or-fork semantics," our two invariants verbatim. `rune0-dev/agent-ledger` ships it on PyPI ("AI agents retry. Side effects shouldn't."). LangGraph #8464 is building it natively. Stripe/OpenAI-Agents/Strands ecosystem converging. | **Reposition (see §3).** The concept is claimed. Sell the combination + implementation. |
 | **Tamper-evident hash chain** | Well-supported as a *category*: Proof of Execution (arxiv:2607.05397), Right to History (arxiv:2602.20214, EU-AI-Act-motivated), Mandato (arxiv:2608.14074). | Legitimate, on-trend (EU AI Act tailwind). But Notarized Agents (arxiv:2606.04193) critiques self-produced logs as self-attested — **applies to us**; receiver-attestation is a roadmap answer. |
@@ -28,7 +28,7 @@ implementation discipline, never with "we invented refuse-and-record."
 
 ## 3. The defensible position (what to actually say)
 
-The barrier *concept* is claimed, but **no one ships the union** Rewind does. Verified via GitHub
+The barrier *concept* is claimed, but **no one ships the union** Agent Rewind does. Verified via GitHub
 (Lane B): `korg` has chain+rewind but no barrier (Rust); `agent-gate` has the gate but is not
 rewind-aware (Python, no license); `chidori` records effects for replay but no barrier (Rust);
 `agent-ledger` has idempotency+replay but no workspace-rewind and no tamper-evident chain (Python).
@@ -55,14 +55,14 @@ moment is the "obviously useful" hook that drives installs.
 
 ---
 
-## 4. The naming problem (escalated — decide before first publish)
+## 4. The naming problem (RESOLVED — now "Agent Rewind")
 
-"Rewind" is **crowded in exactly our niche.** Three live repos: `khalilbalaree/Rewind-MCP` (13★,
-literally a checkpoint MCP server — direct functional + name collision), `nicobailon/pi-rewind-hook`
-(161★), `adi-suresh01/rewind` (agent memory). None own a `@agent-rewind` npm scope you'd want, but the name
-does not read as distinctive here. **Recommendation: treat the name as unresolved and pick a
-distinctive one before the first npm publish / marketplace listing.** This is now a blocker for
-*publishing*, not just a day-one nicety.
+The bare name **"Rewind" was crowded in exactly our niche.** Three live repos collided:
+`khalilbalaree/Rewind-MCP` (13★, literally a checkpoint MCP server — direct functional + name
+collision), `nicobailon/pi-rewind-hook` (161★), `adi-suresh01/rewind` (agent memory); and the unscoped
+`rewind` npm name is an unrelated package. **Resolution:** the product is now **Agent Rewind**, shipped
+under the `@agent-rewind/*` npm scope (`@agent-rewind/core`, `/gateway`, `/mcp`), published and live.
+The distinct name and scope clear the collision.
 
 ---
 

@@ -1,8 +1,8 @@
 # deep-prospect log
 
-## 2026-08-18 — harvest targets for Rewind's next levers (pruning · verified cache · tree-search · proxy interop)
+## 2026-08-18 — harvest targets for Agent Rewind's next levers (pruning · verified cache · tree-search · proxy interop)
 
-Grounding: Rewind is TypeScript/Node 24; **exact-replay determinism is the sacred invariant**. Next
+Grounding: Agent Rewind is TypeScript/Node 24; **exact-replay determinism is the sacred invariant**. Next
 levers (from `docs/RESEARCH-ROADMAP.md`): deterministic pruning (savings), verified off-path semantic
 cache (savings), tree-search/backtracking (accuracy). Three lanes (HF / GitHub / papers), all
 candidates verified against live APIs.
@@ -17,10 +17,10 @@ candidates verified against live APIs.
 | **Krites** (paper 2602.13165, ACM) | B+C | **Verified** semantic cache: async off-path judge promotes grey-zone matches; **triggering request NEVER served a near-hit**; +136–290% curated-served share, zero critical-path latency | Peer-reviewed · **no OSS impl** | Lever 2 — the design to build from the paper. PRESERVES replay if each cache decision is a recorded trace node. LATER slice (needs async judge). |
 | **Slipstream** (2605.08580; github chenzhuofu/slipstream) | C | Off-path judge validates a candidate context-compaction against the agent's next-k steps; **+8.8pp SWE-bench, −39.7% latency**; small (2–3B) judge suffices | Open source · Princeton | Best off-path-validation template for Lever 2. Record the adopt/reject decision. |
 | **Speculate-with-Memory** (2607.12236) | C | **Provably lossless** speculative pre-launch of side-effect-free calls during idle | Salesforce · no repo | Latency lever (not tokens). **Safest under exact-replay** — committed trace unchanged. Optional later. |
-| **LATS** (2310.04406; lapisrocks/LanguageAgentTreeSearch) | B+C | MCTS over agent trajectories; HumanEval +12.6pp (GPT-4), +26.9pp (GPT-3.5) — but **10–40× tokens** | 852★ · MIT · Python · stale (2024-07) | Lever 3. **A tree node = a Rewind checkpoint; backtrack = `rewind`.** LATS explicitly NEEDS env reversion — which we uniquely provide. Sell the substrate; port the search loop later. |
+| **LATS** (2310.04406; lapisrocks/LanguageAgentTreeSearch) | B+C | MCTS over agent trajectories; HumanEval +12.6pp (GPT-4), +26.9pp (GPT-3.5) — but **10–40× tokens** | 852★ · MIT · Python · stale (2024-07) | Lever 3. **A tree node = an Agent Rewind checkpoint; backtrack = `rewind`.** LATS explicitly NEEDS env reversion — which we uniquely provide. Sell the substrate; port the search loop later. |
 | **Reflexion** (2303.11366; noahshinn/reflexion) | B+C | Verbal self-reflection carried across attempts; ~2–3× tokens | 3,233★ · MIT · Python | Our rewind-memory IS Reflexion-across-a-rewind. Validated pattern. |
-| **Portkey-AI/gateway** | B | Production AI gateway, plugin/hooks + cache modes | **12,757★ · MIT · TypeScript** · active | Lever 4 — highest-value interop (TS+MIT). Rewind owns the record/replay boundary; treat its cache hit as a recorded substitution. |
-| **Helicone**, **LiteLLM** | B | Proxy + observability / dominant OpenAI-format proxy | 6k★ Apache TS · 56k★ Python | Interop/learn-from. Be wire-compatible so Rewind drops into existing stacks. |
+| **Portkey-AI/gateway** | B | Production AI gateway, plugin/hooks + cache modes | **12,757★ · MIT · TypeScript** · active | Lever 4 — highest-value interop (TS+MIT). Agent Rewind owns the record/replay boundary; treat its cache hit as a recorded substitution. |
+| **Helicone**, **LiteLLM** | B | Proxy + observability / dominant OpenAI-format proxy | 6k★ Apache TS · 56k★ Python | Interop/learn-from. Be wire-compatible so Agent Rewind drops into existing stacks. |
 | **nebius/SWE-agent-trajectories**, **SWE-bench Verified**, **terminal-bench** | A | 80k real agent trajectories; the 500-instance gold eval; terminal-agent bench | CC-BY / MIT · high downloads | The benchmark + test corpus to MEASURE pruning token-cut and rewind accuracy. Inert data → zero replay risk. |
 | **swe-pruner-pro-training-corpus** | A | 22,609 line-level keep/prune annotations | 210 dl · Apache-2.0 | Training data to build OUR OWN deterministic skimmer (we control precision) if we go model-based. |
 
@@ -29,7 +29,7 @@ candidates verified against live APIs.
    byte-identical/superseded tool outputs, no model. This is the highest impact-÷-cost, lowest-risk next
    slice for a TS replay-invariant system. Model-based SWE-Pruner is a heavier later slice.
 2. **No existing proxy does byte-exact record/replay** (LiteLLM/Portkey/Helicone all cache on content
-   similarity). **That is Rewind's defensible moat.** Best interop: be OpenAI/Anthropic-wire-compatible.
+   similarity). **That is Agent Rewind's defensible moat.** Best interop: be OpenAI/Anthropic-wire-compatible.
 
 ### Checked, didn't hold up
 - **TweakLLM** (2507.23674): the OPPOSITE of Krites — synchronous, on-path, rewrites+serves the near-hit
@@ -49,7 +49,7 @@ heavier slices — each validated here as real, with a clear harvest path.
 
 ## 2026-08-18 — competitive landscape (products/startups): who else saves tokens or rewinds agents
 
-Grounding: Rewind = a LOCAL, byte-exact **record/replay** LLM proxy + MCP server for coding agents, with
+Grounding: Agent Rewind = a LOCAL, byte-exact **record/replay** LLM proxy + MCP server for coding agents, with
 whole-workspace git checkpoint/rewind, a refuse-and-record **effect barrier** + tamper-evident hash
 chain, deterministic pruning + cache-hygiene (savings), AgentRewind-style selective-rewind + failure
 memory (accuracy), and planned **gainshare** billing (% of *verified* token savings). GAP axes tested
@@ -61,7 +61,7 @@ hold partial WGR); the assembled combination is unoccupied.
 
 ### A. LLM proxies / AI gateways (the closest category — all compete on cost, none on the moat)
 
-| Product | What it does | Verified stats | GAP vs Rewind | Verdict |
+| Product | What it does | Verified stats | GAP vs Agent Rewind | Verdict |
 |---|---|---|---|---|
 | **LiteLLM** (BerriAI) | Default OSS LLM proxy; 100+ providers, cost tracking, prompt-cache pass-through | 56,665★ · non-std lic · push 2026-08-18 · **Python** | Caching is provider-native pass-through, not deterministic replay. No BXR/WGR/EB/GS | **Direct** category king, but **interoperable** — be wire-compatible, sit in front/behind |
 | **Portkey** | Fast TS AI gateway: routing, guardrails, **simple + semantic caching** | 12,757★ · **MIT · TS** · push 2026-05-25 · seed ~$3M | Semantic cache serves near-hits (unsafe-for-code, no verify); no BXR/WGR/EB/GS | **Direct** on caching · best TS harvest/interop target |
@@ -76,9 +76,9 @@ hold partial WGR); the assembled combination is unoccupied.
 | **Braintrust** | LLM eval + prompt playground + proxy w/ dev caching | closed · Series A ~$36M (a16z) | Dev-speed cache, not billed savings; no BXR/WGR/EB/GS | Adjacent |
 | **Requesty / Unify** | LLM routing + cost controls / model router-benchmark | Unify 113★ MIT Python · Requesty closed | Routing + caching for cost; no BXR/WGR/EB/GS | Adjacent (minor) |
 
-### B. Semantic caches (the group Rewind must out-message on *correctness*)
+### B. Semantic caches (the group Agent Rewind must out-message on *correctness*)
 
-| Product | What | Verified stats | GAP vs Rewind |
+| Product | What | Verified stats | GAP vs Agent Rewind |
 |---|---|---|---|
 | **GPTCache** (zilliztech) | Canonical semantic cache; embeds prompt, serves nearest cached answer | 8,161★ · MIT · Python · **push 2025-07-11 (~13mo STALE)** | Serves near-hits **verbatim, no verify → can return a subtly WRONG answer**; the exact hole BXR closes. Effectively dormant |
 | **Canonical AI** (canonical.chat) | Semantic prompt cache for agents/voice | closed · funding unknown (early) | Embedding-similarity match → wrong-answer-on-near-miss risk; no BXR(true)/WGR/EB/GS | **Direct** on caching, inferior correctness |
@@ -86,7 +86,7 @@ hold partial WGR); the assembled combination is unoccupied.
 
 ### C. Agent checkpoint / time-travel / durable execution (all snapshot *state*, none the filesystem)
 
-| Product | What | Verified stats | GAP vs Rewind |
+| Product | What | Verified stats | GAP vs Agent Rewind |
 |---|---|---|---|
 | **LangGraph** | Agent graph runtime with checkpointer + time-travel (fork prior graph state) | 39,945★ · MIT · Python · push 2026-08-18 | Snapshots **graph/conversation state**, not the **workspace filesystem**; no BXR/EB/GS. Closest conceptual "rewind" but state-only |
 | **Temporal** | Durable execution: deterministic replay of workflow *code* from event history | 22,389★ · MIT · Go | Replays workflow code, not LLM bytes or the FS; **idempotency prevents re-fire on RETRY, not across a human/agent rewind** | 
@@ -95,11 +95,11 @@ hold partial WGR); the assembled combination is unoccupied.
 | **LangSmith time-travel** | Trace + "time-travel" rerun from a step | closed · LangChain ~$25M+ | Re-runs from a trace point against the **LIVE** model — NOT byte-exact deterministic replay; no WGR/EB/GS |
 | **AgentOps** | Agent session replay/visualization + token tracking | closed · small seed | "Replay" = trace visualization/re-run, not byte-exact response replay; no WGR/EB/GS |
 
-### D. Coding agents with context/checkpoint tricks (potential Rewind *consumers*, not competitors)
+### D. Coding agents with context/checkpoint tricks (potential Agent Rewind *consumers*, not competitors)
 
-| Product | Context/checkpoint tricks | Verified stats | GAP vs Rewind |
+| Product | Context/checkpoint tricks | Verified stats | GAP vs Agent Rewind |
 |---|---|---|---|
-| **Cline** | Prompt-cache use, context-window mgmt, **per-message checkpoints (git-shadow) + restore** | 66,420★ · Apache-2.0 · **TS** · push 2026-08-18 · ~$32M | **Overlaps WGR** (workspace file checkpoints) but IDE/agent-locked, shadow-git not portable; **no BXR/EB/GS**. Closest workspace-rewind analog — study its shadow-git. **Interoperable** (could adopt Rewind MCP) |
+| **Cline** | Prompt-cache use, context-window mgmt, **per-message checkpoints (git-shadow) + restore** | 66,420★ · Apache-2.0 · **TS** · push 2026-08-18 · ~$32M | **Overlaps WGR** (workspace file checkpoints) but IDE/agent-locked, shadow-git not portable; **no BXR/EB/GS**. Closest workspace-rewind analog — study its shadow-git. **Interoperable** (could adopt Agent Rewind MCP) |
 | **Cursor** (Anysphere) | Agent + chat checkpoints, context mgmt | closed · Series C ~$10B val | IDE-locked chat/checkpoint restore, not agent-agnostic git WGR; no BXR/EB/GS; cloud | 
 | **Windsurf** (Cognition) | Cascade agent w/ checkpoint/revert | closed · Codeium→Cognition 2025 | Cascade checkpoints overlap WGR but IDE-locked; no BXR/EB/GS |
 | **Kilo Code** | Roo/Cline superset: compaction, context condensing, checkpoints | 26,917★ · MIT · **TS** · push 2026-08-18 | Same as Cline; consumer target, not competitor on BXR/EB/GS |
@@ -118,9 +118,9 @@ hold partial WGR); the assembled combination is unoccupied.
 
 ### F. Gainshare / %-of-savings pricing precedents (the model to RIP — from adjacent infra, none in LLM-savings)
 
-| Precedent | Mechanism | Why it matters to Rewind |
+| Precedent | Mechanism | Why it matters to Agent Rewind |
 |---|---|---|
-| **ProsperOps** | Bills a % of the **realized** savings *as determined by the cloud provider's own bill* — never their own counter. Anchors to **Effective Savings Rate (ESR)**, a standard they got the FinOps Foundation to ratify | **The blueprint.** Defeats "your numbers are made up" by anchoring to a neutral source of truth. Rewind's hash chain = our version of "the provider's bill" |
+| **ProsperOps** | Bills a % of the **realized** savings *as determined by the cloud provider's own bill* — never their own counter. Anchors to **Effective Savings Rate (ESR)**, a standard they got the FinOps Foundation to ratify | **The blueprint.** Defeats "your numbers are made up" by anchoring to a neutral source of truth. Agent Rewind's hash chain = our version of "the provider's bill" |
 | **ProsperOps funnel** | Leads with a no-commitment **Free Savings Analysis** — prove savings before charging | Rip the top-of-funnel: replay recent traffic, show hash-attested savings before any charge |
 | **nOps** | ~15% of savings **or** 1–2% of spend, *whichever is greater* | The floor **erodes pure alignment** ("feels like a tax") — take only as an *optional* floor, flag the tension |
 | **Cast AI** | Not %-share but a **guarantee** ("≥50% savings") | Alternative trust model (guarantee vs share) |
@@ -149,7 +149,7 @@ dashboard**. Every trusted player anchors to the provider's billing, not their o
    only prevent re-fire on RETRY, not across a human/agent rewind. "Refuse-and-record a spent effect
    across a rewind, on a tamper-evident chain" is unclaimed. **Lead with this.**
 3. **RIP #1 — ProsperOps' attestation model, wholesale.** Anchor "tokens saved" to the *provider's own
-   billed usage* (Anthropic/OpenAI usage API), never Rewind's internal counter; the hash chain attests
+   billed usage* (Anthropic/OpenAI usage API), never Agent Rewind's internal counter; the hash chain attests
    the delta between billed-baseline and replayed-actual. Publish a crisp, hard-to-game definition of a
    "saved call" (replay cache-hit returning byte-identical output). This is the direct antidote to the
    baseline-gaming/distrust failure mode.
@@ -172,7 +172,7 @@ dashboard**. Every trusted player anchors to the provider's billing, not their o
    tool* — with local-first/privacy as the deployment posture the hosted gateways structurally can't match.
 
 ### Interop / harvest shortlist (from this scan)
-- **Be wire-compatible with LiteLLM/Portkey/Helicone** (OpenAI + Anthropic formats) so Rewind drops into
+- **Be wire-compatible with LiteLLM/Portkey/Helicone** (OpenAI + Anthropic formats) so Agent Rewind drops into
   existing stacks rather than replacing them. TS incumbents (Portkey, Helicone, Langfuse) are the
   language-aligned interop lane; LiteLLM (Python, 56k★) is the gravitational center to sit beside.
 - **Study Cline's shadow-git checkpoint** implementation as prior art for the workspace-rewind substrate.

@@ -1,4 +1,4 @@
-# Rewind standalone: architecture
+# Agent Rewind standalone: architecture
 
 The shape follows one rule: **the moat is pure logic above a swappable world backend, and it never
 reads the filesystem.** Everything else falls out of that.
@@ -58,7 +58,7 @@ The portable moat. No dependency on the Python substrate, and no dependency on t
   **authority resolver**, both injected with safe defaults. The larger product injects its own; a
   standalone user gets a permissive default.
 
-### `@agent-rewind/mcp` (TypeScript, MIT/Apache)
+### `@agent-rewind/mcp` (TypeScript, FSL-1.1-ALv2)
 
 A stdio MCP server over `@agent-rewind/core`. Five tools, each stateless-core compliant (mint a handle,
 take it back):
@@ -97,7 +97,7 @@ merged to `main`).
 
 All paths below were confirmed present in `mvp-golden-path` on 2026-08-18 (HEAD `800bf8a`).
 
-| Rewind core piece | harvest from | notes |
+| Agent Rewind core piece | harvest from | notes |
 |---|---|---|
 | git snapshot backend (Tier 0) | `src/sandbox/git-tracked-sandbox.ts` (decorates `src/sandbox/sandbox.ts`) | `createGitTrackedSandbox`: per-turn snapshot to a side GIT_DIR, `snapshot`/`revert`/`log`, `RevertIndeterminateError` fails loud on partial revert. Pure git — the MVP backend. |
 | effect barrier | `src/audit/effect-ledger.ts` | `emitEffect`, idempotency `effectKey`, spent-mark, `EFFECT_REPLAY_REFUSED`, `firstEmittedSeq`. **See concurrency bug below — fix during extraction.** |
@@ -131,7 +131,7 @@ store — treat the durable store as an injected interface (as the MVP already i
 Base substrate: `/home/reuben/projects/shepherd` (`shepherd-workspace` v0.3.0, MIT). Tier 0 git and
 copy-on-write snapshotting is already implemented there; harvest it rather than rebuild it. Note:
 shepherd's own docs pitch **reversibility / inspection / supervision** — they make NO token-saving,
-accuracy, or "lightweight" claim, so those are Rewind's to substantiate, not shepherd's to borrow.
+accuracy, or "lightweight" claim, so those are Agent Rewind's to substantiate, not shepherd's to borrow.
 
 ## Keeping it inside the larger product
 
