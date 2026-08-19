@@ -68,7 +68,48 @@ not a hopeful one.
 | **Deterministic tool-output pruning** | Losslessly collapses duplicate `tool_result` blocks; replay-safe by construction. | **[PROVEN]** |
 | **Gainshare billing** | Bill a share of **verified** savings, anchored to a hard-to-game "billable saved tokens" definition and reconciled against the provider's own bill. | **[BY DESIGN]** |
 | **Free Savings Analysis** | A hash-attested, redacted report of how replayable a customer's traffic is — *before* any contract. | **[PROVEN]** |
-| **Distribution** *(packaged & publish-ready; publish pending)* | Install will be `npx -y @agent-rewind/mcp` (the unscoped `rewind` name is taken, so it ships scoped), with one-line config for Claude Code, Cursor, Codex CLI. Packages build to `dist` (ESM + `.d.ts`), the built CLI is verified end-to-end, and `npm pack` is clean — awaiting the `@agent-rewind` npm org + `npm publish`. | **[PROVEN]** build + client wiring; **[NOT YET MEASURED]** public availability |
+| **Distribution** — **LIVE on npm** | Install is `npx -y @agent-rewind/mcp` (scoped, since the unscoped `rewind` name is taken), one-line config for Claude Code, Cursor, Codex CLI. Published as `@agent-rewind/core`, `/gateway`, `/mcp` and **verified installable + runnable from the registry**. | **[PROVEN]** live + verified install |
+
+---
+
+## 3a. Use cases (who reaches for this, and when)
+
+- **Long multi-step agent tasks** — big refactors, framework migrations, dependency upgrades. Recover
+  from a bad step at minute 40 without throwing away the first 39.
+- **Agents that touch the real world** — deploys, database migrations, payments, emails, provisioning.
+  A safe undo that **cannot double-fire** the effect on a retry (the barrier's whole point).
+- **Cutting cost on repetitive / iterative runs** — the optional proxy replays byte-identical calls at
+  zero upstream cost and keeps prompt caching healthy.
+- **Safe experimentation / what-if** — checkpoint, try a risky approach, rewind cleanly if it doesn't
+  pan out.
+- **Debugging agent runs** — a typed divergence report shows exactly where a re-run stopped matching a
+  recorded one.
+
+## 3b. How the token savings & accuracy actually happen (plain English)
+
+**Two separate systems — don't conflate them.** Checkpoint/rewind is **literally git** (a private side
+repo doing real commits over the whole workspace); it does **not** use prompt caching. Prompt caching is
+a feature of the **optional proxy**, a different layer entirely. You can run either without the other.
+
+**Token savings — three levers in the proxy**, all priced from the provider's *own* usage numbers and
+floored so they never over-count:
+1. **Exact record/replay (the big one).** A *byte-identical* request — common right after a rewind or a
+   retry — is served from the local record with **zero** upstream call; the saving is that whole call.
+   Correctness-safe by construction: only byte-for-byte-equivalent requests replay, so it can never
+   serve a subtly-wrong answer (the key difference from "semantic" caches that guess).
+2. **Prompt-cache preservation.** Injects/keeps one `cache_control` breakpoint on the static prefix
+   (system prompt + tool defs) so it's re-read at ~1/10th the input price instead of full price each
+   turn. Saving = (input rate − cache-read rate) × cached tokens.
+3. **Deterministic pruning.** Collapses duplicate tool-output blocks losslessly — fewer tokens sent.
+
+*(The math and price table are in §6; the ~28% figure is [SYNTHETIC] — §8.)*
+
+**Accuracy — the mechanism.** Rewind makes *recovery* cheap and safe: instead of compounding a mistake,
+the agent rewinds to the last good checkpoint and tries again; a **failure-memory** model (the
+`backtrack` tools) stops it re-walking the same dead-end; and the barrier guarantees a retry can't
+double-fire an effect. **[RESEARCH, not ours]** the headline accuracy figures (e.g. task-success
+~44%→~88% with environment rewind) come from published research that motivates the design — Agent
+Rewind ships the *mechanism*; measuring its own accuracy uplift is future work.
 
 ---
 
@@ -346,14 +387,12 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 ## 11. Distribution & integration
 
-> **Availability today:** the packages are **packaged and publish-ready** (`@agent-rewind/core`,
-> `@agent-rewind/gateway`, `@agent-rewind/mcp` at `0.1.0`; `dist` ESM + `.d.ts` builds; the built CLI verified
-> end-to-end; `npm pack` clean) and the source is on a private git host — but **not yet published to the
-> public npm registry**. One step remains: claim the `@agent-rewind` npm org and run `npm publish` (see
-> `docs/PUBLISHING.md`). The unscoped `rewind` name is taken by an unrelated package, so the CLI ships
-> **scoped** — install is `npx -y @agent-rewind/mcp`, not a bare `npx rewind`.
+> **Availability: LIVE on npm.** `@agent-rewind/core`, `@agent-rewind/gateway`, `@agent-rewind/mcp` are
+> published (0.1.1) and **verified installable + runnable from the public registry**. The CLI ships
+> **scoped** (the unscoped `rewind` name is taken), so install is `npx -y @agent-rewind/mcp`, not a bare
+> `npx rewind`.
 
-- **Zero install (once published):** `npx -y @agent-rewind/mcp` (also runnable as a stdio MCP server and a thin CLI).
+- **Zero install:** `npx -y @agent-rewind/mcp` (also runnable as a stdio MCP server and a thin CLI).
 - **One-line config** for Claude Code, Cursor, and Codex CLI; the plugin ships a `PreToolUse` hook that
   wires the effect guard onto `Bash|Write|Edit` (a refused guard exits 2 to block the call) — **[PROVEN]**
   the plugin test decodes the exact stdio launch and verifies the hook wiring.
@@ -369,7 +408,7 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 | Claim | Status |
 |---|---|
-| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 285 tests |
+| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 286 tests |
 | Never serves a stale/wrong answer on a near-match | **[PROVEN]** — deny-list + bench gate |
 | Never over-credits savings (floors, dedupes, counterfactuals impossible) | **[PROVEN]** — meter/billable/bench |
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |
