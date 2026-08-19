@@ -139,26 +139,24 @@ const QUERY_AUTH_NOISE: ReadonlySet<string> = new Set(["key", "access_token", "a
  * The AUTH params are dropped (QUERY_AUTH_NOISE) so secrets are never hashed. Anthropic/OpenAI carry
  * the model in the body, so this only distinguishes genuinely different endpoints for them. Per the
  * module deny-list discipline: an unknown query param is KEPT, so it forces a miss, never a false hit.
+ *
+ * The query is captured as the ORDERED SEQUENCE of `[name, value]` pairs (auth-stripped), not grouped
+ * by name. An array preserves order and multiplicity exactly, and canonicalize() never reorders array
+ * elements — so `?a=1&b=2&a=3` and `?a=1&a=3&b=2` (which an endpoint reading the full sequence may
+ * interpret differently) key DIFFERENTLY, and `?p=a&p=b` never collides with `?p=a,b`. A pair-array
+ * also sidesteps the `__proto__` hazard entirely: a param literally named `__proto__` is just a string
+ * element, never an object key that could mutate a prototype and make the value non-plain.
  */
-function keyTarget(url: string | undefined): { path: string; query: Record<string, string[]> } {
-  // A NULL-PROTOTYPE map for the query, because param NAMES are attacker/caller-controlled arbitrary
-  // strings: assigning a param literally named `__proto__` to a normal `{}` would mutate its prototype
-  // and make it a non-plain object, so canonicalize() would throw and the proxy would skip
-  // record/replay for that request. A null-proto object turns `__proto__` into an ordinary own key.
-  const empty = (): Record<string, string[]> => Object.create(null) as Record<string, string[]>;
-  if (!url) return { path: "", query: empty() };
+function keyTarget(url: string | undefined): { path: string; query: string[][] } {
+  if (!url) return { path: "", query: [] };
   const qIdx = url.indexOf("?");
   const path = qIdx === -1 ? url : url.slice(0, qIdx);
-  const query = empty();
+  const query: string[][] = [];
   if (qIdx !== -1) {
-    const params = new URLSearchParams(url.slice(qIdx + 1));
-    // Distinct param NAMES; each maps to its value LIST (an array) in ARRIVAL order. The array (not a
-    // comma-join) keeps `?p=a&p=b` distinct from `?p=a,b`; preserving order keeps `?p=a&p=b` distinct
-    // from `?p=b&p=a`, because an endpoint MAY interpret repeated params in order — sorting them would
-    // collide two materially different targets, a false hit the exact-replay contract forbids.
-    for (const name of new Set(params.keys())) {
+    // URLSearchParams iterates in ARRIVAL order, duplicates included — exactly the sequence to preserve.
+    for (const [name, value] of new URLSearchParams(url.slice(qIdx + 1))) {
       if (QUERY_AUTH_NOISE.has(name.toLowerCase())) continue;
-      query[name] = params.getAll(name);
+      query.push([name, value]);
     }
   }
   return { path, query };

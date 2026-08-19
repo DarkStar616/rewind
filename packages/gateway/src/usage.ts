@@ -42,9 +42,11 @@ const ZERO: ProviderUsage = {
  *     count to `cache_read_input_tokens` — matching Anthropic's semantics so the meter prices both the
  *     same way and never double-counts the cached tokens.
  *   - **Gemini** (`usageMetadata`): `promptTokenCount` / `candidatesTokenCount`, with
- *     `cachedContentTokenCount` for the cached portion and `thoughtsTokenCount` for thinking. Gemini's
- *     `promptTokenCount` INCLUDES the cached tokens (same as OpenAI), so it splits the same way; and
- *     thinking is billed as OUTPUT but reported separately, so output = candidates + thoughts.
+ *     `cachedContentTokenCount` for the cached portion, `thoughtsTokenCount` for thinking, and
+ *     `toolUsePromptTokenCount` for tool-use prompts. Gemini's `promptTokenCount` INCLUDES the cached
+ *     tokens (same as OpenAI), so it splits the same way; tool-use prompt tokens are reported SEPARATELY
+ *     and added to input; and thinking is billed as OUTPUT but reported separately, so output =
+ *     candidates + thoughts.
  *
  *  Fallbacks fire ONLY when the higher-priority field is absent, so a provider that reports more than
  *  one vocabulary is never double-mapped.
@@ -78,8 +80,12 @@ export function pickUsageFields(u: unknown): ProviderUsage {
   // Gemini usageMetadata fallbacks — only when nothing above supplied the field.
   const cachedG = typeof o.cachedContentTokenCount === "number" ? o.cachedContentTokenCount : 0;
   if (out.input_tokens === undefined && typeof o.promptTokenCount === "number") {
-    // Split Gemini's all-inclusive promptTokenCount into uncached (input) + cached (cache_read).
-    out.input_tokens = Math.max(0, o.promptTokenCount - cachedG);
+    // Split Gemini's all-inclusive promptTokenCount into uncached (input) + cached (cache_read), then
+    // ADD tool-use prompt tokens: Gemini reports `toolUsePromptTokenCount` SEPARATELY from
+    // promptTokenCount for tool-invoking responses, and it is billed as input — omitting it
+    // under-reports both avoided tokens and cost on every such replay.
+    const toolUse = typeof o.toolUsePromptTokenCount === "number" ? Math.max(0, o.toolUsePromptTokenCount) : 0;
+    out.input_tokens = Math.max(0, o.promptTokenCount - cachedG) + toolUse;
     if (out.cache_read_input_tokens === undefined && cachedG > 0) out.cache_read_input_tokens = cachedG;
   }
   if (out.output_tokens === undefined && typeof o.candidatesTokenCount === "number") {

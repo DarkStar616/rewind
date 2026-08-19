@@ -112,6 +112,11 @@ test("repeated query values are unambiguous: ?p=a&p=b never collides with ?p=a,b
   // ?p=a&p=b and ?p=b&p=a are DIFFERENT targets and must not collide (exact-replay contract).
   const reordered = canonicalizeRequest(body, undefined, `${base}?p=b&p=a`);
   assert.notEqual(repeated, reordered, "repeated-value order is significant, never normalised away");
+  // GLOBAL sequence order matters too, not just per-name: interleaving differs even with the same
+  // per-name value lists, so ?a=1&b=2&a=3 and ?a=1&a=3&b=2 must key differently.
+  const interleaved1 = canonicalizeRequest(body, undefined, `${base}?a=1&b=2&a=3`);
+  const interleaved2 = canonicalizeRequest(body, undefined, `${base}?a=1&a=3&b=2`);
+  assert.notEqual(interleaved1, interleaved2, "the full query sequence is preserved, not grouped by name");
 });
 
 test("a query param literally named __proto__ does not crash the key (null-proto query map)", () => {

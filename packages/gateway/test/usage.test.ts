@@ -15,6 +15,14 @@ test("Gemini with no thinking tokens meters candidates alone (no phantom output)
   assert.equal(u.output_tokens, 50);
 });
 
+test("Gemini tool-use prompt tokens are billed as input and added to the uncached input", () => {
+  const u = pickUsageFields({ promptTokenCount: 30, candidatesTokenCount: 50, toolUsePromptTokenCount: 15, cachedContentTokenCount: 10 });
+  // input = (promptTokenCount 30 - cached 10) + toolUse 15 = 35
+  assert.equal(u.input_tokens, 35);
+  assert.equal(u.cache_read_input_tokens, 10);
+  assert.equal(u.output_tokens, 50);
+});
+
 /**
  * extractUsage reads the provider's OWN token counts from a raw response — JSON or SSE — and never
  * estimates from text length. A malformed body yields all-zero usage instead of throwing, so a bad
