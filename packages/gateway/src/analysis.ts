@@ -43,15 +43,18 @@ export interface AnalyzedCall {
    */
   headers?: Record<string, string | string[] | undefined>;
   /**
-   * The request's URL/target. Its pathname (query stripped) is folded into the replay key EXACTLY as the
-   * live gateway does, so two calls with the same body but a different endpoint/model target — the case
-   * that matters for providers naming the model in the URL, e.g. Gemini's
-   * `…/gemini-2.5-pro:generateContent` vs `…:flash` — are NOT counted as a replay.
+   * The request's ABSOLUTE upstream URL (scheme + host + path [+ query]), exactly as the live gateway
+   * sees it — e.g. `"https://api.anthropic.com/v1/messages"`. The origin, pathname and non-auth query are
+   * folded into the replay key EXACTLY as the gateway does (proxy.ts `keyUrl`), so two calls are counted
+   * as a replay ONLY when their upstream ORIGIN, endpoint/model target (e.g. Gemini's
+   * `…/gemini-2.5-pro:generateContent` vs `…:flash`) and wire choice (`?alt=sse`) all match.
    *
-   * Absence is UNKNOWN, exactly like `headers`: omitting `url` means the target is unknown, and an
-   * unknown-target call is never counted as a replay (the live gateway keys on the URL, so a repeat can
-   * only be proven when the target matched too — over-crediting is the one thing a savings report must
-   * never do). Declare it (e.g. `"/v1/messages"`) for the call to be eligible as a replay.
+   * Absence — or a RELATIVE/origin-less url like `"/v1/messages"` — is treated as UNKNOWN, exactly like
+   * an omitted `headers`: the upstream origin cannot be established, and the live gateway namespaces its
+   * key by origin (two OpenAI-compatible vendors both speak `/v1/chat/completions`), so a repeat can only
+   * be PROVEN when the origin matched too. An unknown-target call is never counted as a replay —
+   * over-crediting is the one thing a savings report must never do. Pass the absolute url (the form a
+   * proxy access log already records) for the call to be eligible as a replay.
    */
   url?: string;
 }
@@ -105,6 +108,25 @@ const emptyScope = (scope: string): ScopeAnalysis => ({
 });
 
 /**
+ * The normalized ABSOLUTE href (origin + path + query) if `url` is absolute, else undefined.
+ *
+ * The live gateway namespaces its replay key by the absolute upstream href (proxy.ts `keyUrl` resolves
+ * the request against the upstream base and takes `.href`, which lowercases the host and drops the
+ * default port). To key EXACTLY as it does — and never over-credit — the analysis only treats a call as
+ * replay-eligible when it carries an absolute url, and normalizes it the same way. A relative/origin-less
+ * url leaves the upstream ORIGIN unknown, so a repeat can never be PROVEN to have hit the same vendor;
+ * such a call returns undefined here and is keyed as an unknown target (never a replay).
+ */
+function absoluteHref(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  try {
+    return new URL(url).href; // absolute only — a relative url has no base and throws, matching keyUrl's own parse
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Analyse a batch of request traffic for replay + prune savings, scope-isolated and provider-priced.
  * Deterministic and side-effect-free — no upstream calls are made; this only reads the supplied bodies.
  */
@@ -128,18 +150,21 @@ export function analyzeTraffic(calls: readonly AnalyzedCall[], opts: AnalyzeOpti
     }
     scope.calls += 1;
 
-    // A call whose headers OR url are UNKNOWN (the field is absent) cannot be PROVEN byte-replayable:
-    // two such calls may have differed in an output-affecting header (anthropic-version / anthropic-beta)
-    // OR in the endpoint/model target (Gemini names the model in the URL) that the live gateway keys on
-    // but we cannot see here. Give it a key that can never match another call, so it is never counted as
-    // a replay — over-crediting is the one thing a savings report must never do. A call that DECLARES
-    // both (even `headers:{}` = "I checked, no output-affecting headers") is keyed exactly as the live
-    // gateway keys it — over body + headers + url path. The `unknown-target:` key can never collide with
-    // a 64-hex canonical key.
+    // A call whose headers OR upstream target are UNKNOWN cannot be PROVEN byte-replayable:
+    // two such calls may have differed in an output-affecting header (anthropic-version / anthropic-beta),
+    // in the endpoint/model target (Gemini names the model in the URL), OR — critically — in the upstream
+    // ORIGIN (two OpenAI-compatible vendors both speak `/v1/chat/completions`). The live gateway keys on
+    // the ABSOLUTE upstream href, so it namespaces by origin; a RELATIVE url loses the origin and can no
+    // longer prove a repeat targeted the same vendor. Give any such call a key that can never match
+    // another, so it is never counted as a replay — over-crediting is the one thing a savings report must
+    // never do. A call that DECLARES its headers (even `headers:{}` = "I checked, none output-affecting")
+    // AND an ABSOLUTE url is keyed EXACTLY as the live gateway keys it — over body + headers + origin +
+    // path + query. The `unknown-target:` key can never collide with a 64-hex canonical key.
+    const href = absoluteHref(c.url);
     const key =
-      c.headers === undefined || c.url === undefined
+      c.headers === undefined || href === undefined
         ? `unknown-target:${callIndex}`
-        : canonicalizeRequest(c.body, c.headers, c.url);
+        : canonicalizeRequest(c.body, c.headers, href);
     const seen = seenByScope.get(c.scope)!;
     if (seen.has(key)) {
       // A byte-replayable repeat: the whole upstream call is avoidable on replay. A malformed call
