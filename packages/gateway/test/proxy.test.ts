@@ -135,6 +135,30 @@ test("a SHARED store never cross-serves between two different upstream origins (
   }
 });
 
+test("a customised messagesPath keeps Anthropic semantics even when it collides with an auto-detected path", async () => {
+  // An existing Anthropic caller pointed messagesPath at /v1/chat/completions. Auto-detection would pick
+  // the openai adapter (wrong: an Anthropic response has no `choices`), so the explicit config must win.
+  const stub = await startStub({ body: anthropicJson });
+  const store = createMemoryRecordStore();
+  const savings = createMemoryReplaySavings();
+  const replayer = createReplayer(store, savings);
+  const proxy = await startProxy({ upstreamBase: stub.base, replayer, store, messagesPath: "/v1/chat/completions" });
+  try {
+    const body = JSON.stringify({ model: "claude-opus-4-8", max_tokens: 100, messages: [{ role: "user", content: "hi" }] });
+    const r1 = await post(proxy, "/v1/chat/completions", body);
+    assert.equal(r1.headers.get("x-rewind"), "live");
+    assert.equal(stub.hits, 1);
+    // The Anthropic response WAS recorded (anthropic terminal), so the repeat replays with 0 upstream.
+    const r2 = await post(proxy, "/v1/chat/completions", body + " ");
+    assert.equal(r2.headers.get("x-rewind"), "replay", "recorded under Anthropic semantics, so it replays");
+    assert.equal(stub.hits, 1);
+    assert.equal(savings.total("test").tokens, 1050, "Anthropic usage was metered, not OpenAI");
+  } finally {
+    await proxy.close();
+    await stub.close();
+  }
+});
+
 test("preserveCache never injects Anthropic cache_control into an OpenAI request (would break upstream)", async () => {
   const openaiJson = (n: number) => JSON.stringify({ id: `c${n}`, model: "gpt-4o", choices: [{ message: { role: "assistant", content: "hi" } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
   const stub = await startStub({ body: openaiJson });

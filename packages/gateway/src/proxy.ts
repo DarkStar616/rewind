@@ -160,23 +160,37 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
 
     async function handle(): Promise<void> {
       const rawBody = await readBody(req);
-      // Pick the provider adapter for this request. Explicit options.provider wins; otherwise the
-      // first adapter whose endpoint matches the path. As a legacy fallback, a request hitting the
-      // configured messagesPath that no adapter path-matched is treated as Anthropic — so existing
-      // callers (and a customised messagesPath) keep recording exactly as before.
+      // Pick the provider adapter for this request. Precedence, in order:
+      //   1. An explicit `options.provider` pin wins outright — its adapter is used when it path-matches;
+      //      a pinned request that does not match (and is not the anthropic legacy case) is treated as
+      //      non-recordable rather than silently parsed with another provider's semantics.
+      //   2. Otherwise, an EXPLICITLY-CUSTOMISED `messagesPath` that the request hits is a deliberate
+      //      "record THIS path as Anthropic" and wins over auto-detection — so an existing Anthropic
+      //      caller who set messagesPath to a path another adapter now recognises (e.g.
+      //      /v1/chat/completions) keeps Anthropic semantics.
+      //   3. Otherwise auto-detect: the first adapter whose endpoint path-matches.
+      //   4. Otherwise, a request on the (default) messagesPath falls back to Anthropic — the legacy
+      //      behaviour existing callers depend on.
       const selected = selectAdapter({ provider: options.provider }, req.method, req.url);
       const pathMatches = selected?.matchPath(req.method, req.url) ?? false;
-      const legacyMessages = req.method === "POST" && (req.url ?? "").split("?")[0] === messagesPath;
-      // The legacy Anthropic fallback (a request on messagesPath that no adapter path-matched) applies
-      // ONLY when the provider is unpinned or explicitly pinned to anthropic. A proxy pinned to
-      // openai/gemini must NEVER silently parse/record/meter a /v1/messages request with Anthropic
-      // semantics — an explicit pin is honoured, so such a request is treated as non-recordable instead.
-      const legacyAnthropicOk = options.provider === undefined || options.provider === "anthropic";
-      const adapter: ProviderAdapter | undefined = pathMatches
-        ? selected
-        : legacyMessages && legacyAnthropicOk
-          ? anthropicAdapter
-          : undefined;
+      const hitsMessagesPath = req.method === "POST" && (req.url ?? "").split("?")[0] === messagesPath;
+      const messagesPathCustomised = messagesPath !== "/v1/messages";
+      let adapter: ProviderAdapter | undefined;
+      if (options.provider) {
+        adapter = pathMatches
+          ? selected
+          : hitsMessagesPath && options.provider === "anthropic"
+            ? anthropicAdapter // pinned-anthropic honours a customised messagesPath its own matchPath misses
+            : undefined;
+      } else if (hitsMessagesPath && messagesPathCustomised) {
+        adapter = anthropicAdapter; // explicit messagesPath config beats auto-detection
+      } else if (pathMatches) {
+        adapter = selected;
+      } else if (hitsMessagesPath) {
+        adapter = anthropicAdapter; // legacy default-path fallback
+      } else {
+        adapter = undefined;
+      }
 
       // Decide replay ONLY for a recordable model endpoint, and only when the body parses. Any failure
       // here falls through to a plain forward — Rewind never blocks a call it cannot help.
