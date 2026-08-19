@@ -106,3 +106,26 @@ test("a partial/garbage SSE frame is skipped, valid frames still fold", () => {
   assert.equal(usage.input_tokens, 99);
   assert.equal(usage.output_tokens, 3);
 });
+
+test("OpenAI-compatible usage (Nebius/OpenAI) maps prompt/completion tokens", () => {
+  const body = JSON.stringify({ model: "meta-llama/Llama-3.3-70B-Instruct", usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 } });
+  const { usage, model } = extractUsage(body, "application/json");
+  assert.equal(usage.input_tokens, 100, "prompt_tokens -> input_tokens");
+  assert.equal(usage.output_tokens, 50, "completion_tokens -> output_tokens");
+  assert.equal(model, "meta-llama/Llama-3.3-70B-Instruct");
+});
+
+test("OpenAI cached prompt tokens split out of input, never double-counted", () => {
+  const body = JSON.stringify({ usage: { prompt_tokens: 100, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 30 } } });
+  const { usage } = extractUsage(body, "application/json");
+  assert.equal(usage.input_tokens, 70, "uncached remainder = 100 - 30");
+  assert.equal(usage.cache_read_input_tokens, 30, "cached portion -> cache_read");
+  assert.equal(usage.output_tokens, 20);
+});
+
+test("Anthropic shape still wins when its fields are present (no OpenAI override)", () => {
+  const body = JSON.stringify({ usage: { input_tokens: 11, output_tokens: 22 } });
+  const { usage } = extractUsage(body, "application/json");
+  assert.equal(usage.input_tokens, 11);
+  assert.equal(usage.output_tokens, 22);
+});

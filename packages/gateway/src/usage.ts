@@ -30,7 +30,17 @@ const ZERO: ProviderUsage = {
   cache_creation_input_tokens: 0,
 };
 
-/** Copy only the numeric usage fields we price; ignore anything else the provider includes. */
+/** Copy only the numeric usage fields we price; ignore anything else the provider includes.
+ *
+ *  Handles BOTH shapes so the gateway meters any provider:
+ *   - **Anthropic:** `input_tokens` (uncached) / `output_tokens` / `cache_read_input_tokens` /
+ *     `cache_creation_input_tokens`.
+ *   - **OpenAI-compatible** (OpenAI, Nebius, Together, Groq, …): `prompt_tokens` / `completion_tokens`,
+ *     with `prompt_tokens_details.cached_tokens` for the cached portion. OpenAI's `prompt_tokens`
+ *     INCLUDES the cached tokens, so we map the UNCACHED remainder to `input_tokens` and the cached
+ *     count to `cache_read_input_tokens` — matching Anthropic's semantics so the meter prices both the
+ *     same way and never double-counts the cached tokens.
+ */
 function pickUsage(u: unknown): ProviderUsage {
   if (!u || typeof u !== "object") return {};
   const o = u as Record<string, unknown>;
@@ -40,6 +50,22 @@ function pickUsage(u: unknown): ProviderUsage {
   if (typeof o.cache_read_input_tokens === "number") out.cache_read_input_tokens = o.cache_read_input_tokens;
   if (typeof o.cache_creation_input_tokens === "number")
     out.cache_creation_input_tokens = o.cache_creation_input_tokens;
+
+  // OpenAI-compatible fallbacks — only when the Anthropic field is absent, so a provider that reports
+  // both never gets double-mapped.
+  const details = o.prompt_tokens_details;
+  const cached =
+    details && typeof details === "object" && typeof (details as Record<string, unknown>).cached_tokens === "number"
+      ? ((details as Record<string, unknown>).cached_tokens as number)
+      : 0;
+  if (out.input_tokens === undefined && typeof o.prompt_tokens === "number") {
+    // Split OpenAI's all-inclusive prompt_tokens into uncached (input) + cached (cache_read).
+    out.input_tokens = Math.max(0, o.prompt_tokens - cached);
+    if (out.cache_read_input_tokens === undefined && cached > 0) out.cache_read_input_tokens = cached;
+  }
+  if (out.output_tokens === undefined && typeof o.completion_tokens === "number") {
+    out.output_tokens = o.completion_tokens;
+  }
   return out;
 }
 
