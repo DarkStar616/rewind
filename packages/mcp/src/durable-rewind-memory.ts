@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { AttemptRecord, RewindMemoryStore } from "@rewind/core";
+import type { AttemptRecord, RewindMemoryStore } from "@agent-rewind/core";
 
 interface PersistShape {
   version: 1;

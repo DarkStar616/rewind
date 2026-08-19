@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { ReplaySaving } from "@rewind/core";
+import type { ReplaySaving } from "@agent-rewind/core";
 import { reconcileAgainstProviderBill } from "../src/reconcile.ts";
 
 const s = (t: number): ReplaySaving => ({ scope: "s", tokensAvoided: t, costMicros: t, model: "m", callId: `s ${t}` });

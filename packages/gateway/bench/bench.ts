@@ -20,7 +20,7 @@
  * Fully deterministic: fixed request bodies, an injected clock, no Date.now / Math.random. Two runs
  * produce byte-identical reports.
  */
-import { createMemoryReplaySavings } from "@rewind/core";
+import { createMemoryReplaySavings } from "@agent-rewind/core";
 
 import { createMemoryRecordStore } from "../src/record-store.ts";
 import { createReplayer } from "../src/replay.ts";

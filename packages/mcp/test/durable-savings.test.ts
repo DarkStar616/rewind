@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createMemoryRecordStore, createReplayer, startProxy } from "@rewind/gateway";
+import { createMemoryRecordStore, createReplayer, startProxy } from "@agent-rewind/gateway";
 import { createFileReplaySavings } from "../src/durable-savings.ts";
 
 /**

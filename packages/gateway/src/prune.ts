@@ -24,7 +24,7 @@
  *   - **Only tool_result (observations) are touched** — never tool_use (the agent's own actions/inputs),
  *     so a side-effecting call's request is never elided.
  */
-import { canonicalize } from "@rewind/core";
+import { canonicalize } from "@agent-rewind/core";
 
 const DEFAULT_MIN_LENGTH = 200;
 const ELIDED_MARKER = "[elided by rewind: identical to an earlier tool result in this conversation]";

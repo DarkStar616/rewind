@@ -47,7 +47,7 @@ export interface RewindMemoryStore {
 /**
  * In-memory attempt log. Dedup is by (scope, seq): re-recording the same seq is idempotent (first write
  * wins), so a retried append never double-counts. A durable, file-backed store lands behind the same
- * interface (see @rewind/mcp durable-rewind-memory).
+ * interface (see @agent-rewind/mcp durable-rewind-memory).
  */
 export function createMemoryRewindStore(): RewindMemoryStore {
   // scope -> (seq -> record); nested so scope isolation is structural, not delimiter-dependent.

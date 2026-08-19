@@ -3,7 +3,7 @@
 > Executors: TDD each task, `node --test` must stay green, commit per task. Harvest, don't rebuild.
 > Read `docs/BUSINESS-MODEL.md` (billing basis), and the design synthesis in this repo's history.
 
-**Goal:** `@rewind/gateway` — a local, byte-transparent LLM proxy that records/replays model calls and
+**Goal:** `@agent-rewind/gateway` — a local, byte-transparent LLM proxy that records/replays model calls and
 preserves prompt-cache across rewinds, turning the savings receipt from `0` into a real, billable number.
 
 ## Two proven mechanisms (keep them SEPARATE, never double-count)
@@ -18,11 +18,11 @@ preserves prompt-cache across rewinds, turning the savings receipt from `0` into
 ## Harvest sources (read-only; qm-athena `mvp-golden-path` worktree)
 - `src/harness/recorded-response-harness.ts` — the replay engine (Mechanism A). PRIMARY.
 - `src/harness/recorded/recorded-response-store.ts` — `indexRecordedTurns`, SHA-256 request fingerprint.
-- `src/harness/recorded/replay-savings.ts` — already ported to `@rewind/core`.
+- `src/harness/recorded/replay-savings.ts` — already ported to `@agent-rewind/core`.
 - shepherd-experiments `exp/framework-perf/src/experiment_framework_perf/bench_kv_cache_comprehensive.py`
   — the cache cost model + rolling ephemeral breakpoint (Mechanism B reference).
 
-## Package layout — `packages/gateway` (`@rewind/gateway`, FSL-1.1-ALv2, depends on `@rewind/core`)
+## Package layout — `packages/gateway` (`@agent-rewind/gateway`, FSL-1.1-ALv2, depends on `@agent-rewind/core`)
 ```
 src/canonical-request.ts   canonicalizeRequest(body) -> replayKey (SHA-256 over the OUTPUT-affecting
                            fields: model, system, messages, tools, tool_choice, temperature, top_p,
@@ -80,7 +80,7 @@ CLI: add `rewind gateway [--port N] [--upstream URL]` to `packages/mcp/src/cli.t
   suite, commits only if green.)
 - **Path three-classes** (git backend) — *tracked* (snapshot/revert), *excluded* (`.git`, `.env`,
   secrets — NEVER snapshotted), *volatile* (caches — deleted on restore). AgentRewind §C.4/Table 14.
-- **Recovery-policy module** (`@rewind/core`) — the two-tool interface (`backtrack_candidates` /
+- **Recovery-policy module** (`@agent-rewind/core`) — the two-tool interface (`backtrack_candidates` /
   `backtrack_commit` with a required memory note) + cumulative rewind-memory (worth ~+18pp accuracy);
   checkpoint-sparsity gate (Crab: >75% of turns need no checkpoint — gate on observed effect/diff).
 

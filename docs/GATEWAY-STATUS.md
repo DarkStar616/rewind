@@ -74,7 +74,7 @@ serve a wrong answer):**
 ## Shipped since (research-driven, `docs/RESEARCH-ROADMAP.md`)
 
 - **BP2 recovery / accuracy engine** ✅ — the AgentRewind-style **selective rewind + failure-memory**
-  (`@rewind/core` recovery policy; durable attempt log; `backtrack_candidates` / `backtrack_commit` MCP
+  (`@agent-rewind/core` recovery policy; durable attempt log; `backtrack_candidates` / `backtrack_commit` MCP
   tools; checkpoint-sparsity gate). `backtrack_commit` requires a non-empty note (the carried-forward
   lesson) and returns the accumulated failure memory for the target checkpoint. Memory survives across
   sessions/processes. This is the measured +25.6pp accuracy mechanism, and Mechanism A makes its

@@ -12,7 +12,7 @@
 // aggregate reconciliation against the provider's own bill lives in reconcile.ts (#6); this module
 // only defines what WE attest as billable from the chain-logged replays.
 
-import type { ReplaySaving } from "@rewind/core";
+import type { ReplaySaving } from "@agent-rewind/core";
 
 export interface BillableSavings {
   /** Total avoided input+output tokens over distinct realized replays, floored. */

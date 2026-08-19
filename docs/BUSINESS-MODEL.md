@@ -26,11 +26,11 @@ revenue instead.
 
 | Layer | Where it runs | Licence / secrecy | Role |
 |---|---|---|---|
-| `@rewind/core` + `@rewind/mcp` (barrier, chain, local git rewind, effect capture, local savings meter) | **User's machine** | **FSL-1.1-Apache-2.0** — source-available, no competing product, → Apache-2.0 in 2 yrs | The free, viral, offline wedge. Readable but legally protected. |
+| `@agent-rewind/core` + `@agent-rewind/mcp` (barrier, chain, local git rewind, effect capture, local savings meter) | **User's machine** | **FSL-1.1-Apache-2.0** — source-available, no competing product, → Apache-2.0 in 2 yrs | The free, viral, offline wedge. Readable but legally protected. |
 | Entitlement / license validation | **Hosted (closed)** | fully closed | The real access gate (client checks are bypassable). |
 | Savings verification + billing meter | **Hosted (closed)** | fully closed | Computes the billable number server-side so it can't be gamed. |
 | Team dashboard, cross-machine sync, aggregate savings data | **Hosted (closed)** | fully closed | The paid product + the data flywheel. |
-| Athena authority resolver | **Private (Athena repo)** | fully closed | Injected via the seam; never in `@rewind/core`. |
+| Athena authority resolver | **Private (Athena repo)** | fully closed | Injected via the seam; never in `@agent-rewind/core`. |
 
 Free tier = local + FSL (account-free, zero-marginal-cost, viral). Paid tier = server-gated.
 

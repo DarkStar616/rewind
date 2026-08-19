@@ -1,7 +1,7 @@
 /**
  * Shared engine builder for the rewind adapters (CLI and the stdio MCP server).
  *
- * Both adapters compose @rewind/core the same way: one Tier-0 git backend over the workspace, one
+ * Both adapters compose @agent-rewind/core the same way: one Tier-0 git backend over the workspace, one
  * durable file-backed evidence ledger (the barrier records on it; see store.ts for why the chain
  * MUST be on disk and NOT in connection/session memory), one in-memory savings sink, wired into the
  * single engine. Factoring it here keeps the two adapters bit-identical in how they build the world,
@@ -15,14 +15,14 @@ import {
   createGitBackend,
   EFFECT_EMITTED,
   EFFECT_REPLAY_REFUSED,
-} from "@rewind/core";
+} from "@agent-rewind/core";
 import type {
   Engine,
   EvidenceLedger,
   ReplaySavingsSink,
   RewindMemoryStore,
   WorldBackend,
-} from "@rewind/core";
+} from "@agent-rewind/core";
 import { createFileEvidenceLedger } from "./store.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
 import { createFileRewindMemory } from "./durable-rewind-memory.ts";

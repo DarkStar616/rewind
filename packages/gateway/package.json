@@ -1,5 +1,5 @@
 {
-  "name": "@rewind/gateway",
+  "name": "@agent-rewind/gateway",
   "version": "0.1.0",
   "description": "Local byte-exact record/replay LLM proxy for AI coding agents: zero-cost replay after a rewind, prompt-cache preservation, deterministic tool-output pruning, and verifiable token-savings accounting.",
   "type": "module",
@@ -43,6 +43,6 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@rewind/core": "^0.1.0"
+    "@agent-rewind/core": "^0.1.0"
   }
 }

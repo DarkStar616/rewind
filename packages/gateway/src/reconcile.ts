@@ -14,7 +14,7 @@
 // testable without network; the `ProviderUsageFetcher` type is the seam a real (async, networked)
 // adapter implements.
 
-import type { ReplaySaving } from "@rewind/core";
+import type { ReplaySaving } from "@agent-rewind/core";
 import { billableSavedTokens } from "./billable.ts";
 
 export interface ReconciliationReport {

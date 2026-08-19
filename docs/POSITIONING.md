@@ -59,7 +59,7 @@ moment is the "obviously useful" hook that drives installs.
 
 "Rewind" is **crowded in exactly our niche.** Three live repos: `khalilbalaree/Rewind-MCP` (13★,
 literally a checkpoint MCP server — direct functional + name collision), `nicobailon/pi-rewind-hook`
-(161★), `adi-suresh01/rewind` (agent memory). None own a `@rewind` npm scope you'd want, but the name
+(161★), `adi-suresh01/rewind` (agent memory). None own a `@agent-rewind` npm scope you'd want, but the name
 does not read as distinctive here. **Recommendation: treat the name as unresolved and pick a
 distinctive one before the first npm publish / marketplace listing.** This is now a blocker for
 *publishing*, not just a day-one nicety.
@@ -74,9 +74,9 @@ web** — Claude.ai and ChatGPT run the MCP server from the vendor's cloud with 
 **effect barrier + hash chain read only the effect log and trace, never the FS.** So: **one core, two
 transports.**
 
-- **`@rewind/core`** — the moat.
-- **stdio transport** (`npx @rewind/mcp`) — where the *full* local moat works. One JSON `mcpServers`
-  block (with `"type": "stdio"`, `npx -y @rewind/mcp`) drops into **Claude Code + Cursor + Cline +
+- **`@agent-rewind/core`** — the moat.
+- **stdio transport** (`npx @agent-rewind/mcp`) — where the *full* local moat works. One JSON `mcpServers`
+  block (with `"type": "stdio"`, `npx -y @agent-rewind/mcp`) drops into **Claude Code + Cursor + Cline +
   Windsurf unchanged**; one TOML `[mcp_servers.rewind]` block covers **Codex CLI** (the sole outlier).
   Prefer the CLI one-liners `claude mcp add` / `codex mcp add` as the primary documented path.
 - **remote Streamable-HTTP transport** — the single transport accepted by *both* Claude.ai custom
@@ -85,7 +85,7 @@ transports.**
   deprecated — target Streamable HTTP only. ChatGPT write-actions are Business/Enterprise-gated.)
 
 ### Minimum viable distribution (build these four)
-1. **`@rewind/mcp` stdio bin on npm** — the single payload behind every install.
+1. **`@agent-rewind/mcp` stdio bin on npm** — the single payload behind every install.
 2. **Two copy-paste snippets** on the docs page (JSON `mcpServers` + TOML for Codex) plus the CLI
    one-liners.
 3. **A Claude Code plugin in a marketplace repo** bundling the `.mcp.json` **+ a `PreToolUse`

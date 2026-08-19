@@ -6,14 +6,14 @@
 
 **Architecture:** All work sits ABOVE or INSIDE the existing layering. The barrier/chain/pruner/meter stay pure logic over logs+traces (never the filesystem). Redaction and analysis operate on an EXPORT copy, never the primary replay tape, so byte-exact replay is untouched. Pricing/reconciliation are pure functions over provider-reported usage.
 
-**Tech Stack:** TypeScript, Node ≥24.15 native type-stripping (no runtime typecheck → `tsc --noEmit` gate), ESM with explicit `.ts` import specifiers, `node:test` + `node:assert/strict`, npm workspaces (`@rewind/core`, `@rewind/gateway`, `@rewind/mcp`).
+**Tech Stack:** TypeScript, Node ≥24.15 native type-stripping (no runtime typecheck → `tsc --noEmit` gate), ESM with explicit `.ts` import specifiers, `node:test` + `node:assert/strict`, npm workspaces (`@agent-rewind/core`, `@agent-rewind/gateway`, `@agent-rewind/mcp`).
 
 **Spec:** `docs/RIP-LIST.md` (the graded rip-list, with the agenticstash verdict) + `docs/deep-prospect-log.md` (the competitive evidence). Item numbers below (#1..#11) map to RIP-LIST ranks.
 
 ## Global Constraints
 
 - **Exact-replay determinism is sacred.** Any transform that changes forwarded request bytes must be deterministic AND keyed over the transformed form, OR must not touch the primary replay tape at all. Never redact/mutate the recorded body used for replay.
-- **Pure-logic-above-WorldBackend.** The barrier, evidence chain, meter, pruner, and any new analysis/reconciliation logic read only the effect log / recorded calls / provider usage — never the filesystem or clock. No `Date.now()` in `@rewind/core`; timestamps are injected.
+- **Pure-logic-above-WorldBackend.** The barrier, evidence chain, meter, pruner, and any new analysis/reconciliation logic read only the effect log / recorded calls / provider usage — never the filesystem or clock. No `Date.now()` in `@agent-rewind/core`; timestamps are injected.
 - **One real implementation** of the effect barrier + hash chain. Do not add a second. Do not add `@takk/agenticstash` or any competitor package as a dependency (RIP-LIST hard-skip). All rips are re-derived in our own code.
 - **Tests must fail on a do-nothing implementation** for every correctness-critical change (barrier, chain, restore, redaction, metering).
 - **Per slice:** `npm run check` (typecheck + full suite) green, then a `codex exec --sandbox read-only` cross-vendor review, fix findings, then commit. Small commits, no backticks in `-m`.
@@ -243,7 +243,7 @@ Use a module- or closure-scoped `counter` (NOT `Date.now`/random — determinist
 - Modify: `packages/gateway/src/index.ts` (export)
 
 **Interfaces:**
-- Consumes: `ReplaySaving`, `ReplaySavingsTotal` from `@rewind/core`.
+- Consumes: `ReplaySaving`, `ReplaySavingsTotal` from `@agent-rewind/core`.
 - Produces: `billableSavedTokens(savings: readonly ReplaySaving[]): { billableTokens: number; billableCostMicros: number; realizedReplays: number }`. Credits ONLY realized, chain-logged replay savings (each `ReplaySaving` IS a realized replay by construction) — never a hypothetical/counterfactual call. Pure function; floors costs (never rounds up). This is the published contractual definition of a "saved call".
 
 - [ ] **Step 1: Write the failing test**
@@ -291,7 +291,7 @@ test("never credits a hypothetical: only records present in the list count", () 
 - Modify: `packages/gateway/src/index.ts` (export)
 
 **Interfaces:**
-- Consumes: `RecordedCall` from `record-store.ts`, `canonicalize` from `@rewind/core` (stable traversal).
+- Consumes: `RecordedCall` from `record-store.ts`, `canonicalize` from `@agent-rewind/core` (stable traversal).
 - Produces:
   - `type RedactFn = (value: unknown, ctx: { path: string; kind: "request" | "response" }) => unknown | typeof DROP` and `const DROP: unique symbol`.
   - `redactValue(value: unknown, redact: RedactFn, ctx): unknown` — deep, structure-preserving; a `DROP` return replaces the value with `{ "[redacted]": true }`.
@@ -347,7 +347,7 @@ test("redactedExportView never mutates the input record (replay tape stays byte-
 - Modify: `packages/mcp/src/cli.ts` (add an `analyze` subcommand), `packages/gateway/src/index.ts` (export)
 
 **Interfaces:**
-- Consumes: `pruneToolOutputs` (prune savings simulation), `canonicalizeRequest` (replayability check), `billableSavedTokens` (C2), `redactedExportView` (B1), `meterAvoidance`/`avoidedCostMicros` (meter), `computeEntryHash`/`verifyChain`/`GENESIS_HASH` (`@rewind/core`, to attest the report).
+- Consumes: `pruneToolOutputs` (prune savings simulation), `canonicalizeRequest` (replayability check), `billableSavedTokens` (C2), `redactedExportView` (B1), `meterAvoidance`/`avoidedCostMicros` (meter), `computeEntryHash`/`verifyChain`/`GENESIS_HASH` (`@agent-rewind/core`, to attest the report).
 - Produces:
   - `analyzeTraffic(calls: AnalyzedCall[], opts?: { redact?: RedactFn; priceTable?: PriceTable }): SavingsAnalysis` where `AnalyzedCall = { scope: string; body: unknown; usage: ProviderUsage; model: string }`. Computes: how many calls are byte-replayable (duplicate canonical keys within a scope), estimated prune char-savings, and the priced $ figure — returning a `SavingsAnalysis` with per-scope + total figures and a redacted sample.
   - `attestAnalysis(analysis: SavingsAnalysis): { analysis; chain: AuditEntry[]; rootHash: string }` — folds the analysis JSON into a one-entry hash chain (via `computeEntryHash` over the canonicalized analysis) so the report is tamper-evident and `verifyChain`-checkable.
@@ -358,7 +358,7 @@ test("redactedExportView never mutates the input record (replay tape stays byte-
 // packages/gateway/test/analysis.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verifyChain } from "@rewind/core";
+import { verifyChain } from "@agent-rewind/core";
 import { analyzeTraffic, attestAnalysis } from "../src/analysis.ts";
 
 const call = (scope: string, prompt: string, tokens: number) => ({
@@ -538,7 +538,7 @@ test("toolUseId is recorded but is NOT part of effect identity", async () => {
 - Modify: `packages/gateway/src/index.ts`
 
 **Interfaces:**
-- Consumes: `canonicalize` from `@rewind/core`.
+- Consumes: `canonicalize` from `@agent-rewind/core`.
 - Produces: `divergeMessages(a: unknown, b: unknown): DivergenceReport` where `DivergenceReport = { kinds: Divergence[]; firstDivergence?: Divergence }` and `Divergence = { kind: "input-mismatch" | "extra-call" | "missing-call"; index: number; detail: string }`. Aligns the two request bodies' `messages` arrays by index and classifies: same index different canonical content → `input-mismatch`; present in `b` not `a` → `extra-call`; present in `a` not `b` → `missing-call`. Collect-all by default; `firstDivergence` is the lowest-index one. Pure, deterministic.
 
 - [ ] **Step 1: Write the failing test**

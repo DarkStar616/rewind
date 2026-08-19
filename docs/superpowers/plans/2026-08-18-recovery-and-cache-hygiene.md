@@ -8,9 +8,9 @@
 failure-memory**, and (savings) **cache-breakpoint hygiene** — shipped as pure, tested modules plus MCP
 tools, so an agent can rewind-with-memory and users can see why their prompts do/don't cache.
 
-**Architecture:** `@rewind/core/recovery` = pure recovery policy (attempt log, backtrack candidates,
-checkpoint-selection, sparsity gate). `@rewind/mcp` = durable rewind-memory + `backtrack_candidates` /
-`backtrack_commit` tools. `@rewind/gateway/cache-hygiene` = static analyzer that flags prefix-poisoning
+**Architecture:** `@agent-rewind/core/recovery` = pure recovery policy (attempt log, backtrack candidates,
+checkpoint-selection, sparsity gate). `@agent-rewind/mcp` = durable rewind-memory + `backtrack_candidates` /
+`backtrack_commit` tools. `@agent-rewind/gateway/cache-hygiene` = static analyzer that flags prefix-poisoning
 dynamic content + the 4-breakpoint cap, wired into the proxy + a `rewind cache-report` CLI.
 
 **Tech stack:** Node 24 native TS, ESM, `.ts` imports, `node:test`, npm workspaces. FSL-1.1-ALv2.

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { createMemoryReplaySavings } from "@rewind/core";
+import { createMemoryReplaySavings } from "@agent-rewind/core";
 
 import { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from "../src/cache-preserve.ts";
 import type { PriceTable } from "../src/meter.ts";

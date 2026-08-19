@@ -18,7 +18,7 @@
  * sink is process-lifetime and the durable, time-windowed receipt is deferred. The `window` label is
  * carried through for the shareable line; it does not (yet) filter by time, so it is a label only.
  */
-import type { ReplaySavingsTotal } from "@rewind/core";
+import type { ReplaySavingsTotal } from "@agent-rewind/core";
 
 export type Currency = "USD";
 

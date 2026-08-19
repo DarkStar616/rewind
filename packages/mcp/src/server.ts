@@ -1,5 +1,5 @@
 /**
- * `@rewind/mcp` — the stdio MCP server: five tools over the @rewind/core engine.
+ * `@agent-rewind/mcp` — the stdio MCP server: five tools over the @agent-rewind/core engine.
  *
  * A thin adapter, exactly like the CLI. It builds ONE engine over the Tier-0 git backend and the
  * durable file-backed evidence chain for a workspace, and registers five tools against it:
@@ -32,8 +32,8 @@ import {
   memoryForCheckpoint,
   recommendedCheckpoint,
   type AttemptRecord,
-} from "@rewind/core";
-import type { ExternalEffect } from "@rewind/core";
+} from "@agent-rewind/core";
+import type { ExternalEffect } from "@agent-rewind/core";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { buildSavingsReceipt } from "./savings.ts";
 
@@ -69,7 +69,7 @@ function ok(structured: Record<string, unknown>): {
  */
 export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   const { engine, store, rewindMemory } = buildAdapterEngine(opts.cwd, opts.log);
-  const server = new McpServer({ name: "rewind", version: "0.0.0" });
+  const server = new McpServer({ name: "agent-rewind", version: "0.0.0" });
 
   const attemptShape = z.object({
     seq: z.number(),

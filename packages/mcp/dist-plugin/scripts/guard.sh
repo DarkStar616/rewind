@@ -55,10 +55,10 @@ effect="$(printf '%s' "$payload" | node -e '
 [ -z "$effect" ] && exit 0
 
 # Prefer a `rewind` already on PATH; otherwise fall back to the published package via npx.
-if command -v rewind >/dev/null 2>&1; then
-  out="$(rewind guard "$effect" 2>/dev/null)"; code=$?
+if command -v agent-rewind >/dev/null 2>&1; then
+  out="$(agent-rewind guard "$effect" 2>/dev/null)"; code=$?
 else
-  out="$(npx -y @rewind/mcp guard "$effect" 2>/dev/null)"; code=$?
+  out="$(npx -y @agent-rewind/mcp guard "$effect" 2>/dev/null)"; code=$?
 fi
 
 # Exit 2 = barrier refusal -> BLOCK, surfacing the reason to the agent. Any other non-zero is a guard

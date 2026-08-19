@@ -31,7 +31,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { computeEntryHash, EvidenceLedgerError, GENESIS_HASH, verifyChain } from "@rewind/core";
+import { computeEntryHash, EvidenceLedgerError, GENESIS_HASH, verifyChain } from "@agent-rewind/core";
 import type {
   AuditEntry,
   AuditEntryInput,
@@ -41,7 +41,7 @@ import type {
   LedgerQuery,
   UnhashedEntry,
   VerifyResult,
-} from "@rewind/core";
+} from "@agent-rewind/core";
 
 export interface FileEvidenceLedgerOptions extends LedgerOptions {
   /** Absolute path to the JSON file the chain is persisted to (created on first append). */

@@ -42,7 +42,7 @@ Everything you actually want survives, and gets *stronger*, when the protection 
   of the earlier answer).
 - **Defensibility** → a **licence** a competitor can't legally build a rival product on (below), plus
   the architectural moat that never ships to a device: the **hosted team tier** (server-side), the
-  **Athena authority resolver** (kept private via the injection seam, never in `@rewind/core`), the
+  **Athena authority resolver** (kept private via the injection seam, never in `@agent-rewind/core`), the
   **savings-data flywheel**, and **distribution/first-mover**.
 - **Bill on savings** → the tamper-evident hash chain is your **billing meter**; the honest-counterfactual
   metering is **invoice integrity**; server-side receipt validation stops under-reporting. (Unchanged and
@@ -65,7 +65,7 @@ licensor isn't bound by its own outbound licence). A private npm registry is opt
 
 ## Recommendation
 
-**FSL-1.1-Apache-2.0, flown under the "Fair Source" banner, for `@rewind/core` + `@rewind/mcp`; hosted
+**FSL-1.1-Apache-2.0, flown under the "Fair Source" banner, for `@agent-rewind/core` + `@agent-rewind/mcp`; hosted
 tier + Athena as separate fully-closed proprietary packages; sell access via license keys.** It is the
 one option that is *legally proprietary/defensible* (no one can build a competing rewind on it) **and**
 keeps the frictionless install + the auditability a shell-touching tool needs to be trusted and to pass
@@ -78,7 +78,7 @@ dependency licence-scan before first publish. *Not legal advice — have an IP l
 
 ## FINAL DECISION (locked 2026-08-18)
 
-**Licence: `FSL-1.1-Apache-2.0` (SPDX `FSL-1.1-ALv2`) on `@rewind/core` + `@rewind/mcp`.** Dev repo may
+**Licence: `FSL-1.1-Apache-2.0` (SPDX `FSL-1.1-ALv2`) on `@agent-rewind/core` + `@agent-rewind/mcp`.** Dev repo may
 stay private (hygiene only — the shipped package is readable on the user's disk regardless; protection is
 by licence + hosting, never by secrecy). The deep-research (`wuoiazto1`) confirmed the tactic: Bun/SEA
 binaries are extracted wholesale (Claude Code's own was), and client-side licence checks are bypassable

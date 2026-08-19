@@ -5,12 +5,12 @@
 // point of divergence. It supports the gainshare audit story (show exactly where a customer's traffic
 // stopped matching a recorded tape) and general replay debugging.
 //
-// Comparison is by CANONICAL content (via @rewind/core canonicalize), so object-key ordering — which is
+// Comparison is by CANONICAL content (via @agent-rewind/core canonicalize), so object-key ordering — which is
 // not semantically meaningful — never registers as a divergence. Pure and deterministic: no clock, no
 // network. Aligns the two request bodies' `messages` arrays positionally; a body without a messages
 // array is tolerated as empty rather than throwing.
 
-import { canonicalize } from "@rewind/core";
+import { canonicalize } from "@agent-rewind/core";
 
 export type DivergenceKind = "input-mismatch" | "extra-call" | "missing-call";
 

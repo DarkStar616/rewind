@@ -101,12 +101,12 @@ larger product's domain action vocabulary, and it imports that product's approva
 Both must become injected dependencies, with sensible defaults, or the SDK drags an entire product's
 approval and domain model with it. This is the single most important extraction task, and it is small.
 
-**Keeping it in the larger product:** the larger product depends on the extracted `@rewind/core` as a
+**Keeping it in the larger product:** the larger product depends on the extracted `@agent-rewind/core` as a
 published package, and injects its own store, action vocabulary and authority resolver. You develop
 Rewind once, and the product consumes it. Do not maintain a fork; a fork recreates the drift the whole
 method exists to avoid.
 
-**Decision:** extract `@rewind/core` (TypeScript) as git-snapshot decorator, effect barrier, hash
+**Decision:** extract `@agent-rewind/core` (TypeScript) as git-snapshot decorator, effect barrier, hash
 chain, correlation, canonical JSON, replay accounting and jail-enforcement gate, with the two coupling
 points injected. The MVP subset is only the git decorator, the barrier and the chain. The Python
 adapters extract later, as-is, when the enforcement tier is needed.

@@ -9,12 +9,12 @@ reads the filesystem.** Everything else falls out of that.
                                   |  MCP (stdio)          [ later: hooks, plugin, hosted connector ]
                                   v
                         +--------------------+
-                        |    @rewind/mcp     |   stdio server: 5 tools, handle-in / handle-out
+                        |    @agent-rewind/mcp     |   stdio server: 5 tools, handle-in / handle-out
                         +--------------------+
                                   |  in-process calls
                                   v
                         +--------------------+
-                        |    @rewind/core    |   TypeScript, source of truth
+                        |    @agent-rewind/core    |   TypeScript, source of truth
                         |                    |
                         |  effect barrier    |   pure logic (node:crypto), refuse-and-record
                         |  evidence chain    |   append-only, tamper-evident hash chain
@@ -35,7 +35,7 @@ reads the filesystem.** Everything else falls out of that.
 
 ## The two packages (MVP)
 
-### `@rewind/core` (TypeScript, MIT/Apache)
+### `@agent-rewind/core` (TypeScript, MIT/Apache)
 
 The portable moat. No dependency on the Python substrate, and no dependency on the larger product.
 
@@ -58,9 +58,9 @@ The portable moat. No dependency on the Python substrate, and no dependency on t
   **authority resolver**, both injected with safe defaults. The larger product injects its own; a
   standalone user gets a permissive default.
 
-### `@rewind/mcp` (TypeScript, MIT/Apache)
+### `@agent-rewind/mcp` (TypeScript, MIT/Apache)
 
-A stdio MCP server over `@rewind/core`. Five tools, each stateless-core compliant (mint a handle,
+A stdio MCP server over `@agent-rewind/core`. Five tools, each stateless-core compliant (mint a handle,
 take it back):
 
 | tool | input | output |
@@ -75,7 +75,7 @@ State lives in the durable store keyed by the handle, never in transport or conn
 
 ## The internal CLI engine
 
-`@rewind/core` is driven by a thin CLI (`rewind checkpoint | list | rewind | replay | guard`) that is
+`@agent-rewind/core` is driven by a thin CLI (`rewind checkpoint | list | rewind | replay | guard`) that is
 the single engine. The MCP server calls the engine; later, the hooks and the public `rewind run --`
 CLI call the same engine. One core, thin adapters, no logic duplicated across surfaces.
 
@@ -135,7 +135,7 @@ accuracy, or "lightweight" claim, so those are Rewind's to substantiate, not she
 
 ## Keeping it inside the larger product
 
-The larger product depends on the published `@rewind/core` and injects its own store, action
+The larger product depends on the published `@agent-rewind/core` and injects its own store, action
 vocabulary and authority resolver. That is the whole mechanism: one implementation, consumed in two
 places. The extraction task that unlocks this is genericizing the two coupling points in the evidence
 chain, which today hard-code the product's action vocabulary and import its authority resolver. Do that

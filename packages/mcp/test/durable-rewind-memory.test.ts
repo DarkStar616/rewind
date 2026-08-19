@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { AttemptRecord } from "@rewind/core";
+import type { AttemptRecord } from "@agent-rewind/core";
 import { createFileRewindMemory } from "../src/durable-rewind-memory.ts";
 
 /**

@@ -1,7 +1,7 @@
 {
-  "name": "@rewind/mcp",
+  "name": "@agent-rewind/mcp",
   "version": "0.1.0",
-  "description": "Rewind CLI + stdio MCP server: whole-workspace checkpoint/rewind, a refuse-and-record effect barrier on a tamper-evident chain, and a token-saving record/replay proxy — for Claude Code, Cursor, and Codex CLI. Run with `npx @rewind/mcp`.",
+  "description": "Rewind CLI + stdio MCP server: whole-workspace checkpoint/rewind, a refuse-and-record effect barrier on a tamper-evident chain, and a token-saving record/replay proxy — for Claude Code, Cursor, and Codex CLI. Run with `npx @agent-rewind/mcp`.",
   "type": "module",
   "license": "FSL-1.1-ALv2",
   "keywords": [
@@ -24,7 +24,7 @@
     "node": ">=20.0.0"
   },
   "bin": {
-    "rewind": "./dist/cli.js"
+    "agent-rewind": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -39,8 +39,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@rewind/core": "^0.1.0",
-    "@rewind/gateway": "^0.1.0",
+    "@agent-rewind/core": "^0.1.0",
+    "@agent-rewind/gateway": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
   }

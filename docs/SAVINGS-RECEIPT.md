@@ -11,7 +11,7 @@ formatting.
 record whenever a recorded turn is replayed with `modelCalls: 0` — i.e. a recorded model response was
 returned **without contacting the provider**, and a recorded tool result **without invoking the tool**.
 Each record carries the avoided input/output token counts (and the model, to price it). Port this sink
-into `@rewind/core` as the receipt's ledger. The durable variant (`postgres-replay-savings.ts`) is the
+into `@agent-rewind/core` as the receipt's ledger. The durable variant (`postgres-replay-savings.ts`) is the
 team-view/paid path; the MVP uses the local store.
 
 ## What counts as "saved" (the honest counterfactual — the acceptance bar)
@@ -37,7 +37,7 @@ divides it by their actual invoice.
 
 ## Surface
 
-- **CLI:** `rewind savings [--scope <id>] [--since <window>] [--json]`
+- **CLI:** `agent-rewind savings [--scope <id>] [--since <window>] [--json]`
 - **MCP tool:** `savings` — input `{ scope?, since? }`, output `{ tokensSaved, costSaved, currency,
   window, breakdown: { replayHits, rewindAvoided } }`.
 - Both read the same core function; no logic duplicated (per `ARCHITECTURE.md`, one engine, thin
@@ -62,7 +62,7 @@ Nothing else in the free, local product asks for an account.
 
 ## Tests (acceptance)
 
-1. **Zero when nothing was avoided.** Feed a session with no replay cache-hit; `rewind savings` reports
+1. **Zero when nothing was avoided.** Feed a session with no replay cache-hit; `agent-rewind savings` reports
    `0 tokens`. This test guards against an inflated number and must fail on a "credit the whole run"
    implementation.
 2. **Exact on a real hit.** A session with one recorded replay of a known-size call reports exactly

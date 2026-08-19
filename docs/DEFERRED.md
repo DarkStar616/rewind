@@ -47,7 +47,7 @@ exact-replay determinism (a human decision is session state, not replayable requ
 **above** the pure core, never inside the barrier/replay path.
 
 **Un-defer trigger.** Post-MVP, when the effect-barrier tiers are the focus. **Constraint:** the gate
-sits above `@rewind/core`; the pure barrier/replay path stays deterministic and human-free. The chain
+sits above `@agent-rewind/core`; the pure barrier/replay path stays deterministic and human-free. The chain
 records the human's decision as an event (like any other effect), but the decision must never be a
 blocking step inside a replay. This composes with the deny-reason work (#11, already shipped) but adds
 approval state, which is exactly what must stay out of the core (RIP-LIST hard-skip on auto-approve

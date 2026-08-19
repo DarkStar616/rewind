@@ -1,4 +1,4 @@
-# Rewind pricing decision — gainshare on verified savings
+# Agent Rewind pricing decision — gainshare on verified savings
 
 Decision record. Derived from the competitive scan (`deep-prospect-log.md`, `RIP-LIST.md` #3) and the
 ProsperOps-vs-nOps contrast. This is a positioning + go-to-market decision; the metered basis and the
@@ -6,13 +6,13 @@ trust anchor it references are already built.
 
 ## The decision
 
-**Lead with a pure percentage of verified token savings.** Rewind charges a share of the savings it
-can *prove* it delivered — nothing else, by default. This is the maximum-alignment model: Rewind only
+**Lead with a pure percentage of verified token savings.** Agent Rewind charges a share of the savings it
+can *prove* it delivered — nothing else, by default. This is the maximum-alignment model: Agent Rewind only
 makes money when the customer demonstrably spends less, and the amount is derived from a tamper-evident
 record, not an invoice line the customer has to take on faith.
 
 - **Metered basis:** `billableSavedTokens` (`packages/gateway/src/billable.ts`). Billable = tokens the
-  agent *did* re-issue as a byte-equivalent request and Rewind served from record, chain-logged as a
+  agent *did* re-issue as a byte-equivalent request and Agent Rewind served from record, chain-logged as a
   realized replay. Deduped by `callId`, floored, and **counterfactuals are structurally
   unrepresentable** — there is no "would-have" record to pass in, so a hypothetical saving can never be
   billed. See the module for the exact definition.
@@ -21,14 +21,14 @@ record, not an invoice line the customer has to take on faith.
   the period. The chain attests the individual events; the provider's bill bounds the aggregate. A
   claim that exceeds the provider's own reported total is flagged, never silently credited.
 - **Prove-then-charge:** the Free Savings Analysis (`analyzeTraffic` + `attestAnalysis`, the
-  `rewind analyze` subcommand) produces a **hash-attested, redacted report** of replayable savings
+  `agent-rewind analyze` subcommand) produces a **hash-attested, redacted report** of replayable savings
   *before any contract*. The customer verifies the report against their own bill; the trust barrier for
   a novel pricing model collapses because the number is checkable, not asserted.
 
 ## What we will NOT do
 
 - **No percent-of-total-LLM-spend floor.** This is the nOps "feels like a tax" churn trigger: charging
-  a fraction of a bill the customer would pay anyway, whether or not Rewind saved anything, breaks the
+  a fraction of a bill the customer would pay anyway, whether or not Agent Rewind saved anything, breaks the
   alignment that is the entire wedge. A percent-of-spend component is a hard skip (`RIP-LIST.md`).
 - **No crediting counterfactual saved calls.** Only realized, chain-logged replays count. Crediting
   calls the agent never actually re-issued forfeits the defensibility the tamper-evident chain buys us.

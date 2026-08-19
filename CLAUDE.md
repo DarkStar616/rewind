@@ -21,12 +21,12 @@ language, stop and re-read the phase boundaries in `docs/PLAN.md`.
 
 Two npm packages, TypeScript, zero Python, zero dependency on the alpha substrate:
 
-- `@rewind/core` — a `WorldBackend` interface with ONE implementation (git + reflink copy-on-write
+- `@agent-rewind/core` — a `WorldBackend` interface with ONE implementation (git + reflink copy-on-write
   worktrees), plus the effect barrier and the tamper-evident hash chain. The barrier and chain are
   pure logic (`node:crypto`), and they sit ABOVE the `WorldBackend`, reading only the effect log
   and the trace, never the filesystem. That single discipline is what lets the same moat later run
   on a hosted sandbox without a rewrite. Do not violate it.
-- `@rewind/mcp` — a stdio MCP server exposing five tools: `checkpoint`, `list`, `rewind`, `replay`,
+- `@agent-rewind/mcp` — a stdio MCP server exposing five tools: `checkpoint`, `list`, `rewind`, `replay`,
   `guard_effect`. Follow the current MCP stateless-core rule: every stateful tool mints an explicit
   checkpoint-id handle and takes it back as an argument. Do not store per-connection state in
   transport or session memory; persist it in the substrate's durable store keyed by the handle.
@@ -71,7 +71,7 @@ a general-purpose SDK:
   is the opt-in jail tier. Overclaiming here is a product defect, not a nicety.
 - **Reflink copy-on-write is filesystem-dependent** (fast on APFS, btrfs, XFS, ReFS; falls back to a
   full checkout on ext4 and similar). Detect and message this, never promise CoW speed everywhere.
-- **Keep it consumable by the larger product.** The larger product will depend on `@rewind/core` as
+- **Keep it consumable by the larger product.** The larger product will depend on `@agent-rewind/core` as
   a published package once the two coupling points above are genericized. Design the public API so
   that consumer can inject its own store, action vocabulary and authority resolver. Do not fork.
 

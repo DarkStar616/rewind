@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
-import { verifyChain, type AuditEntry } from "@rewind/core";
+import { verifyChain, type AuditEntry } from "@agent-rewind/core";
 
 const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 

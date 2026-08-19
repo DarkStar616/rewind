@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { createMemoryReplaySavings } from "@rewind/core";
+import { createMemoryReplaySavings } from "@agent-rewind/core";
 
 import { canonicalizeRequest } from "../src/canonical-request.ts";
 import { createMemoryRecordStore, type RecordedCall } from "../src/record-store.ts";

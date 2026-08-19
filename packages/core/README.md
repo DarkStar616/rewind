@@ -1,6 +1,6 @@
-# @rewind/core
+# @agent-rewind/core
 
-The portable core of [Rewind](https://github.com/DarkStar616/rewind) — reversible execution for AI
+The portable core of [Agent Rewind](https://github.com/DarkStar616/rewind) — reversible execution for AI
 agents, as pure logic over logs and traces (never the filesystem or clock, so it runs unchanged across
 backend tiers).
 
@@ -18,7 +18,7 @@ Provides:
   an AgentRewind-style **recovery/failure-memory** model.
 
 ```bash
-npm install @rewind/core
+npm install @agent-rewind/core
 ```
 
 Requires Node ≥ 20. Licence: **FSL-1.1-ALv2**. See the [monorepo](https://github.com/DarkStar616/rewind)

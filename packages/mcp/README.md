@@ -1,8 +1,8 @@
-# @rewind/mcp
+# @agent-rewind/mcp
 
 **Reversible execution for AI coding agents** — the `rewind` CLI and stdio MCP server.
 
-Rewind gives any coding agent (Claude Code, Cursor, Codex CLI, Cline, Windsurf) three things it
+Agent Rewind gives any coding agent (Claude Code, Cursor, Codex CLI, Cline, Windsurf) three things it
 doesn't have on its own:
 
 1. **Whole-workspace checkpoint & rewind** — snapshot the entire working tree (including changes made
@@ -22,13 +22,13 @@ doesn't have on its own:
 Zero install — run straight from npm (requires Node ≥ 20):
 
 ```bash
-npx -y @rewind/mcp mcp     # start the stdio MCP server
+npx -y @agent-rewind/mcp mcp     # start the stdio MCP server
 ```
 
 ### Claude Code
 
 ```bash
-claude mcp add rewind -- npx -y @rewind/mcp mcp
+claude mcp add agent-rewind -- npx -y @agent-rewind/mcp mcp
 ```
 
 ### Cursor / Cline / Windsurf — add to the client's `mcpServers` config
@@ -36,7 +36,7 @@ claude mcp add rewind -- npx -y @rewind/mcp mcp
 ```json
 {
   "mcpServers": {
-    "rewind": { "type": "stdio", "command": "npx", "args": ["-y", "@rewind/mcp", "mcp"] }
+    "agent-rewind": { "type": "stdio", "command": "npx", "args": ["-y", "@agent-rewind/mcp", "mcp"] }
   }
 }
 ```
@@ -44,7 +44,7 @@ claude mcp add rewind -- npx -y @rewind/mcp mcp
 ### Codex CLI
 
 ```bash
-codex mcp add rewind -- npx -y @rewind/mcp mcp
+codex mcp add agent-rewind -- npx -y @agent-rewind/mcp mcp
 ```
 
 ## MCP tools
@@ -56,7 +56,7 @@ an explicit checkpoint-id handle, and all durable state lives under `.rewind/` i
 ## CLI
 
 ```
-rewind checkpoint [label] | list | rewind <id> | replay <id> | guard <json>
+agent-rewind checkpoint [label] | list | rewind <id> | replay <id> | guard <json>
        | savings [--json] | cache-report <json> | prune <json> | analyze <json>
        | gateway [--port <n>] [--upstream <url>] | mcp
 ```
@@ -65,8 +65,8 @@ A refused `guard` exits **2**, so a `PreToolUse` hook can block the offending to
 
 ## Token-saving proxy
 
-Point your agent's `ANTHROPIC_BASE_URL` at the local gateway (`rewind gateway`): a byte-equivalent
-request after a rewind is served from record with **zero** upstream cost, and `rewind savings` prints
+Point your agent's `ANTHROPIC_BASE_URL` at the local gateway (`agent-rewind gateway`): a byte-equivalent
+request after a rewind is served from record with **zero** upstream cost, and `agent-rewind savings` prints
 the running total.
 
 ## Links

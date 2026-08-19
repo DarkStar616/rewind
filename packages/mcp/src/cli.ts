@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `rewind` — the universal terminal floor over the @rewind/core engine.
+ * `rewind` — the universal terminal floor over the @agent-rewind/core engine.
  *
  * A thin adapter: it builds one engine over the Tier-0 git backend in the current working directory,
  * dispatches a subcommand, and prints the engine's result as one line of JSON on stdout (advisory
@@ -18,7 +18,7 @@
 import { writeSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
-import type { Engine, ExternalEffect } from "@rewind/core";
+import type { Engine, ExternalEffect } from "@agent-rewind/core";
 import {
   createMemoryRecordStore,
   createReplayer,
@@ -28,14 +28,14 @@ import {
   analyzeTraffic,
   attestAnalysis,
   type AnalyzedCall,
-} from "@rewind/gateway";
+} from "@agent-rewind/gateway";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
 import { runStdioServer } from "./server.ts";
 import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts";
 
 const USAGE =
-  "usage: rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
+  "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
   "analyze <json> | gateway [--port <n>] [--upstream <url>] | mcp>";
 

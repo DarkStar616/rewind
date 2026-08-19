@@ -1,8 +1,8 @@
-# Rewind — Full Product Breakdown
+# Agent Rewind — Full Product Breakdown
 
 *Reversible execution + verifiable token savings for AI coding agents.*
 
-> **Purpose of this document.** A complete, technically accurate breakdown of what Rewind is, what
+> **Purpose of this document.** A complete, technically accurate breakdown of what Agent Rewind is, what
 > it ships, how each piece works, why it works, and exactly what has been measured versus what is a
 > design guarantee. It is written to be used in marketing and sales conversations with a technical
 > audience — so every claim carries its evidence, and nothing is rounded up. A buyer who reads the
@@ -19,14 +19,14 @@ Every substantive claim below is tagged:
 | **[PROVEN]** | Backed by an automated test that fails if the property breaks. Named test titles are quoted so you can audit them. |
 | **[BY DESIGN]** | True by construction of the architecture; follows from the code, not from a benchmark. |
 | **[SYNTHETIC]** | A real, reproducible number from a deterministic in-repo scenario with mock upstream and injected clock — **not** a measurement against a live provider. |
-| **[RESEARCH]** | A figure from published external research that motivates the design. **Not** Rewind's own result. |
+| **[RESEARCH]** | A figure from published external research that motivates the design. **Not** Agent Rewind's own result. |
 | **[NOT YET MEASURED]** | Honestly unproven; on the roadmap. |
 
 ---
 
 ## 1. In one sentence
 
-Rewind is a **local, zero-config MCP server + LLM proxy** that gives any coding agent (Claude Code,
+Agent Rewind is a **local, zero-config MCP server + LLM proxy** that gives any coding agent (Claude Code,
 Cursor, Codex CLI, Cline, Windsurf) three things it doesn't have on its own: **whole-workspace
 checkpoint/rewind**, a **refuse-and-record effect barrier** so a rewind can never silently re-fire a
 real-world side effect, and **token savings from byte-exact record/replay + prompt-cache
@@ -45,7 +45,7 @@ throws away the 17 good steps and redoes them. And the two obvious "fixes" are t
   tools. Anything a `bash` command changed, and every external side effect, is invisible to it —
   untracked and un-undoable.
 
-Rewind covers exactly that gap — *everything the built-in can't see (bash + external effects)* — and
+Agent Rewind covers exactly that gap — *everything the built-in can't see (bash + external effects)* — and
 does it for **every** agent, not one.
 
 Why now: recent research shows agents fail in ways that make blind retry actively dangerous — GPT-5
@@ -68,21 +68,21 @@ not a hopeful one.
 | **Deterministic tool-output pruning** | Losslessly collapses duplicate `tool_result` blocks; replay-safe by construction. | **[PROVEN]** |
 | **Gainshare billing** | Bill a share of **verified** savings, anchored to a hard-to-game "billable saved tokens" definition and reconciled against the provider's own bill. | **[BY DESIGN]** |
 | **Free Savings Analysis** | A hash-attested, redacted report of how replayable a customer's traffic is — *before* any contract. | **[PROVEN]** |
-| **Distribution** *(packaged & publish-ready; publish pending)* | Install will be `npx -y @rewind/mcp` (the unscoped `rewind` name is taken, so it ships scoped), with one-line config for Claude Code, Cursor, Codex CLI. Packages build to `dist` (ESM + `.d.ts`), the built CLI is verified end-to-end, and `npm pack` is clean — awaiting the `@rewind` npm org + `npm publish`. | **[PROVEN]** build + client wiring; **[NOT YET MEASURED]** public availability |
+| **Distribution** *(packaged & publish-ready; publish pending)* | Install will be `npx -y @agent-rewind/mcp` (the unscoped `rewind` name is taken, so it ships scoped), with one-line config for Claude Code, Cursor, Codex CLI. Packages build to `dist` (ESM + `.d.ts`), the built CLI is verified end-to-end, and `npm pack` is clean — awaiting the `@agent-rewind` npm org + `npm publish`. | **[PROVEN]** build + client wiring; **[NOT YET MEASURED]** public availability |
 
 ---
 
 ## 4. Architecture — the one discipline that makes it portable
 
-Rewind is a small monorepo of three TypeScript packages (npm workspaces, ESM, Node ≥ 24.15, zero
+Agent Rewind is a small monorepo of three TypeScript packages (npm workspaces, ESM, Node ≥ 24.15, zero
 Python in the core path):
 
-- **`@rewind/core`** — the moat as pure logic: the `WorldBackend` interface (with one Tier-0 git
+- **`@agent-rewind/core`** — the moat as pure logic: the `WorldBackend` interface (with one Tier-0 git
   implementation), the effect barrier, the evidence hash chain, canonical JSON, the engine, and the
   recovery/failure-memory model.
-- **`@rewind/gateway`** — the token-saving LLM proxy: canonical request keying, record store, replay,
+- **`@agent-rewind/gateway`** — the token-saving LLM proxy: canonical request keying, record store, replay,
   metering, cache preservation, cache hygiene, pruning, and the savings/analysis surface.
-- **`@rewind/mcp`** — the stdio MCP server and the `rewind` CLI, plus durable file-backed stores.
+- **`@agent-rewind/mcp`** — the stdio MCP server and the `rewind` CLI, plus durable file-backed stores.
 
 **The load-bearing rule:** the barrier, the hash chain, the meter, the pruner, and every analysis
 function read **only** the effect log / recorded calls / provider usage — **never the filesystem or a
@@ -91,14 +91,14 @@ sandbox without a rewrite, and why the correctness-critical logic is fully unit-
 inputs. Timestamps are injected; there is no `Date.now()` in the pure path.
 
 Two "coupling points" were deliberately genericized during extraction so the larger product can depend
-on `@rewind/core` as a published package: the hash chain's **action vocabulary** and its **authority
+on `@agent-rewind/core` as a published package: the hash chain's **action vocabulary** and its **authority
 resolver** are both *injected*, not hard-coded (with a no-op default) **[BY DESIGN]**.
 
 ---
 
 ## 5. Component-by-component breakdown
 
-### 5.1 The moat (`@rewind/core`)
+### 5.1 The moat (`@agent-rewind/core`)
 
 **`world/git-backend.ts` — Tier-0 whole-workspace snapshots.**
 *What:* snapshots the entire working tree into a **side** git dir (`.rewind/snapshots.git`), never the
@@ -152,9 +152,9 @@ verifies"`.
 model (pure logic, injected timestamps): which checkpoint to resume from, and remembering what already
 failed so the agent doesn't repeat it. Motivated by **[RESEARCH: arXiv:2608.14380]** which reports
 environment rewind lifting agent task success from **43.9% → 87.8%** and recovery from **8% → 30%** —
-*their* numbers, the reason this model exists, not Rewind's measurement.
+*their* numbers, the reason this model exists, not Agent Rewind's measurement.
 
-### 5.2 The token-saving proxy (`@rewind/gateway`)
+### 5.2 The token-saving proxy (`@agent-rewind/gateway`)
 
 **`canonical-request.ts` — the replay key.**
 *What:* turns a request body + output-affecting headers into a SHA-256 `replayKey`. *How:* a
@@ -178,7 +178,7 @@ delimiter-injection), so one caller's recording is never served to another. **[P
 **`meter.ts` — the honest cost math.** See §6.
 
 **`cache-preserve.ts` — Mechanism B (cache preservation).**
-If the request already carries any `cache_control`, Rewind changes nothing (agent-controlled).
+If the request already carries any `cache_control`, Agent Rewind changes nothing (agent-controlled).
 Otherwise it injects **one** ephemeral breakpoint on the static prefix, and credits a saving *only*
 when it injected **and** the provider actually reported a cache read — valued at
 `(input_rate − cacheRead_rate)`. It never touches the replay key. **[PROVEN]** — `cache-preserve.test.ts`.
@@ -201,7 +201,7 @@ fail-open path never fabricates.
 **[RESEARCH: arXiv:2601.06007v2]**: teams forfeit **~78–80%** of achievable cache savings this way.
 Advisory only — it can't prove a given value actually changes, so it accepts false positives.
 
-### 5.3 The gainshare surface (`@rewind/gateway` + `@rewind/mcp`)
+### 5.3 The gainshare surface (`@agent-rewind/gateway` + `@agent-rewind/mcp`)
 
 **`billable.ts`** — the published, hard-to-game "billable saved tokens" definition: the sum of
 **realized** replays, deduped by call id, **floored**; a counterfactual "would-have" call is
@@ -215,7 +215,7 @@ bill and flags any over-claim; honest limit encoded: *the chain attests the even
 the aggregate*. **`diverge.ts`** — turns a failed replay match into a typed, debuggable report
 (input-mismatch / extra-call / missing-call).
 
-**`@rewind/mcp`** — the `rewind` CLI (subcommands `checkpoint / list / rewind / replay / guard /
+**`@agent-rewind/mcp`** — the `rewind` CLI (subcommands `checkpoint / list / rewind / replay / guard /
 savings / cache-report / prune / analyze / gateway / mcp`; a refused `guard` exits **2** so a
 PreToolUse hook can block the offending tool call) and the stdio MCP server exposing the five MVP tools
 (`checkpoint`, `list`, `rewind`, `replay`, `guard_effect`) plus `savings` and two `backtrack` tools.
@@ -261,7 +261,7 @@ the events," never "the metric is cryptographically unforgeable."
 
 ---
 
-## 7. Testing & verification results (Rewind's own numbers)
+## 7. Testing & verification results (Agent Rewind's own numbers)
 
 - **285 automated tests, 100% passing; typecheck clean** **[PROVEN]** — `npm run check` → `tests 285,
   pass 285, fail 0`. Split: core 101, gateway 142, mcp 42.
@@ -282,13 +282,13 @@ the events," never "the metric is cryptographically unforgeable."
 
 **What is NOT yet measured [NOT YET MEASURED]:** there is **no live-provider benchmark** — no measured
 latency, throughput, or real-dollar savings percentage from production traffic. The only savings figure
-Rewind produces today is synthetic (below).
+Agent Rewind produces today is synthetic (below).
 
 ---
 
 ## 8. Benchmarks (read this carefully)
 
-Rewind ships **deterministic accounting gates**, not performance benchmarks. They run against a mock
+Agent Rewind ships **deterministic accounting gates**, not performance benchmarks. They run against a mock
 upstream with an injected clock and synthetic token counts, and their job is to prove the savings math
 can **never over-credit**, not to report a speed:
 
@@ -306,7 +306,7 @@ deferred. **We will not publish a savings percentage as if it were a live result
 
 ---
 
-## 9. What Rewind is *not* (honest limits)
+## 9. What Agent Rewind is *not* (honest limits)
 
 These are stated up front because overclaiming here is a product defect:
 
@@ -314,7 +314,7 @@ These are stated up front because overclaiming here is a product defect:
   cannot stop an agent touching files outside the tree or making a network call. Enforcement (an
   OS-level jail) is a separate, opt-in tier. This honesty is baked into every MCP tool description.
 - **Reflink copy-on-write is filesystem-dependent** — fast on APFS/btrfs/XFS/ReFS, falls back to a full
-  git checkout on ext4 and similar (correct, just not CoW-accelerated). Rewind detects and messages
+  git checkout on ext4 and similar (correct, just not CoW-accelerated). Agent Rewind detects and messages
   this; it never promises CoW speed everywhere.
 - **Provider usage APIs report aggregates, not per-call provenance** — so reconciliation is "chain
   attests events, bill attests aggregate," never "the provider certifies each saved call."
@@ -329,12 +329,12 @@ These are stated up front because overclaiming here is a product defect:
 
 ---
 
-## 10. Where Rewind is differentiated (the white space)
+## 10. Where Agent Rewind is differentiated (the white space)
 
 The competitive scan (`docs/deep-prospect-log.md`, `docs/POSITIONING.md`) found LLM gateways with
 caching, agent-checkpoint frameworks, and semantic caches — but **no existing proxy does byte-exact
 record/replay**, and no competing agent-checkpoint tool ships the **refuse-and-record effect barrier**.
-Rewind's wedge is the *intersection*, delivered locally and verifiably:
+Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 1. **Byte-exact record/replay** — correctness-first (never a stale hit), where semantic caches trade
    correctness for hit-rate.
@@ -346,19 +346,19 @@ Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 ## 11. Distribution & integration
 
-> **Availability today:** the packages are **packaged and publish-ready** (`@rewind/core`,
-> `@rewind/gateway`, `@rewind/mcp` at `0.1.0`; `dist` ESM + `.d.ts` builds; the built CLI verified
+> **Availability today:** the packages are **packaged and publish-ready** (`@agent-rewind/core`,
+> `@agent-rewind/gateway`, `@agent-rewind/mcp` at `0.1.0`; `dist` ESM + `.d.ts` builds; the built CLI verified
 > end-to-end; `npm pack` clean) and the source is on a private git host — but **not yet published to the
-> public npm registry**. One step remains: claim the `@rewind` npm org and run `npm publish` (see
+> public npm registry**. One step remains: claim the `@agent-rewind` npm org and run `npm publish` (see
 > `docs/PUBLISHING.md`). The unscoped `rewind` name is taken by an unrelated package, so the CLI ships
-> **scoped** — install is `npx -y @rewind/mcp`, not a bare `npx rewind`.
+> **scoped** — install is `npx -y @agent-rewind/mcp`, not a bare `npx rewind`.
 
-- **Zero install (once published):** `npx -y @rewind/mcp` (also runnable as a stdio MCP server and a thin CLI).
+- **Zero install (once published):** `npx -y @agent-rewind/mcp` (also runnable as a stdio MCP server and a thin CLI).
 - **One-line config** for Claude Code, Cursor, and Codex CLI; the plugin ships a `PreToolUse` hook that
   wires the effect guard onto `Bash|Write|Edit` (a refused guard exits 2 to block the call) — **[PROVEN]**
   the plugin test decodes the exact stdio launch and verifies the hook wiring.
 - **Proxy mode:** point `ANTHROPIC_BASE_URL` at the local gateway; replays after a rewind cost 0 upstream
-  tokens, and `rewind savings` prints the running total.
+  tokens, and `agent-rewind savings` prints the running total.
 - **Licence:** FSL-1.1-ALv2 (Functional Source License 1.1 with an Apache-2.0 future grant at 2 years) —
   source-available, with the hosted/enterprise layer kept cleanly separate from day one. *(Note: some
   older in-repo docs still say "MIT/Apache-2.0" — the authoritative licence is FSL-1.1-ALv2.)*
@@ -375,7 +375,7 @@ Rewind's wedge is the *intersection*, delivered locally and verifiably:
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |
 | Tamper-evident, fail-closed verification | **[PROVEN]** — evidence-ledger tests |
 | 28.08% billable saving | **[SYNTHETIC]** — reproducible mock scenario, not live |
-| AgentRewind 43.9%→87.8%, prompt-cache 59–90%, etc. | **[RESEARCH]** — external papers, not Rewind's results |
+| AgentRewind 43.9%→87.8%, prompt-cache 59–90%, etc. | **[RESEARCH]** — external papers, not Agent Rewind's results |
 | Live latency / throughput / real-dollar savings % | **[NOT YET MEASURED]** |
 
 ---

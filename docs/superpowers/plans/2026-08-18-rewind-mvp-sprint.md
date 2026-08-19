@@ -4,13 +4,13 @@
 > or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`)
 > syntax for tracking.
 
-**Goal:** Ship `@rewind/core` + `@rewind/mcp` + a `rewind` CLI giving any coding agent whole-workspace
+**Goal:** Ship `@agent-rewind/core` + `@agent-rewind/mcp` + a `rewind` CLI giving any coding agent whole-workspace
 git checkpoint/rewind plus a deterministic refuse-and-record effect barrier and tamper-evident hash
 chain, harvested from qm-athena and genericized.
 
-**Architecture:** One `@rewind/core` (WorldBackend + effect barrier + evidence chain + replay-savings,
+**Architecture:** One `@agent-rewind/core` (WorldBackend + effect barrier + evidence chain + replay-savings,
 all pure logic above a swappable backend; barrier and chain never read the filesystem) driven by a thin
-engine. Thin adapters reach every surface: a `rewind` CLI (universal terminal floor), an `@rewind/mcp`
+engine. Thin adapters reach every surface: a `rewind` CLI (universal terminal floor), an `@agent-rewind/mcp`
 stdio server (all local agents), and a Claude Code plugin. Harvest, don't rebuild.
 
 **Tech Stack:** Node ≥24.15, native TypeScript (no bundler, `.ts` imports), ESM, `node:test`,
@@ -25,7 +25,7 @@ stdio server (all local agents), and a Claude Code plugin. Harvest, don't rebuil
   `module`/`moduleResolution` = `nodenext`, `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`;
   import sibling modules WITH the `.ts` extension.
 - Test runner: `node --test` (node:test). No vitest/jest.
-- Packages `@rewind/core` and `@rewind/mcp` are licensed **FSL-1.1-Apache-2.0** (source-available,
+- Packages `@agent-rewind/core` and `@agent-rewind/mcp` are licensed **FSL-1.1-Apache-2.0** (source-available,
   legally proprietary — no competing product; converts to Apache-2.0 after 2 yrs). `package.json`
   `"license": "FSL-1.1-ALv2"`; bundle the FSL `LICENSE` text. npm workspaces. Dev repo may be private,
   but paid access is enforced SERVER-SIDE (entitlement + savings verification are hosted, never in the
@@ -50,7 +50,7 @@ rewind/
   tsconfig.base.json
   packages/
     core/
-      package.json                  # @rewind/core
+      package.json                  # @agent-rewind/core
       tsconfig.json
       src/
         types.ts                    # ScopeId, shared types
@@ -66,7 +66,7 @@ rewind/
         index.ts                    # public exports
       test/*.test.ts
     mcp/
-      package.json                  # @rewind/mcp, bin: rewind
+      package.json                  # @agent-rewind/mcp, bin: rewind
       src/
         server.ts                   # stdio MCP server, 5 tools
         store.ts                    # durable handle store
@@ -78,7 +78,7 @@ rewind/
 
 ---
 
-## SLICE 0 — `@rewind/core`
+## SLICE 0 — `@agent-rewind/core`
 
 ### Task 1: Scaffold the workspace
 
@@ -120,7 +120,7 @@ rewind/
 
 ```json
 {
-  "name": "@rewind/core",
+  "name": "@agent-rewind/core",
   "version": "0.0.0",
   "type": "module",
   "license": "FSL-1.1-ALv2",
@@ -139,7 +139,7 @@ export type ScopeId = string;
 - [ ] **Step 8:** Run `node --test` (expect: no tests found, exit 0) and commit.
 
 ```bash
-git add -A && git commit -m "chore: scaffold rewind npm workspace + @rewind/core"
+git add -A && git commit -m "chore: scaffold rewind npm workspace + @agent-rewind/core"
 ```
 
 ### Task 2: Canonical JSON (port as-is)
@@ -423,12 +423,12 @@ effects that are now spent-but-refusable (read from the chain, never the FS).
   bash edit → guard(effect A) admitted → rewind → guard(effect A again) REFUSED and recorded → verify
   chain ok. Run it; expect PASS.
 - [ ] **Step 3:** Export the public surface from `index.ts`.
-- [ ] **Step 4: SLICE 0 GATE:** run the whole `@rewind/core` suite `node --test`; all green. Commit:
+- [ ] **Step 4: SLICE 0 GATE:** run the whole `@agent-rewind/core` suite `node --test`; all green. Commit:
   `feat(core): engine wiring — end-to-end checkpoint/rewind/guard`.
 
 ---
 
-## SLICE 1 — `@rewind/mcp` (server + CLI + distribution)
+## SLICE 1 — `@agent-rewind/mcp` (server + CLI + distribution)
 
 ### Task 9: The CLI (universal terminal floor)
 
@@ -443,9 +443,9 @@ handle→state store (a JSON file under `.rewind/`), keyed by checkpoint id.
 
 ```json
 {
-  "name": "@rewind/mcp", "version": "0.0.0", "type": "module", "license": "FSL-1.1-ALv2",
+  "name": "@agent-rewind/mcp", "version": "0.0.0", "type": "module", "license": "FSL-1.1-ALv2",
   "bin": { "rewind": "./src/cli.ts" },
-  "dependencies": { "@rewind/core": "0.0.0", "@modelcontextprotocol/sdk": "^1.29.0" }
+  "dependencies": { "@agent-rewind/core": "0.0.0", "@modelcontextprotocol/sdk": "^1.29.0" }
 }
 ```
 
@@ -479,7 +479,7 @@ All state via `store.ts` keyed by the handle; nothing in connection/session memo
 `packages/mcp/dist-plugin/scripts/guard.sh`; `docs/install/README.md`.
 
 - [ ] **Step 1:** Write the two config snippets in `docs/install/README.md`: a JSON `mcpServers` block
-  (`"type":"stdio"`, `npx -y @rewind/mcp mcp`) for Claude Code/Cursor/Cline/Windsurf, and a TOML
+  (`"type":"stdio"`, `npx -y @agent-rewind/mcp mcp`) for Claude Code/Cursor/Cline/Windsurf, and a TOML
   `[mcp_servers.rewind]` block for Codex CLI; plus the `claude mcp add` / `codex mcp add` one-liners.
 - [ ] **Step 2:** Write the Claude Code plugin: `.mcp.json` pointing at the bin, and `hooks/hooks.json`
   registering a `PreToolUse` matcher on `Bash|Write|Edit` that calls `guard.sh` (which calls

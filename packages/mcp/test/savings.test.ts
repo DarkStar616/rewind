@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMemoryReplaySavings } from "@rewind/core";
-import type { ReplaySavingsSink } from "@rewind/core";
+import { createMemoryReplaySavings } from "@agent-rewind/core";
+import type { ReplaySavingsSink } from "@agent-rewind/core";
 import {
   buildSavingsReceipt,
   estimateCostMicros,

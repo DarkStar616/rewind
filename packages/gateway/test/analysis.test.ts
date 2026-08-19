@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verifyChain } from "@rewind/core";
+import { verifyChain } from "@agent-rewind/core";
 import { analyzeTraffic, attestAnalysis } from "../src/analysis.ts";
 import { DROP } from "../src/redact.ts";
 

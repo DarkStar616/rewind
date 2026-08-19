@@ -1,6 +1,6 @@
-# Rewind and tamper-evident logging (EU AI Act Article 12 framing)
+# Agent Rewind and tamper-evident logging (EU AI Act Article 12 framing)
 
-Positioning note, not a legal opinion. Derived from `RIP-LIST.md` #4. Frames a primitive Rewind
+Positioning note, not a legal opinion. Derived from `RIP-LIST.md` #4. Frames a primitive Agent Rewind
 **already ships** — the append-only SHA-256 evidence chain — in the language of the EU AI Act's
 automatic-logging requirement. It does not add code and does not claim certified compliance.
 
@@ -24,26 +24,26 @@ Article 12 of the EU AI Act requires certain high-risk AI systems to **automatic
 traceability. The engineering primitive that requirement calls for is exactly a tamper-evident,
 append-only log with an integrity check — which is what the evidence chain is.
 
-Rewind's surface for this:
+Agent Rewind's surface for this:
 
 - **Seal → root digest.** Any set of events (including the Free Savings Analysis report, via
   `attestAnalysis`) folds into the chain and produces a root hash that fixes the content.
 - **Verify → pass | fail.** `verifyChain` re-derives every hash and reports pass/fail with the first
   broken sequence — a third party can independently confirm the log has not been altered since sealing.
-- **Concrete export.** `rewind analyze <json>` emits a hash-attested, redacted report whose
+- **Concrete export.** `agent-rewind analyze <json>` emits a hash-attested, redacted report whose
   `verified: true/false` field is exactly this check; the same mechanism attests effect-barrier events.
 
 ## What we do NOT claim
 
 - **Not certified compliance.** We provide a *tamper-evident logging primitive suitable for Art. 12-style
   automatic logging*, verified by our own tests — not a certification, not legal advice, and not a claim
-  that deploying Rewind makes a system Art. 12-compliant. Compliance is a property of the whole system
+  that deploying Agent Rewind makes a system Art. 12-compliant. Compliance is a property of the whole system
   and its operator, assessed by a competent body; a log integrity primitive is one input to that.
 - **Not "two AI vendors" as independence.** The real assurance is deterministic tests + the SHA-256
   construction + a human auditor re-running `verifyChain`, exactly as with billing (see `PRICING.md`).
 
 ## Honest summary
 
-"Rewind ships an append-only SHA-256 evidence chain with a fail-closed `verifyChain`, a tamper-evident
+"Agent Rewind ships an append-only SHA-256 evidence chain with a fail-closed `verifyChain`, a tamper-evident
 logging primitive suitable for EU AI Act Article 12-style automatic logging and independently checkable
 by anyone holding the log — we verify it with our own tests and do not claim certified compliance."

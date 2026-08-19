@@ -5,7 +5,7 @@
 
 ## Goal
 
-Ship `@rewind/core` + `@rewind/mcp` + a `rewind` CLI: whole-workspace git checkpoint/rewind plus a
+Ship `@agent-rewind/core` + `@agent-rewind/mcp` + a `rewind` CLI: whole-workspace git checkpoint/rewind plus a
 deterministic refuse-and-record effect barrier and tamper-evident hash chain, harvested from
 qm-athena and genericized so the same core later runs elsewhere unchanged.
 
@@ -19,18 +19,18 @@ qm-athena and genericized so the same core later runs elsewhere unchanged.
 
 ## Surface matrix (how "works everywhere" is delivered)
 
-One `@rewind/core`; thin adapters. Terminal CLI (universal floor, full moat) · stdio MCP (`npx rewind
+One `@agent-rewind/core`; thin adapters. Terminal CLI (universal floor, full moat) · stdio MCP (`npx rewind
 mcp`, full moat, all local agents) · Claude Code plugin (auto-wires the barrier via a PreToolUse hook)
 · remote Streamable-HTTP MCP (fast-follow, portable half only).
 
 ## Scope
 
 **In (MVP slices):**
-- **Slice 0** — `@rewind/core`: `WorldBackend` interface + Tier-0 git backend; canonical JSON;
+- **Slice 0** — `@agent-rewind/core`: `WorldBackend` interface + Tier-0 git backend; canonical JSON;
   tamper-evident evidence chain; deterministic effect barrier (refuse-and-record) **with the
   concurrency fix**; replay-savings sink; the two injected coupling points (action vocabulary,
   authority resolver) with permissive/no-op defaults; a thin internal engine driving a `rewind` CLI.
-- **Slice 1** — `@rewind/mcp`: stdio MCP server exposing `checkpoint`/`list`/`rewind`/`replay`/
+- **Slice 1** — `@agent-rewind/mcp`: stdio MCP server exposing `checkpoint`/`list`/`rewind`/`replay`/
   `guard_effect`, handle-in/handle-out, state in the durable store; `npx rewind` distribution; config
   snippets; the Claude Code plugin (`.mcp.json` + PreToolUse barrier hook); "Add to Cursor" deeplink.
 - **Slice 1.5** — the savings receipt: `rewind savings` CLI + `savings` MCP tool over the replay-savings
@@ -46,14 +46,14 @@ calculator (already built as a standalone page, no code dependency).
   — no bundler; import with `.ts` extensions; `tsconfig` `module`/`moduleResolution` `nodenext`,
   `verbatimModuleSyntax`, `allowImportingTsExtensions`. Test runner: `node --test` (node:test).
 - **MCP:** official `@modelcontextprotocol/sdk` ^1.29.
-- **Packaging & licence (FINAL, research-grounded):** npm workspaces; `@rewind/core` and `@rewind/mcp`
+- **Packaging & licence (FINAL, research-grounded):** npm workspaces; `@agent-rewind/core` and `@agent-rewind/mcp`
   are separate packages licensed **FSL-1.1-Apache-2.0** (Functional Source License; `package.json`
   `"license": "FSL-1.1-ALv2"`; bundle the FSL `LICENSE` text). Source-available and legally proprietary:
   a competitor may NOT build a competing/substituting product on it; converts to Apache-2.0 after 2 yrs.
   The **dev repo may stay private** (hygiene) but note the shipped package is readable on the user's disk
   regardless — protection is by licence, not secrecy. **Real secrecy + access-gate + billing integrity
   live HOSTED (closed), never shipped:** entitlement validation, savings verification/billing, team
-  dashboard, and the Athena authority resolver. Athena consumes `@rewind/core` privately (common
+  dashboard, and the Athena authority resolver. Athena consumes `@agent-rewind/core` privately (common
   ownership; a private registry is optional). See `docs/LICENCE-DECISION.md` + `docs/BUSINESS-MODEL.md`.
 - **The barrier and the hash chain NEVER read the filesystem** — only the effect log and the trace.
   Exactly ONE real barrier implementation (the TypeScript one). Any Python probe is a conformance model.

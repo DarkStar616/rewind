@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { ReplaySaving } from "@rewind/core";
+import type { ReplaySaving } from "@agent-rewind/core";
 import { billableSavedTokens } from "../src/billable.ts";
 
 test("billable = sum of realized replay savings; a body with none bills zero", () => {

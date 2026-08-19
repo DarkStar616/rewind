@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "rewind": {
+    "agent-rewind": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@rewind/mcp", "mcp"]
+      "args": ["-y", "@agent-rewind/mcp", "mcp"]
     }
   }
 }

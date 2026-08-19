@@ -1,6 +1,6 @@
-# @rewind/gateway
+# @agent-rewind/gateway
 
-The token-saving LLM proxy of [Rewind](https://github.com/DarkStar616/rewind) — local, **byte-exact**
+The token-saving LLM proxy of [Agent Rewind](https://github.com/DarkStar616/rewind) — local, **byte-exact**
 record/replay for AI coding agents, plus prompt-cache preservation, deterministic pruning, and
 verifiable savings accounting.
 
@@ -19,7 +19,7 @@ Provides:
   never over-crediting; reports fold into a verifiable hash chain.
 
 ```bash
-npm install @rewind/gateway
+npm install @agent-rewind/gateway
 ```
 
 Requires Node ≥ 20. Licence: **FSL-1.1-ALv2**. See the [monorepo](https://github.com/DarkStar616/rewind)

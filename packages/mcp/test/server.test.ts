@@ -9,7 +9,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createRewindMcpServer } from "../src/server.ts";
 
 /**
- * Stand up the real @rewind/mcp server for `cwd` and connect a real MCP client to it over an
+ * Stand up the real @agent-rewind/mcp server for `cwd` and connect a real MCP client to it over an
  * in-process linked transport pair. This exercises the genuine JSON-RPC client<->server protocol
  * (initialize handshake, tool list, tool calls, structured output validation) without spawning a
  * process, so the test is deterministic and fast while still driving the actual SDK surface.

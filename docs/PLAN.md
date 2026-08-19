@@ -20,7 +20,7 @@ the sprint-critical pieces are pulled into the slices below.
 
 ## MVP
 
-### Slice 0: the core engine (`@rewind/core`)
+### Slice 0: the core engine (`@agent-rewind/core`)
 
 Build the portable moat with one world backend and no substrate dependency.
 
@@ -50,13 +50,13 @@ points as you port the hash chain.
   the key) — the port must close it (check inside the serializing lock + unique `(scope, effectKey)`
   constraint). This test must fail on the lifted-as-is code. See `ARCHITECTURE.md` harvest map.
 
-### Slice 1: the MCP server (`@rewind/mcp`) — the first adoptable surface
+### Slice 1: the MCP server (`@agent-rewind/mcp`) — the first adoptable surface
 
 - A stdio MCP server over the core, exposing `checkpoint`, `list`, `rewind`, `replay`,
   `guard_effect` as tools, each minting and accepting a checkpoint-id handle, with all state in the
   durable store keyed by the handle, none in transport or connection memory.
 - Distribution as `npx rewind` with zero install.
-- **Minimum viable distribution (see `POSITIONING.md` §5):** (1) the `npx -y @rewind/mcp` stdio bin;
+- **Minimum viable distribution (see `POSITIONING.md` §5):** (1) the `npx -y @agent-rewind/mcp` stdio bin;
   (2) two copy-paste snippets on the docs page — one JSON `mcpServers` block with `"type":"stdio"` that
   drops into Claude Code + Cursor + Cline + Windsurf unchanged, and one TOML `[mcp_servers.rewind]` for
   Codex CLI (the outlier) — plus the `claude mcp add` / `codex mcp add` one-liners as the primary path;
@@ -99,8 +99,8 @@ replay). Full spec: `docs/SAVINGS-RECEIPT.md`.
 ### Slice 2: keep it inside the larger product
 
 - Confirm the two coupling points (action vocabulary, authority resolver) are injected in
-  `@rewind/core`.
-- Publish `@rewind/core` (a private or pre-release channel is fine) and switch the larger product
+  `@agent-rewind/core`.
+- Publish `@agent-rewind/core` (a private or pre-release channel is fine) and switch the larger product
   from its local copies to the package, injecting its own store, vocabulary and resolver.
 
 **Acceptance:**
@@ -115,7 +115,7 @@ The build and the distribution are one sprint, in this order. Rationale and the 
 live in `POSITIONING.md` §5; the risks (support-time-scales-with-success, the two-motions focus
 question) are founder calls and are noted there, not resolved here.
 
-1. **Name:** deferred by founder — ship under `rewind` / `@rewind/*` for now, rename in prod before a
+1. **Name:** deferred by founder — ship under `rewind` / `@agent-rewind/*` for now, rename in prod before a
    loud launch. (The collision risk still stands for the *public* launch; it is not a blocker for the
    sprint.)
 2. **Savings receipt (Slice 1.5)** — built on the harvested replay-savings sink. The growth engine.
@@ -138,7 +138,7 @@ a zero marginal cost into a real bill.
 **The one path back to Athena** is a single button in the (paid) team view: *"See who authorised these
 runs."* That button is not a bolt-on — it is the **authority resolver** coupling point
 (`ARCHITECTURE.md` #2). Free Rewind ships the **no-op default resolver** (no authority, no button);
-Athena injects its **real resolver** and the button lights up. Same `@rewind/core`, no fork. Do not
+Athena injects its **real resolver** and the button lights up. Same `@agent-rewind/core`, no fork. Do not
 mention Athena anywhere else in the product.
 
 ## Later phases (do not pull forward)
@@ -192,7 +192,7 @@ later moat surface and is not part of the standalone SDK's near-term path.
 ```
 # in /home/reuben/projects/rewind
 git init
-# scaffold the npm workspace and @rewind/core per docs/ARCHITECTURE.md, then start Slice 0.
+# scaffold the npm workspace and @agent-rewind/core per docs/ARCHITECTURE.md, then start Slice 0.
 ```
 
 Read `CLAUDE.md`, then `docs/ARCHITECTURE.md`, then build Slice 0. Harvest from

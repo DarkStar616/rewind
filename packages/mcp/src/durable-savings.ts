@@ -20,7 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ReplaySaving, ReplaySavingsSink, ReplaySavingsTotal } from "@rewind/core";
+import type { ReplaySaving, ReplaySavingsSink, ReplaySavingsTotal } from "@agent-rewind/core";
 
 interface PersistShape {
   version: 1;

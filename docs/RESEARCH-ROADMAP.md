@@ -117,7 +117,7 @@ Ship the Mechanism-B breakpoint-discipline hardening alongside it (cheap, replay
 
 ## Status (2026-08-18) — SHIPPED
 The recommended slice is **built and tested** (plan: `docs/superpowers/plans/2026-08-18-recovery-and-cache-hygiene.md`):
-- **Accuracy:** `@rewind/core` recovery policy (rewind-memory, selective `recommendedCheckpoint`,
+- **Accuracy:** `@agent-rewind/core` recovery policy (rewind-memory, selective `recommendedCheckpoint`,
   sparsity gate) + durable attempt log + `backtrack_candidates`/`backtrack_commit` MCP tools (note
   required; memory survives across sessions).
 - **Savings:** `analyzeCacheHygiene` + proxy advisory + `rewind cache-report` CLI (flags prefix

@@ -23,7 +23,7 @@ import { pruneToolOutputs } from "./prune.ts";
 import { avoidedCostMicros, totalUsageTokens, DEFAULT_PRICE_TABLE, type PriceTable } from "./meter.ts";
 import { redactValue, DEFAULT_REDACTORS, type RedactFn } from "./redact.ts";
 import type { ProviderUsage } from "./record-store.ts";
-import { computeEntryHash, GENESIS_HASH, type AuditEntry, type UnhashedEntry } from "@rewind/core";
+import { computeEntryHash, GENESIS_HASH, type AuditEntry, type UnhashedEntry } from "@agent-rewind/core";
 
 /** One observed request in the traffic sample: which scope it belongs to, its body, and its usage. */
 export interface AnalyzedCall {

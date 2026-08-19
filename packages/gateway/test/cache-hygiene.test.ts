@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 
-import { createMemoryReplaySavings } from "@rewind/core";
+import { createMemoryReplaySavings } from "@agent-rewind/core";
 
 import { analyzeCacheHygiene } from "../src/cache-hygiene.ts";
 import { createMemoryRecordStore } from "../src/record-store.ts";
