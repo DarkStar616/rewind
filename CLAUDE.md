@@ -19,19 +19,21 @@ language, stop and re-read the phase boundaries in `docs/PLAN.md`.
 
 ## What the MVP is, exactly
 
-Two npm packages, TypeScript, zero Python, zero dependency on the alpha substrate:
+Three npm packages, TypeScript, zero Python, zero dependency on the alpha substrate:
 
 - `@agent-rewind/core` — a `WorldBackend` interface with ONE implementation (git + reflink copy-on-write
   worktrees), plus the effect barrier and the tamper-evident hash chain. The barrier and chain are
   pure logic (`node:crypto`), and they sit ABOVE the `WorldBackend`, reading only the effect log
   and the trace, never the filesystem. That single discipline is what lets the same moat later run
   on a hosted sandbox without a rewrite. Do not violate it.
+- `@agent-rewind/gateway` — the token-saving record/replay LLM proxy (exact replay, prompt-cache
+  preservation, deterministic pruning) plus the verifiable savings/analysis surface.
 - `@agent-rewind/mcp` — a stdio MCP server exposing five tools: `checkpoint`, `list`, `rewind`, `replay`,
   `guard_effect`. Follow the current MCP stateless-core rule: every stateful tool mints an explicit
   checkpoint-id handle and takes it back as an argument. Do not store per-connection state in
   transport or session memory; persist it in the substrate's durable store keyed by the handle.
 
-Distribution: runnable as `npx rewind` with zero install. Ship a one-line config snippet for Claude
+Distribution: runnable as `npx -y @agent-rewind/mcp` with zero install. Ship a one-line config snippet for Claude
 Code, Cursor and Codex CLI.
 
 Done means: in any git repo, an agent can checkpoint, make edits including via `bash`, rewind to a
@@ -89,5 +91,6 @@ a general-purpose SDK:
 
 - Confirm the name "Rewind" is usable (there is at least one unrelated product using it); pick the
   npm scope accordingly. This is a day-one check, not a blocker for building.
-- Core is MIT or Apache-2.0 (the substrate is MIT). Keep the hosted and enterprise layers separate
-  from the core packages from the first commit, so the open-core boundary is clean.
+- Licence is **FSL-1.1-ALv2** (Functional Source License 1.1, converting to Apache-2.0 two years after
+  each release) — source-available, not MIT/open-source. Keep the hosted and enterprise layers separate
+  from the core packages from the first commit, so the commercial boundary is clean.

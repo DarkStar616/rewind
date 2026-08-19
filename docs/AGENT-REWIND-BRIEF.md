@@ -122,8 +122,21 @@ floored, so they never over-count:
 3. **Deterministic pruning (smaller lever).** Collapses duplicate tool-output blocks (the same file read
    five times) into one — losslessly, so the model still sees the content once — sending fewer tokens.
 
-*Honest note:* the ~28% number that appears internally is from a **synthetic benchmark**; real savings
-depend entirely on the workload — how repetitive the runs are and how large the static prefix is.
+**The savings benchmark (Benchmark B, 120 trials, deterministic).** How much a rewind recovers depends
+on **how late the run failed** — it's a *curve, not a constant*:
+
+| When the run fails | Tokens recovered |
+|---|---|
+| early (step 2 of 10) | **9.1%** |
+| mid (step 5 of 10) | **25.6%** |
+| **late (step 8 of 10)** | **41.2%** |
+
+So the honest headline is **"recover up to 41.2% of the tokens a *late-failing* run burned"** — the
+condition (late failure) must ride with the number. **Do not** state a bare "41.2%" with no condition;
+the same benchmark is 9.1% for an early failure. Two more caveats the benchmark itself declares: the
+ceiling for a *single* interruption is **50%**, and it's a deterministic workload (temperature 0), so it
+does not yet capture real run-to-run variance. *(An independent in-repo bench of the same replay
+mechanism corroborates the curve — ~28% at a step-5 rewind, scaling to ~39% on a deep rewind.)*
 
 ## How accuracy improves (the mechanism)
 
@@ -167,9 +180,10 @@ published package was **installed from npm and run end-to-end**.
   tier.
 - Copy-on-write snapshot *speed* depends on the filesystem (fast on APFS/btrfs/XFS/ReFS; still correct
   but slower on ext4).
-- The token-savings percentage quoted anywhere internally (~28%) is from a **synthetic benchmark**, not
-  a live-traffic measurement. There is **no real-dollar savings figure yet** — don't publish one as if
-  there were.
+- The **41.2%** savings figure is real and measured (Benchmark B), but it is the **late-failure** point
+  of a curve (9.1% early → 41.2% late) on a **deterministic synthetic workload** — always state the
+  late-failure condition, never a bare "41.2%". It is **not** a live-traffic / real-dollar measurement
+  yet, and the single-interruption ceiling is 50%.
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "@agent-rewind/mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Rewind CLI + stdio MCP server: whole-workspace checkpoint/rewind, a refuse-and-record effect barrier on a tamper-evident chain, and a token-saving record/replay proxy — for Claude Code, Cursor, and Codex CLI. Run with `npx @agent-rewind/mcp`.",
   "type": "module",
   "license": "FSL-1.1-ALv2",

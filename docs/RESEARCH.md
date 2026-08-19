@@ -186,6 +186,6 @@ botching a long multi-step task, or by an agent re-firing a side effect on a ret
 demo is a ten-step task interrupted at step eight that resumes instead of restarting, and an agent
 that is refused when it tries to re-send a spent effect after a rewind.
 
-**Licence and shape:** open-core. The core SDK and MCP server are MIT or Apache-2.0, matching the MIT
+**Licence and shape:** open-core. The core SDK and MCP server are FSL-1.1-ALv2 (Apache-2.0 future grant), harvested from the MIT
 substrate, and the hosted and enterprise features are the commercial layer. Keep that boundary clean
 from the first commit.

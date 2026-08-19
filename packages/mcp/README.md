@@ -104,7 +104,9 @@ over-count:
   (system prompt + tools) so it's re-read at ~1/10th the input price instead of full price each turn.
 - **Deterministic pruning** — collapses duplicate tool-output blocks losslessly, sending fewer tokens.
 
-`agent-rewind savings` prints the running total. *(Note: this is separate from the checkpoint/rewind
+How much a rewind recovers depends on **how late the run failed** (Benchmark B, deterministic): **9.1%**
+for an early failure → **41.2%** for a late one (step 8 of 10). It's a curve, not a constant — the
+late-failure condition rides with the number. `agent-rewind savings` prints your running total. *(Note: this is separate from the checkpoint/rewind
 system — that's real git; this proxy is a different layer you can run independently.)*
 
 ## Links

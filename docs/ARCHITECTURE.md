@@ -33,9 +33,9 @@ reads the filesystem.** Everything else falls out of that.
            worktrees            privileged host  (Apache-2.0 provider first)
 ```
 
-## The two packages (MVP)
+## The three packages
 
-### `@agent-rewind/core` (TypeScript, MIT/Apache)
+### `@agent-rewind/core` (TypeScript, FSL-1.1-ALv2)
 
 The portable moat. No dependency on the Python substrate, and no dependency on the larger product.
 

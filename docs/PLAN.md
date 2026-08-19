@@ -24,7 +24,7 @@ the sprint-critical pieces are pulled into the slices below.
 
 Build the portable moat with one world backend and no substrate dependency.
 
-- Scaffold the repo: a small npm workspace, TypeScript, one test runner, MIT or Apache licence, a
+- Scaffold the repo: a small npm workspace, TypeScript, one test runner, FSL-1.1-ALv2 licence, a
   clean split between the open core packages and any future commercial packages.
 - `WorldBackend` interface + the Tier 0 git and reflink copy-on-write worktree backend
   (`snapshot`, `fork`, `restore`, `diff`, `log`). Detect copy-on-write support and fall back to a
@@ -170,7 +170,7 @@ later moat surface and is not part of the standalone SDK's near-term path.
   `khalilbalaree/Rewind-MCP` (a checkpoint MCP server), `nicobailon/pi-rewind-hook` (161★),
   `adi-suresh01/rewind`. Pick a distinctive name + npm scope **before the first npm publish / plugin
   listing.** See `POSITIONING.md` §4.
-- **Open-core boundary from the first commit.** Core packages MIT or Apache; keep any hosted or
+- **Open-core boundary from the first commit.** Core packages FSL-1.1-ALv2; keep any hosted or
   enterprise code in separate packages so the boundary never has to be untangled later.
 - **Honesty guardrails, in the docs and the tool descriptions.** Tier 0 is reversibility, not
   isolation — and per fresh research it is now **commodity** (Claude Code/Cline/OpenCode/Gemini CLI all
