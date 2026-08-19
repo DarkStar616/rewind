@@ -152,7 +152,16 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
       const selected = selectAdapter({ provider: options.provider }, req.method, req.url);
       const pathMatches = selected?.matchPath(req.method, req.url) ?? false;
       const legacyMessages = req.method === "POST" && (req.url ?? "").split("?")[0] === messagesPath;
-      const adapter: ProviderAdapter | undefined = pathMatches ? selected : legacyMessages ? anthropicAdapter : undefined;
+      // The legacy Anthropic fallback (a request on messagesPath that no adapter path-matched) applies
+      // ONLY when the provider is unpinned or explicitly pinned to anthropic. A proxy pinned to
+      // openai/gemini must NEVER silently parse/record/meter a /v1/messages request with Anthropic
+      // semantics — an explicit pin is honoured, so such a request is treated as non-recordable instead.
+      const legacyAnthropicOk = options.provider === undefined || options.provider === "anthropic";
+      const adapter: ProviderAdapter | undefined = pathMatches
+        ? selected
+        : legacyMessages && legacyAnthropicOk
+          ? anthropicAdapter
+          : undefined;
 
       // Decide replay ONLY for a recordable model endpoint, and only when the body parses. Any failure
       // here falls through to a plain forward — Rewind never blocks a call it cannot help.

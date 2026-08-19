@@ -21,6 +21,18 @@ const INDEX = fileURLToPath(new URL("../src/index.ts", import.meta.url));
  *  the snapshot unchanged and silently pass while the public surface changed.) */
 function exportedNames(path: string): string[] {
   const src = readFileSync(path, "utf8");
+  // Fail CLOSED on any export form this brace-parser cannot enumerate. A star re-export
+  // (`export * from …` / `export type * from …`) would add or remove public names invisibly to both
+  // the brace parser and the runtime Object.keys check, leaving the "exact" snapshot green while the
+  // surface drifted. The freeze REQUIRES every public export to be an explicit named brace export, so
+  // an index that reaches for a star form must be refactored to name its exports (or this guard
+  // widened deliberately) rather than silently escape the snapshot.
+  if (/export\s+(?:type\s+)?\*/.test(src)) {
+    throw new Error(
+      `${path} uses a star re-export (export * / export type *), which bypasses the public-API freeze. ` +
+        "Enumerate the exports by name so the snapshot can see them.",
+    );
+  }
   const re = /export\s+(?:type\s+)?\{([^}]*)\}/g;
   const out = new Set<string>();
   let m: RegExpExecArray | null;

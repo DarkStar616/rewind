@@ -107,6 +107,30 @@ test("forward-on-miss records; the byte-equivalent replay then skips upstream", 
   }
 });
 
+test("an explicit provider pin is honoured: a proxy pinned to openai does NOT record /v1/messages as anthropic", async () => {
+  const stub = await startStub({ body: anthropicJson });
+  const store = createMemoryRecordStore();
+  const savings = createMemoryReplaySavings();
+  const replayer = createReplayer(store, savings);
+  // Pin openai. A /v1/messages request does not match the openai path; the Anthropic legacy fallback
+  // must NOT kick in (that would parse/record it with the wrong provider semantics). So it forwards
+  // transparently and records NOTHING — the repeat must hit upstream again, never replay.
+  const proxy = await startProxy({ upstreamBase: stub.base, replayer, store, provider: "openai" });
+  try {
+    const body = JSON.stringify({ model: "claude-opus-4-8", max_tokens: 100, messages: [{ role: "user", content: "hi" }] });
+    const r1 = await post(proxy, "/v1/messages", body);
+    assert.equal(r1.headers.get("x-rewind"), "live");
+    assert.equal(stub.hits, 1);
+    const r2 = await post(proxy, "/v1/messages", body);
+    assert.equal(r2.headers.get("x-rewind"), "live", "no record was made, so the repeat is live again");
+    assert.equal(stub.hits, 2, "a pinned-openai proxy must not replay a /v1/messages call as anthropic");
+    assert.equal(savings.total("test").tokens, 0, "nothing was booked under the wrong provider");
+  } finally {
+    await proxy.close();
+    await stub.close();
+  }
+});
+
 test("byte-identity: the exact request bytes are forwarded upstream, key order preserved", async () => {
   const stub = await startStub({ body: anthropicJson });
   const store = createMemoryRecordStore();
