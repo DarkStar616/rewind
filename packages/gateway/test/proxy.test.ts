@@ -107,6 +107,34 @@ test("forward-on-miss records; the byte-equivalent replay then skips upstream", 
   }
 });
 
+test("a SHARED store never cross-serves between two different upstream origins (no cross-provider false hit)", async () => {
+  // Two distinct upstreams returning DIFFERENT bodies, one shared store/replayer. An identical request
+  // to each must NOT let the second replay the first's bytes — the upstream origin namespaces the key.
+  const stubA = await startStub({ body: (n) => JSON.stringify({ id: `A${n}`, model: "claude-opus-4-8", content: [{ type: "text", text: "from A" }], usage: { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }) });
+  const stubB = await startStub({ body: (n) => JSON.stringify({ id: `B${n}`, model: "claude-opus-4-8", content: [{ type: "text", text: "from B" }], usage: { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }) });
+  const store = createMemoryRecordStore();
+  const replayer = createReplayer(store, createMemoryReplaySavings());
+  const proxyA = await startProxy({ upstreamBase: stubA.base, replayer, store });
+  const proxyB = await startProxy({ upstreamBase: stubB.base, replayer, store });
+  try {
+    const body = JSON.stringify({ model: "claude-opus-4-8", max_tokens: 100, messages: [{ role: "user", content: "hi" }] });
+    const ra = await post(proxyA, "/v1/messages", body);
+    assert.match(await ra.text(), /from A/);
+    assert.equal(stubA.hits, 1);
+    // Same body to the OTHER upstream: must be a live miss (different origin => different key), not a
+    // replay of A's recorded bytes.
+    const rb = await post(proxyB, "/v1/messages", body);
+    assert.equal(rb.headers.get("x-rewind"), "live", "different origin must miss, never replay across providers");
+    assert.equal(stubB.hits, 1, "the second upstream WAS actually called");
+    assert.match(await rb.text(), /from B/, "served B's own bytes, not A's");
+  } finally {
+    await proxyA.close();
+    await proxyB.close();
+    await stubA.close();
+    await stubB.close();
+  }
+});
+
 test("an explicit provider pin is honoured: a proxy pinned to openai does NOT record /v1/messages as anthropic", async () => {
   const stub = await startStub({ body: anthropicJson });
   const store = createMemoryRecordStore();

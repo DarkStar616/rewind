@@ -118,6 +118,21 @@ function forwardableRequestHeaders(headers: IncomingHttpHeaders, bodyLen: number
   return out;
 }
 
+/**
+ * The absolute upstream target used to namespace the replay key: the normalized upstream origin +
+ * the request path/query. Resolving `reqUrl` against `upstreamBase` lowercases the host and drops the
+ * default port, so `https://API.host` and `https://api.host:443` namespace identically. On any parse
+ * failure it falls back to the raw request path — degrading to path-only keying (the prior behaviour),
+ * never throwing on the request's critical path.
+ */
+function keyUrl(upstreamBase: string, reqUrl: string | undefined): string {
+  try {
+    return new URL(reqUrl ?? "/", upstreamBase).href;
+  } catch {
+    return reqUrl ?? "";
+  }
+}
+
 /** Read a whole request/response body into a single Buffer. */
 function readBody(stream: NodeJS.ReadableStream): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -183,10 +198,14 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
               log(`proxy: pruned ${pr.elided} duplicate tool output(s) (~${pr.charsSaved} chars) scope=${scope}`);
             }
           }
-          // Pass the request URL so its pathname co-determines the key: providers that name the model
-          // (or the JSON-vs-SSE choice) in the URL rather than the body — Gemini — must not collide two
-          // different targets onto one record. The replayer strips the query (auth material) itself.
-          decision = options.replayer.handle(scope, parsed, req.headers, req.url);
+          // Pass the ABSOLUTE upstream target so BOTH the endpoint path AND the upstream ORIGIN
+          // co-determine the key. The path guards providers that name the model (or the JSON-vs-SSE
+          // choice) in the URL — Gemini — from colliding two targets onto one record; the origin guards
+          // a SHARED store (the SDK lets consumers inject their own) from serving a response recorded
+          // against a DIFFERENT upstream — two OpenAI-compatible vendors both speak /v1/chat/completions
+          // with identical bodies, and that must be a miss, never a cross-provider false hit. The
+          // replayer strips the query (auth material) itself.
+          decision = options.replayer.handle(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url));
         } catch (err) {
           // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
           // NOT fall through to a paid upstream forward. Surface it; forward only on real parse faults.

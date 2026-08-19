@@ -132,7 +132,12 @@ const QUERY_AUTH_NOISE: ReadonlySet<string> = new Set(["key", "access_token", "a
  * Folded into the replay identity so two requests whose OUTPUT-AFFECTING target differs — but whose
  * bodies are byte-identical — never collide onto one key.
  *
- * Gemini is the motivating case on BOTH axes: the model lives only in the path
+ * `url` may be ABSOLUTE (scheme+host+path), in which case the upstream ORIGIN becomes part of the
+ * identity too — this is how a shared record store is kept from serving a response recorded against a
+ * different upstream (two OpenAI-compatible vendors both speak `/v1/chat/completions`). The origin is
+ * simply the part of the target before the query, so no special-casing is needed here.
+ *
+ * Gemini is the motivating case on BOTH the path and query axes: the model lives only in the path
  * (…/gemini-2.5-pro:generateContent vs …:flash), and the JSON-vs-SSE wire choice can live only in the
  * query (`?alt=sse`). Keeping the pathname stops two models colliding; keeping the non-auth query
  * stops an SSE response being replayed to a caller that asked for JSON (byte-exact replay would break).
