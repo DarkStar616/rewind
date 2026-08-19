@@ -77,8 +77,8 @@ default as a security boundary. Honesty about that line is part of the product.
 - [`@agent-rewind/core`](https://www.npmjs.com/package/@agent-rewind/core) — the reversible-execution engine, effect barrier, and hash chain
 - [`@agent-rewind/gateway`](https://www.npmjs.com/package/@agent-rewind/gateway) — the token-saving record/replay proxy
 
-Backed by 289 tests (green, run repeatedly with zero flakiness) and five rounds of independent
-cross-vendor code review. See [`docs/AGENT-REWIND-BRIEF.md`](docs/AGENT-REWIND-BRIEF.md) for the full
+Backed by 334 tests (green, run repeatedly with zero flakiness) and repeated rounds of independent
+cross-vendor (codex) code review. See [`docs/AGENT-REWIND-BRIEF.md`](docs/AGENT-REWIND-BRIEF.md) for the full
 plain-English breakdown (how token savings and accuracy work, use cases, and honest limits),
 [`docs/PRODUCT-BREAKDOWN.md`](docs/PRODUCT-BREAKDOWN.md) for the evidence-tagged technical breakdown,
 and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the shape.

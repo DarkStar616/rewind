@@ -26,7 +26,7 @@ the live analogue of the deterministic bench's `billableSavedMicros`.
 ```bash
 # 1. Start the gateway (leave it running in one terminal). It listens locally and forwards to the API.
 export ANTHROPIC_API_KEY=sk-ant-...            # your real key
-npx rewind gateway --port 8788                 # → http://127.0.0.1:8788
+npx -y @agent-rewind/mcp gateway --port 8788   # → http://127.0.0.1:8788
 
 # 2. In another terminal, point your agent / script at the gateway instead of the API directly:
 export ANTHROPIC_BASE_URL=http://127.0.0.1:8788
@@ -36,7 +36,7 @@ export ANTHROPIC_API_KEY=sk-ant-...            # the gateway forwards this heade
 #    (e.g. drive Claude Code or Cursor pointed at ANTHROPIC_BASE_URL, or a scripted loop).
 
 # 4. Read the saving the gateway measured and booked:
-npx rewind savings --json
+npx -y @agent-rewind/mcp savings --json
 ```
 
 `rewind savings` reports the tokens and cost the gateway **actually avoided** — booked only when a

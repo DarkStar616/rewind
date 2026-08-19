@@ -93,9 +93,11 @@ A refused `guard` exits **2**, so a `PreToolUse` hook can block the offending to
 
 ## Token-saving proxy (optional)
 
-Point your agent's `ANTHROPIC_BASE_URL` at the local gateway (`agent-rewind gateway`) and it saves
-tokens three ways — all priced from the provider's *own* usage numbers, floored so they never
-over-count:
+Point your agent's base URL at the local gateway (`agent-rewind gateway`) and it saves tokens three
+ways — all priced from the provider's *own* usage numbers, floored so they never over-count. It works
+with **Anthropic**, **OpenAI**, **Google Gemini**, and any **OpenAI-compatible** provider (Kimi /
+Moonshot, DeepSeek, Together, Fireworks, Groq, OpenRouter, Nebius, xAI, vLLM, Ollama, …) — the provider
+is auto-detected from the request, or pinned explicitly.
 
 - **Exact record/replay** — a **byte-identical** request (common after a rewind or a retry) is served
   from the local record with **zero** upstream call; the saving is that whole call. Correctness-safe by
@@ -104,9 +106,12 @@ over-count:
   (system prompt + tools) so it's re-read at ~1/10th the input price instead of full price each turn.
 - **Deterministic pruning** — collapses duplicate tool-output blocks losslessly, sending fewer tokens.
 
-How much a rewind recovers depends on **how late the run failed** (Benchmark B, deterministic): **9.1%**
-for an early failure → **41.2%** for a late one (step 8 of 10). It's a curve, not a constant — the
-late-failure condition rides with the number. `agent-rewind savings` prints your running total. *(Note: this is separate from the checkpoint/rewind
+How many **tokens** a rewind recovers depends on **how late the run failed** (Benchmark B,
+deterministic): **9.1%** for an early failure → **41.2%** for a late one (step 8 of 10). It's a curve,
+not a constant — the late-failure condition rides with the number. Those figures are *tokens recovered*;
+the **billable** saving (the marginal cost avoided over your provider's own prompt caching, which is
+what a gainshare bill would charge) is lower — roughly 25–35% on the same runs — because the recovered
+tokens are largely the already-cheap cached prefix. `agent-rewind savings` prints your running total. *(Note: this is separate from the checkpoint/rewind
 system — that's real git; this proxy is a different layer you can run independently.)*
 
 ## Links

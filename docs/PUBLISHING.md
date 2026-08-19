@@ -25,7 +25,7 @@ npm whoami         # confirm
 
 ```bash
 npm run build      # tsup → dist/ for all three packages (also runs automatically on publish)
-npm run check      # 289 tests + typecheck, all green
+npm run check      # 334 tests + typecheck, all green
 ```
 
 ## 3. Publish — in dependency order
@@ -45,8 +45,8 @@ If your account has 2FA on (recommended), npm will prompt for a one-time code ea
 ## 4. Verify it's live
 
 ```bash
-npm view @agent-rewind/mcp version                 # should print 0.1.0
-npx -y @agent-rewind/mcp@0.1.0 checkpoint --help   # runs the published CLI from a clean cache
+npm view @agent-rewind/mcp version                 # should print 1.0.0
+npx -y @agent-rewind/mcp@1.0.0 checkpoint --help   # runs the published CLI from a clean cache
 ```
 
 Then the real end-to-end: in any git repo, `npx -y @agent-rewind/mcp mcp` starts the MCP server, and the
@@ -55,14 +55,14 @@ Claude Code / Cursor / Codex snippets in `docs/install/README.md` wire it into y
 ## 5. Tag the release
 
 ```bash
-git tag v0.1.0
-git push rewind v0.1.0
+git tag v1.0.0
+git push rewind v1.0.0
 ```
 
 ## Publishing later versions
 
-Bump the version in all three `package.json`s (keep them in lockstep for a 0.x monorepo), and bump the
-`@agent-rewind/core` / `@agent-rewind/gateway` dependency ranges in the dependents if you cross a minor. Then repeat
+Bump the version in all three `package.json`s (keep them in lockstep across the monorepo), and bump the
+`@agent-rewind/core` / `@agent-rewind/gateway` dependency ranges in the dependents when you cross a major (or a minor with new surface). Then repeat
 steps 2–5. A `changeset`-style tool can automate this later; it isn't needed for the first release.
 
 ## What's already done for you
