@@ -69,7 +69,28 @@ function ok(structured: Record<string, unknown>): {
  */
 export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   const { engine, store, rewindMemory } = buildAdapterEngine(opts.cwd, opts.log);
-  const server = new McpServer({ name: "agent-rewind", version: "0.0.0" });
+  // Server-level `instructions` are surfaced to the model by MCP clients (Claude Code, Cursor, …) on
+  // connect, so the agent learns the WORKFLOW up front instead of reverse-engineering it from tool
+  // descriptions. Keep it tight and actionable.
+  const server = new McpServer(
+    { name: "agent-rewind", version: "0.0.0" },
+    {
+      instructions:
+        "Agent Rewind gives you reversible execution for this workspace. Use it like this:\n" +
+        "1. Before any risky or multi-step change, call `checkpoint` (optionally with a label) to snapshot the " +
+        "WHOLE workspace — including files changed by shell/bash, not just your edit tools. It returns an `id`.\n" +
+        "2. If the work goes wrong, call `rewind` with that `id` to restore the entire workspace to that point. " +
+        "History is preserved, so you can also `replay` forward again. Use `list` to see checkpoints.\n" +
+        "3. Before an IRREVERSIBLE external effect (a payment, email, or API call that changes the outside " +
+        "world), call `guard_effect` with a stable `effectKey` for that action. The first call is admitted and " +
+        "recorded on a tamper-evident chain; if you retry the SAME effect after a rewind it is REFUSED — this is " +
+        "what stops a rewind from silently re-charging a card or re-sending an email. On a refusal, do NOT re-fire " +
+        "it; the returned reason explains why.\n" +
+        "Good habit: checkpoint before each meaningful step, and guard_effect before every side effect. " +
+        "Note: this tier is REVERSIBILITY, not isolation or security — it can undo the workspace and block " +
+        "replayed effects, but it is not a sandbox and does not stop the effect from happening the first time.",
+    },
+  );
 
   const attemptShape = z.object({
     seq: z.number(),

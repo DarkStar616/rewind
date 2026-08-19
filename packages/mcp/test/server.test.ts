@@ -28,6 +28,26 @@ async function connect(cwd: string): Promise<{ client: Client; close: () => Prom
   };
 }
 
+test("MCP server hands the agent a workflow via server instructions (self-explaining)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-mcp-"));
+  try {
+    const { client, close } = await connect(dir);
+    try {
+      const instr = client.getInstructions() ?? "";
+      // The connecting agent must be told the workflow up front, not left to reverse-engineer it.
+      assert.ok(instr.length > 0, "the server must provide instructions to the client");
+      assert.match(instr, /checkpoint/i, "instructions name the checkpoint step");
+      assert.match(instr, /rewind/i, "instructions name the rewind step");
+      assert.match(instr, /guard_effect/i, "instructions name the effect guard");
+      assert.match(instr, /reversibility.*not.*(isolation|security)/is, "instructions carry the Tier-0 honesty line");
+    } finally {
+      await close();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("MCP server exposes the five MVP tools plus the Slice 1.5 savings receipt", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-mcp-"));
   try {
