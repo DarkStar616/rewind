@@ -49,7 +49,7 @@ conversation and from `docs/PLAN.md` (Slice 1/1.5/2 acceptance) and `docs/POSITI
 |---|-----------|-------------------------------|-------------------------------|
 | M1 | Provider neutrality | Adapter seam + 3 adapters + fixtures + tests | — |
 | M2 | E2E verification | Stdio JSON-RPC protocol e2e + plugin hook test | Real Claude Code/Cursor GUI smoke |
-| M3 | Distribution surface | Docs page, snippets, deeplinks, registry manifests | Actual registry submissions (accounts) |
+| ~~M3~~ | ~~Distribution surface~~ | **DEFERRED — not in this run (no website/marketing work)** | — |
 | M4 | Savings receipt hardened | Zero-guard confirmed + OpenAI reconcile adapter + tests | — |
 | M5 | API freeze & release-prep | STABILITY.md, 10× soak, codex review, 1.0.0 bump, build+pack+install-verify, draft PR | PR merge + `npm publish` + OTP |
 
@@ -175,20 +175,15 @@ test("auto-detect: a Gemini generateContent path selects the gemini adapter", ()
 
 ---
 
-## Task M3: Distribution surface
+## Task M3: Distribution surface — DEFERRED (out of scope for this run)
 
-**Files:**
-- Create/replace: `docs/install/README.md` (the copy-paste install page)
-- Create: `packages/mcp/server.json` (official MCP registry manifest) + `docs/distribution/pulsemcp.md` (PulseMCP listing copy)
-- Modify: `README.md` (link the install page; add the "any provider" line unlocked by M1)
+**Removed from the 1.0 overnight run by founder directive (2026-08-19): no website, marketing
+page, install page, deeplinks, or registry-listing work.** There is an existing website handled
+entirely outside this run. The overnight workflow does **not** execute M3.
 
-- [ ] **Step 1: Write the two config snippets** in `docs/install/README.md`: a JSON `mcpServers` block (`"type":"stdio"`, `npx -y @agent-rewind/mcp mcp`) for Claude Code/Cursor/Cline/Windsurf, and a TOML `[mcp_servers.agent-rewind]` block for Codex CLI; plus the `claude mcp add agent-rewind …` / `codex mcp add …` one-liners as the primary path.
-- [ ] **Step 2: Add the deeplinks** — an "Add to Cursor" `cursor://anysphere.cursor-deeplink/mcp/install?...` (base64 config payload) and the `windsurf://` equivalent, on the install page.
-- [ ] **Step 3: Write the registry manifest** `server.json` per the official MCP registry schema (name `io.github.<owner>/agent-rewind` or the reserved namespace, package `@agent-rewind/mcp`, transport stdio) and validate it against the schema. Write the PulseMCP submission copy.
-- [ ] **Step 4: Add a test** `packages/mcp/test/server-json.test.ts` asserting `server.json` parses, its package name/version match `package.json`, and the transport is stdio. Run — green.
-- [ ] **Step 5: Commit** — `docs(dist): install page (snippets + Cursor/Windsurf deeplinks), MCP registry manifest, PulseMCP copy`.
-
-**Acceptance (autonomous):** a new user can copy one block and get a working server on Claude Code, Cursor, and Codex; the deeplinks and `server.json` exist and validate. **Parked residual:** actual submission to PulseMCP + the official registry (needs the operator's accounts) — surface the ready-to-submit manifest and copy.
+Any distribution plumbing (config snippets in the package README, an MCP registry `server.json`)
+is pure, website-free plumbing that can be folded in later on request — it does not gate 1.0 and is
+not touched here.
 
 ---
 
@@ -231,7 +226,7 @@ test("auto-detect: a Gemini generateContent path selects the gemini adapter", ()
 
 ## Self-review (done at authoring)
 
-- **Spec coverage:** M1↔Q1 provider neutrality; M2↔PLAN Slice-1 acceptance; M3↔POSITIONING §5 four artifacts; M4↔Slice-1.5 zero-guard + RIP #6; M5↔the semver meaning of 1.0. Deferred items (hosted, jail, web, semantic cache, compression, human-gate, billing) explicitly out of scope.
+- **Spec coverage:** M1↔Q1 provider neutrality; M2↔PLAN Slice-1 acceptance; M4↔Slice-1.5 zero-guard + RIP #6; M5↔the semver meaning of 1.0. **M3 (distribution/website) deferred out of this run by founder directive.** Deferred items (hosted, jail, web, semantic cache, compression, human-gate, billing, distribution/website) explicitly out of scope.
 - **Placeholder scan:** interfaces and the load-bearing acceptance tests are concrete; fixtures specified by exact terminal/usage shape.
 - **Type consistency:** `ProviderAdapter.id` is the same union in the interface, `selectAdapter`, and the fixtures; `ExtractedUsage`/`ProviderUsage` reused from existing modules, not redefined.
 - **Autonomy honesty:** every human-gated step is named as a parked residual, never folded into an "autonomous" acceptance.

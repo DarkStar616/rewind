@@ -6,7 +6,6 @@ export const meta = {
     { title: 'Setup' },
     { title: 'M1 Provider neutrality' },
     { title: 'M2 E2E verification' },
-    { title: 'M3 Distribution' },
     { title: 'M4 Savings' },
     { title: 'M5 Freeze & release-prep' },
   ],
@@ -115,7 +114,7 @@ if (!setup || !setup.baselineGreen) {
 const results = []
 results.push(await runMilestone('M1 Provider neutrality', 'M1'))
 results.push(await runMilestone('M2 E2E verification', 'M2'))
-results.push(await runMilestone('M3 Distribution', 'M3'))
+// M3 (distribution/website) intentionally OMITTED — deferred out of this run by founder directive.
 results.push(await runMilestone('M4 Savings', 'M4'))
 
 // M5 is the release gate; it depends on every prior milestone landing GREEN on the branch.
