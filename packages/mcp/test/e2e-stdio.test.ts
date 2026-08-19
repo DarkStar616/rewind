@@ -20,6 +20,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -32,6 +33,7 @@ import { createFileEvidenceLedger } from "../src/store.ts";
 const HERE = import.meta.dirname;
 const REPO_ROOT = join(HERE, "..", "..", "..");
 const SERVER_BIN = join(REPO_ROOT, "packages", "mcp", "dist", "cli.js");
+const MCP_VERSION = (JSON.parse(readFileSync(join(HERE, "..", "package.json"), "utf8")) as { version: string }).version;
 
 // The spawned server is the BUILT bin; `dist/` is git-ignored, so build the workspaces before the
 // suite runs. This also guarantees the child reflects the CURRENT source every time (`npm run check`
@@ -69,6 +71,10 @@ test("stdio e2e: initialize → tools/list surfaces the eight tools", { timeout:
   await writeFile(join(dir, "a.txt"), "original");
   const { client, close } = await connectStdio(dir);
   try {
+    // The SHIPPED bundle must advertise the published version, not a stale hard-coded one (codex round
+    // 11). `server.ts` derives it from package.json via import.meta.url; this proves that resolves
+    // correctly inside the built `dist/cli.js`, which the in-process test cannot reach.
+    assert.equal(client.getServerVersion()?.version, MCP_VERSION, "the shipped stdio server reports the package version");
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
