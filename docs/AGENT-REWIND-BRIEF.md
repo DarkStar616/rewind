@@ -90,6 +90,69 @@ Requires Node ≥ 20. Nothing to sign up for.
 
 ---
 
+## Two separate systems — don't conflate them (important for accuracy)
+
+People assume the checkpoint tracking *is* the prompt caching. It isn't. There are **two independent
+systems**, and you can use either without the other:
+
+- **Checkpoint / rewind = literally git.** Under the hood it's a real git repository (a private,
+  side repo in `.rewind/`, separate from your project's git) doing commits and trees over your whole
+  workspace. So "true git-like tracking" is exactly right — it genuinely *is* git, append-only.
+- **Prompt caching = a separate feature of the optional proxy.** The git tracking does **not** use
+  prompt caching. Prompt-cache preservation is one of the proxy's token-saving levers, on a different
+  layer entirely. They're complementary but independent.
+
+## How the token savings actually happens (the mechanism)
+
+Three levers in the optional local proxy, all priced from the **provider's own usage numbers** and
+floored, so they never over-count:
+
+1. **Exact record/replay (the big lever).** The proxy records each model request+response. When a
+   **byte-identical** request comes through again — which happens constantly after a rewind, or when an
+   agent retries a step — it serves the recorded response locally and makes **zero** upstream API call.
+   The saving is the *entire* cost of that avoided call. It's correctness-safe by construction: it only
+   replays a request that is byte-for-byte equivalent, so it can never serve a subtly-wrong answer (this
+   is the key difference from "semantic" caches, which guess and can be wrong).
+2. **Prompt-cache preservation.** Providers (e.g. Anthropic) let you mark a stable prefix — the system
+   prompt + tool definitions — with a `cache_control` breakpoint so it's cached and re-read at roughly
+   **one-tenth** the normal input price. Agents often forget to set this or set it badly. The proxy
+   injects/preserves one breakpoint on the static prefix, so that big unchanging prefix is billed at the
+   cheap cache-read rate every turn instead of full price. Saving = (input rate − cache-read rate) ×
+   cached tokens.
+3. **Deterministic pruning (smaller lever).** Collapses duplicate tool-output blocks (the same file read
+   five times) into one — losslessly, so the model still sees the content once — sending fewer tokens.
+
+*Honest note:* the ~28% number that appears internally is from a **synthetic benchmark**; real savings
+depend entirely on the workload — how repetitive the runs are and how large the static prefix is.
+
+## How accuracy improves (the mechanism)
+
+Accuracy improves because rewind makes **recovery cheap and safe**:
+
+- When an agent goes down a wrong path, instead of compounding the mistake it can **rewind to the last
+  good checkpoint** and try a different approach — the entire workspace restored cleanly.
+- A **failure-memory** model records what was tried and failed at each checkpoint, so (via the
+  `backtrack` tools) the agent doesn't walk back into the same dead-end.
+- The effect barrier improves correctness in a hard sense: a rewind-and-retry **cannot** double-fire a
+  real-world action.
+
+*Honest note:* the big accuracy figures you'll see (e.g. agent task-success jumping from ~44% to ~88%
+with environment rewind) come from **published research that motivates the design — not from Agent
+Rewind's own benchmark.** Agent Rewind ships the *mechanism*; measuring its own accuracy uplift is
+future work. Don't attribute those research numbers to Agent Rewind directly.
+
+## Use cases
+
+- **Long multi-step agent tasks** (big refactors, migrations, framework upgrades): recover from a bad
+  step at minute 40 without throwing away the first 39.
+- **Agents that touch the real world** (deploys, DB migrations, payments, emails, provisioning): a safe
+  undo that can't double-charge or double-send on a retry.
+- **Cutting cost on repetitive/iterative agent runs**: replay + prompt-cache preservation.
+- **Safe experimentation / what-if**: checkpoint, try a risky approach, rewind if it doesn't pan out.
+- **Debugging agent runs**: see exactly where a re-run diverged from a recorded one.
+
+---
+
 ## What's proven vs. honest limits (do not overclaim)
 
 **Proven** (automated tests + live verification): the checkpoint/rewind/effect-barrier/hash-chain

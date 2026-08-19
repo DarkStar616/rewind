@@ -9,11 +9,32 @@ have on its own:
 
 1. **Whole-workspace checkpoints** — a copy-on-write snapshot of the working tree at each step,
    including changes made by shell commands, not just the agent's file-edit tools.
-2. **Agent Rewind to any checkpoint** — resume a multi-step run from where it went wrong instead of
+2. **Rewind to any checkpoint** — resume a multi-step run from where it went wrong instead of
    starting over.
 3. **An effect barrier** — a refuse-and-record guard so that when a run is rewound, an external
    effect that already happened (a payment, an email, a provisioning call) cannot be silently
    replayed. The refusal is recorded on a tamper-evident hash chain.
+
+## Quick start
+
+Live on npm — no account, no API key, Node ≥ 20:
+
+```bash
+# Claude Code
+claude mcp add agent-rewind -- npx -y @agent-rewind/mcp mcp
+# Cursor / Cline / Windsurf: add { "command": "npx", "args": ["-y","@agent-rewind/mcp","mcp"] } to mcpServers
+# Codex CLI
+codex mcp add agent-rewind -- npx -y @agent-rewind/mcp mcp
+```
+
+Then, in plain terms: the agent **checkpoints** before risky work, **rewinds** to undo (bash changes
+included), and **guards** irreversible effects so a retry after a rewind can't re-charge a card or
+re-send an email. The server tells the agent this workflow on connect. Full guide:
+[`docs/install/README.md`](docs/install/README.md).
+
+**Use cases:** long multi-step tasks (recover from a bad step without redoing everything) · agents that
+deploy/migrate/pay/email (safe undo that can't double-fire) · cheaper repetitive runs (the optional
+record/replay + prompt-cache proxy) · safe experimentation (checkpoint, try, rewind).
 
 ## Why this exists
 
@@ -32,8 +53,8 @@ agent.*
 
 ## The moat
 
-The snapshot mechanics are a commodity, and Agent Rewind's core is built on an open-source (MIT)
-reversible-execution substrate. The differentiated piece is the **effect barrier**: at the moment
+The snapshot mechanics are a commodity — Agent Rewind's core drives plain `git` in a private side
+repo, no exotic substrate. The differentiated piece is the **effect barrier**: at the moment
 an irreversible external effect is emitted it is recorded as spent, on the same hash chain as
 everything else, so a later rewind cannot un-spend it. An agent that tries to re-emit a spent
 effect after a rewind is refused, and the refusal is itself recorded, citing the original. This
@@ -50,16 +71,20 @@ default as a security boundary. Honesty about that line is part of the product.
 
 ## Status
 
-This repository is a fresh start. The design is grounded in a working implementation that already
-exists inside a larger product, and the plan here is to extract the portable core, ship it as a
-standalone open-core SDK plus MCP server, and keep the larger product consuming the same package.
+**Live on npm.** Three packages, verified installable and working end-to-end from the registry:
 
-- Start with `CLAUDE.md` for how to build here.
-- `docs/RESEARCH.md` is the grounded research the plan rests on.
-- `docs/ARCHITECTURE.md` is the proposed shape.
-- `docs/PLAN.md` is the phased build plan, and names the first slice to build.
+- [`@agent-rewind/mcp`](https://www.npmjs.com/package/@agent-rewind/mcp) — the CLI + MCP server people install
+- [`@agent-rewind/core`](https://www.npmjs.com/package/@agent-rewind/core) — the reversible-execution engine, effect barrier, and hash chain
+- [`@agent-rewind/gateway`](https://www.npmjs.com/package/@agent-rewind/gateway) — the token-saving record/replay proxy
+
+Backed by 286 tests (green, run repeatedly with zero flakiness) and five rounds of independent
+cross-vendor code review. See [`docs/AGENT-REWIND-BRIEF.md`](docs/AGENT-REWIND-BRIEF.md) for the full
+plain-English breakdown (how token savings and accuracy work, use cases, and honest limits),
+[`docs/PRODUCT-BREAKDOWN.md`](docs/PRODUCT-BREAKDOWN.md) for the evidence-tagged technical breakdown,
+and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the shape.
 
 ## Licence
 
-Open-core. The core SDK and MCP server are intended to be MIT or Apache-2.0 (the underlying
-substrate is MIT). Hosted and enterprise features are the commercial layer.
+**FSL-1.1-ALv2** — the [Functional Source License 1.1](https://fsl.software/), which converts to
+Apache-2.0 two years after each release. Source-available and free for you to use and modify; the
+future Apache grant keeps it open long-term. Hosted and enterprise features are the commercial layer.
