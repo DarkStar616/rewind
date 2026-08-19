@@ -42,8 +42,9 @@ const ZERO: ProviderUsage = {
  *     count to `cache_read_input_tokens` — matching Anthropic's semantics so the meter prices both the
  *     same way and never double-counts the cached tokens.
  *   - **Gemini** (`usageMetadata`): `promptTokenCount` / `candidatesTokenCount`, with
- *     `cachedContentTokenCount` for the cached portion. Gemini's `promptTokenCount` INCLUDES the
- *     cached tokens (same as OpenAI), so it splits the same way.
+ *     `cachedContentTokenCount` for the cached portion and `thoughtsTokenCount` for thinking. Gemini's
+ *     `promptTokenCount` INCLUDES the cached tokens (same as OpenAI), so it splits the same way; and
+ *     thinking is billed as OUTPUT but reported separately, so output = candidates + thoughts.
  *
  *  Fallbacks fire ONLY when the higher-priority field is absent, so a provider that reports more than
  *  one vocabulary is never double-mapped.
@@ -82,7 +83,11 @@ export function pickUsageFields(u: unknown): ProviderUsage {
     if (out.cache_read_input_tokens === undefined && cachedG > 0) out.cache_read_input_tokens = cachedG;
   }
   if (out.output_tokens === undefined && typeof o.candidatesTokenCount === "number") {
-    out.output_tokens = o.candidatesTokenCount;
+    // Gemini bills THINKING (thoughtsTokenCount) as output, but reports it SEPARATELY from
+    // candidatesTokenCount. Sum both so a thinking-enabled response is metered at its true billed
+    // output — mapping only candidatesTokenCount under-reports avoided tokens and cost.
+    const thoughts = typeof o.thoughtsTokenCount === "number" ? o.thoughtsTokenCount : 0;
+    out.output_tokens = o.candidatesTokenCount + Math.max(0, thoughts);
   }
   return out;
 }

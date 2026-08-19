@@ -141,19 +141,24 @@ const QUERY_AUTH_NOISE: ReadonlySet<string> = new Set(["key", "access_token", "a
  * module deny-list discipline: an unknown query param is KEPT, so it forces a miss, never a false hit.
  */
 function keyTarget(url: string | undefined): { path: string; query: Record<string, string[]> } {
-  if (!url) return { path: "", query: {} };
+  // A NULL-PROTOTYPE map for the query, because param NAMES are attacker/caller-controlled arbitrary
+  // strings: assigning a param literally named `__proto__` to a normal `{}` would mutate its prototype
+  // and make it a non-plain object, so canonicalize() would throw and the proxy would skip
+  // record/replay for that request. A null-proto object turns `__proto__` into an ordinary own key.
+  const empty = (): Record<string, string[]> => Object.create(null) as Record<string, string[]>;
+  if (!url) return { path: "", query: empty() };
   const qIdx = url.indexOf("?");
   const path = qIdx === -1 ? url : url.slice(0, qIdx);
-  const query: Record<string, string[]> = {};
+  const query = empty();
   if (qIdx !== -1) {
     const params = new URLSearchParams(url.slice(qIdx + 1));
-    // Distinct param NAMES; each maps to its sorted value LIST (an array), so multi-valued params are
-    // order-insensitive and unambiguous. canonicalize() sorts the object keys, so param order is moot.
+    // Distinct param NAMES; each maps to its value LIST (an array) in ARRIVAL order. The array (not a
+    // comma-join) keeps `?p=a&p=b` distinct from `?p=a,b`; preserving order keeps `?p=a&p=b` distinct
+    // from `?p=b&p=a`, because an endpoint MAY interpret repeated params in order — sorting them would
+    // collide two materially different targets, a false hit the exact-replay contract forbids.
     for (const name of new Set(params.keys())) {
       if (QUERY_AUTH_NOISE.has(name.toLowerCase())) continue;
-      // Store the sorted value LIST as an array, not a joined string: comma-joining would let
-      // `?p=a&p=b` collide with `?p=a,b`. An array keeps repeated values unambiguous in the key.
-      query[name] = params.getAll(name).sort();
+      query[name] = params.getAll(name);
     }
   }
   return { path, query };

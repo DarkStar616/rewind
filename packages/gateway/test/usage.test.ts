@@ -1,7 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { extractUsage } from "../src/usage.ts";
+import { extractUsage, pickUsageFields } from "../src/usage.ts";
+
+test("Gemini thinking tokens (thoughtsTokenCount) are billed as output and added to candidates", () => {
+  const u = pickUsageFields({ promptTokenCount: 30, candidatesTokenCount: 50, thoughtsTokenCount: 100, cachedContentTokenCount: 10 });
+  assert.equal(u.output_tokens, 150, "output = candidatesTokenCount (50) + thoughtsTokenCount (100)");
+  assert.equal(u.input_tokens, 20, "promptTokenCount (30) minus cached (10) = uncached input");
+  assert.equal(u.cache_read_input_tokens, 10);
+});
+
+test("Gemini with no thinking tokens meters candidates alone (no phantom output)", () => {
+  const u = pickUsageFields({ promptTokenCount: 30, candidatesTokenCount: 50 });
+  assert.equal(u.output_tokens, 50);
+});
 
 /**
  * extractUsage reads the provider's OWN token counts from a raw response — JSON or SSE — and never

@@ -108,9 +108,23 @@ test("repeated query values are unambiguous: ?p=a&p=b never collides with ?p=a,b
   const repeated = canonicalizeRequest(body, undefined, `${base}?p=a&p=b`);
   const commaJoined = canonicalizeRequest(body, undefined, `${base}?p=a%2Cb`);
   assert.notEqual(repeated, commaJoined, "distinct multi-value targets must not share a key");
-  // But value ORDER within a repeated param does not matter (a=... then b=... == b=... then a=...).
+  // Value ORDER is PRESERVED, not sorted: an endpoint may interpret repeated params in order, so
+  // ?p=a&p=b and ?p=b&p=a are DIFFERENT targets and must not collide (exact-replay contract).
   const reordered = canonicalizeRequest(body, undefined, `${base}?p=b&p=a`);
-  assert.equal(repeated, reordered, "repeated-value order is normalised");
+  assert.notEqual(repeated, reordered, "repeated-value order is significant, never normalised away");
+});
+
+test("a query param literally named __proto__ does not crash the key (null-proto query map)", () => {
+  const body = { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
+  const base = "/v1beta/models/gemini-2.5-pro:generateContent";
+  // Must not throw (a plain-object query would have its prototype mutated → canonicalize throws).
+  const withProto = canonicalizeRequest(body, undefined, `${base}?__proto__=x`);
+  assert.match(withProto, /^[0-9a-f]{64}$/, "still produces a valid 64-hex key");
+  // And it is a real, distinguishing param: a different value keys differently.
+  const withProto2 = canonicalizeRequest(body, undefined, `${base}?__proto__=y`);
+  assert.notEqual(withProto, withProto2);
+  const plain = canonicalizeRequest(body, undefined, base);
+  assert.notEqual(withProto, plain, "the __proto__ param is kept in the key, not silently dropped");
 });
 
 test("omitting the url keeps the legacy key stable (backward-compatible addition)", () => {
