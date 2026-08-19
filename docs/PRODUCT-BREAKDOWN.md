@@ -68,7 +68,7 @@ not a hopeful one.
 | **Deterministic tool-output pruning** | Losslessly collapses duplicate `tool_result` blocks; replay-safe by construction. | **[PROVEN]** |
 | **Gainshare billing** | Bill a share of **verified** savings, anchored to a hard-to-game "billable saved tokens" definition and reconciled against the provider's own bill. | **[BY DESIGN]** |
 | **Free Savings Analysis** | A hash-attested, redacted report of how replayable a customer's traffic is — *before* any contract. | **[PROVEN]** |
-| **Distribution** | `npx rewind`, zero install; one-line config for Claude Code, Cursor, Codex CLI; MCP + thin CLI. | **[PROVEN]** (plugin wiring test) |
+| **Distribution** *(designed; not yet shipped)* | Intended as `npx rewind`, zero install, with one-line config for Claude Code, Cursor, Codex CLI (MCP + thin CLI). The client wiring is tested; the packages are **not yet published to npm** and the `rewind` npm name is currently taken by an unrelated package. | **[BY DESIGN]** + **[NOT YET MEASURED]** |
 
 ---
 
@@ -346,7 +346,14 @@ Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 ## 11. Distribution & integration
 
-- **Zero install:** `npx rewind` (also runnable as a stdio MCP server and a thin CLI).
+> **Availability today [NOT YET MEASURED]:** Rewind is **not yet published**. The packages are not on
+> npm (marked `private`, version `0.0.0`) and the code is not yet on a public git host. Two things gate a
+> public launch: (1) the npm name — the unscoped `rewind` is taken by an unrelated package, so the CLI
+> must ship under a claimed scope (e.g. `npx @rewind/cli` / `@yourscope/rewind`) or a resolved name; (2)
+> versions + `private:false` + a publish step. The integration mechanics below are built and tested — they
+> describe how install *will* work once those two steps are done.
+
+- **Intended zero install:** `npx rewind` (also runnable as a stdio MCP server and a thin CLI).
 - **One-line config** for Claude Code, Cursor, and Codex CLI; the plugin ships a `PreToolUse` hook that
   wires the effect guard onto `Bash|Write|Edit` (a refused guard exits 2 to block the call) — **[PROVEN]**
   the plugin test decodes the exact stdio launch and verifies the hook wiring.
