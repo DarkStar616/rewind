@@ -7,6 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("REWIND_")));
 const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 
 for (const variant of [
@@ -28,7 +29,7 @@ for (const variant of [
   upstream.listen(0, "127.0.0.1");
   await once(upstream, "listening");
   const address = upstream.address() as { port: number };
-  const child = spawn(process.execPath, [CLI, "gateway", "--port", "0", "--upstream", `http://127.0.0.1:${address.port}`, ...variant.flags], { cwd: dir, env: { ...process.env, REWIND_PROFILE: "compat" }, stdio: ["ignore", "ignore", "pipe"] });
+  const child = spawn(process.execPath, [CLI, "gateway", "--port", "0", "--upstream", `http://127.0.0.1:${address.port}`, ...variant.flags], { cwd: dir, env: { ...cleanEnv, REWIND_PROFILE: "compat" }, stdio: ["ignore", "ignore", "pipe"] });
   const exited = once(child, "exit");
   let stderr = "";
   try {
@@ -71,12 +72,12 @@ for (const variant of [
 test("gateway CLI invalid flags exit before opening a listener", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-gateway-invalid-"));
   try {
-    const help = spawnSync(process.execPath, [CLI, "gateway", "--help"], { cwd: dir, encoding: "utf8", timeout: 5000 });
+    const help = spawnSync(process.execPath, [CLI, "gateway", "--help"], { cwd: dir, env: cleanEnv, encoding: "utf8", timeout: 5000 });
     assert.equal(help.status, 0, help.stderr);
     assert.match(help.stderr, /--preserve-cache/);
     for (const flags of [["--port"], ["--unknown"], ["--profile", "max"]]) {
       const result = spawnSync(process.execPath, [CLI, "gateway", ...flags], {
-        cwd: dir, encoding: "utf8", timeout: 5000,
+        cwd: dir, env: cleanEnv, encoding: "utf8", timeout: 5000,
       });
       assert.equal(result.status, 1, result.stderr);
       assert.doesNotMatch(result.stderr, /listening on/);

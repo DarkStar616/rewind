@@ -132,13 +132,12 @@ equivalents are `REWIND_PROFILE`, `REWIND_PORT`, `REWIND_UPSTREAM`, `REWIND_PRES
 `REWIND_PRUNE_CONTEXT`. Boolean environment values must be exactly `true` or `false`. Supply provider
 authentication in request headers; upstream URLs must use a root path and cannot contain credentials, query strings or fragments.
 
-How many **tokens** a rewind recovers depends on **how late the run failed** (Benchmark B,
-deterministic): **9.1%** for an early failure → **41.2%** for a late one (step 8 of 10). It's a curve,
-not a constant — the late-failure condition rides with the number. Those figures are *tokens recovered*;
-the **billable** saving (the marginal cost avoided over your provider's own prompt caching, which is
-what a gainshare bill would charge) is lower — roughly 25–35% on the same runs — because the recovered
-tokens are largely the already-cheap cached prefix. `agent-rewind savings` prints your running total. *(Note: this is separate from the checkpoint/rewind
-system — that's real git; this proxy is a different layer you can run independently.)*
+The executable nine-call mock benchmark reports **28.08% simulated cost savings**, with three
+replayed calls out of nine. Unique calls report zero. Run `npm run --silent bench:json` from a source
+checkout for a reproducible artifact with source hashes and denominators. These results are not real
+provider billing or a general product savings estimate. The historical 120-trial Benchmark B curve is
+unverified: its runner and corpus were not located, so those percentages are withdrawn.
+
 
 ## Links
 

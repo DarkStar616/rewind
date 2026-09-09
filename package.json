@@ -14,7 +14,8 @@
     "test": "NODE_OPTIONS=--conditions=development node --test packages/*/test/*.test.ts",
     "check": "npm run typecheck && npm run test",
     "build": "npm run build --workspaces --if-present",
-    "clean": "rm -rf packages/*/dist"
+    "clean": "rm -rf packages/*/dist",
+    "bench:json": "NODE_OPTIONS=--conditions=development node packages/gateway/bench/run-artifact.ts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

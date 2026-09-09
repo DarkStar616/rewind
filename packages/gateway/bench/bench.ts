@@ -66,6 +66,7 @@ export interface BenchCall {
   servedBy: "upstream" | "replay";
   costMicros: number;
   warm: boolean;
+  usage?: Parameters<typeof avoidedCostMicros>[0];
 }
 
 export interface BenchReport {
@@ -118,7 +119,7 @@ export async function runBench(trajectory: number[] = defaultTrajectory()): Prom
       const cost = priceUsage(usage);
       offCost += cost;
       const warm = offUpstream.calls[offUpstream.calls.length - 1]?.warm ?? false;
-      offTranscript.push({ turn, servedBy: "upstream", costMicros: cost, warm });
+      offTranscript.push({ turn, servedBy: "upstream", costMicros: cost, warm, usage });
     }
   } finally {
     await offUpstream.close();
@@ -143,7 +144,7 @@ export async function runBench(trajectory: number[] = defaultTrajectory()): Prom
         const cost = priceUsage(usage);
         onCost += cost;
         const warm = onUpstream.calls[onUpstream.calls.length - 1]?.warm ?? false;
-        onTranscript.push({ turn, servedBy: "upstream", costMicros: cost, warm });
+        onTranscript.push({ turn, servedBy: "upstream", costMicros: cost, warm, usage });
       }
     }
   } finally {
@@ -175,7 +176,7 @@ export async function runBench(trajectory: number[] = defaultTrajectory()): Prom
 export function formatReport(r: BenchReport): string {
   const usd = (micros: number) => `$${(micros / 1_000_000).toFixed(6)}`;
   return [
-    `Rewind gateway bench — deterministic, no API key`,
+    `Rewind gateway bench — SIMULATED costs/tokens, deterministic, no API key`,
     `  trajectory turns:     [${r.turns.join(", ")}]  (${r.avoidedCalls} re-runs avoidable)`,
     `  OFF cost (today):     ${usd(r.offCostMicros)}  over ${r.offUpstreamCalls} upstream calls`,
     `  ON  cost (rewind):    ${usd(r.onCostMicros)}  over ${r.onUpstreamCalls} upstream calls`,

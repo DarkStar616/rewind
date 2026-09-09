@@ -1,0 +1,95 @@
+{
+  "schema": "rewind.trace/v1",
+  "source": {
+    "repository": "https://huggingface.co/datasets/obaydata/mcp-agent-trajectory-benchmark",
+    "revision": "f4f449d65271abc1e4ccd5157d121a59a1dd38c4",
+    "license": "Apache-2.0",
+    "sourceSha256": "ffdfe159718289b373f5ee06e85d454b3e281fb170f0a020ad0227c09d638cb4",
+    "sourceSchema": "ATIF-v1.2",
+    "sourceSteps": 12,
+    "path": "project-manager/trajectory.json"
+  },
+  "selection": "steps[0:2]; exact field values including matching tool calls/results; reserialized JSON excerpt",
+  "replayEligible": false,
+  "reason": "ATIF transcript excerpt lacks complete provider request, headers, response and paired billing",
+  "steps": [
+    {
+      "step_id": 1,
+      "timestamp": "2026-03-18T17:54:06.675342+00:00",
+      "source": "user",
+      "message": "Morning! Quick standup check — where do we stand on both projects?"
+    },
+    {
+      "step_id": 2,
+      "timestamp": "2026-03-18T17:54:14.193777+00:00",
+      "source": "agent",
+      "message": "Analysis: Mike wants a quick standup check covering both Mobile App Redesign and API Migration v2. I need to pull current project health, sprint status, blockers, workload distribution, and upcoming deadlines to give him the full picture.\nPlan: Gather all current project data: overall project health, current sprint progress, active blockers, team workload, and upcoming deadlines within the next week. This will give Mike a complete standup overview.",
+      "model_name": "openai/kimi-k2.5",
+      "tool_calls": [
+        {
+          "tool_call_id": "get_projects-2-0",
+          "function_name": "get_projects",
+          "arguments": {}
+        },
+        {
+          "tool_call_id": "get_sprint_status-2-1",
+          "function_name": "get_sprint_status",
+          "arguments": {}
+        },
+        {
+          "tool_call_id": "get_team_workload-2-2",
+          "function_name": "get_team_workload",
+          "arguments": {}
+        },
+        {
+          "tool_call_id": "get_blockers-2-3",
+          "function_name": "get_blockers",
+          "arguments": {}
+        },
+        {
+          "tool_call_id": "get_upcoming_deadlines-2-4",
+          "function_name": "get_upcoming_deadlines",
+          "arguments": {
+            "days": 7
+          }
+        }
+      ],
+      "observation": {
+        "results": [
+          {
+            "source_call_id": "get_projects-2-0",
+            "content": "[\n  {\n    \"id\": \"proj_mobile\",\n    \"name\": \"Mobile App Redesign\",\n    \"status\": \"in_progress\",\n    \"progress_pct\": 65,\n    \"health\": \"yellow\",\n    \"start_date\": \"2026-01-13\",\n    \"target_end\": \"2026-04-24\",\n    \"budget_used_pct\": 58,\n    \"lead\": \"Sarah Chen\",\n    \"team_size\": 5,\n    \"total_tasks\": 48,\n    \"completed_tasks\": 31,\n    \"blocked_tasks\": 2,\n    \"current_phase\": \"Build & Implement\",\n    \"risks\": [\n      \"Design system migration causing rework\",\n      \"iOS 20 beta SDK instability\"\n    ]\n  },\n  {\n    \"id\": \"proj_api\",\n    \"name\": \"API Migration v2\",\n    \"status\": \"in_progress\",\n    \"progress_pct\": 40,\n    \"health\": \"red\",\n    \"start_date\": \"2026-02-03\",\n    \"target_end\": \"2026-04-10\",\n    \"budget_used_pct\": 52,\n    \"lead\": \"Raj Patel\",\n    \"team_size\": 4,\n    \"total_tasks\": 36,\n    \"completed_tasks\": 14,\n    \"blocked_tasks\": 1,\n    \"current_phase\": \"Build & Implement\",\n    \"risks\": [\n      \"Legacy endpoint deprecation timeline moved up\",\n      \"Missing docs for auth service\"\n    ]\n  }\n]"
+          },
+          {
+            "source_call_id": "get_sprint_status-2-1",
+            "content": "{\n  \"sprint\": \"Sprint 25\",\n  \"start\": \"2026-03-17\",\n  \"end\": \"2026-03-28\",\n  \"day_of_sprint\": 3,\n  \"summary\": {\n    \"total_tasks\": 12,\n    \"done\": 1,\n    \"in_progress\": 5,\n    \"blocked\": 3,\n    \"overdue\": 2,\n    \"todo\": 3,\n    \"total_points\": 38,\n    \"completed_points\": 2\n  },\n  \"tasks\": [\n    {\n      \"id\": \"T-301\",\n      \"title\": \"Implement new onboarding flow screens\",\n      \"project\": \"Mobile App Redesign\",\n      \"assignee\": \"Sarah Chen\",\n      \"status\": \"in_progress\",\n      \"points\": 5,\n      \"due\": \"2026-03-20\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-302\",\n      \"title\": \"Migrate /users endpoint to v2 schema\",\n      \"project\": \"API Migration v2\",\n      \"assignee\": \"Raj Patel\",\n      \"status\": \"blocked\",\n      \"points\": 3,\n      \"due\": \"2026-03-18\",\n      \"blocked\": true,\n      \"overdue\": true,\n      \"blocker\": \"BLK-01\"\n    },\n    {\n      \"id\": \"T-303\",\n      \"title\": \"Write integration tests for payment flow\",\n      \"project\": \"Mobile App Redesign\",\n      \"assignee\": \"Lisa Moreno\",\n      \"status\": \"in_progress\",\n      \"points\": 3,\n      \"due\": \"2026-03-21\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-304\",\n      \"title\": \"Set up staging environment for API v2\",\n      \"project\": \"API Migration v2\",\n      \"assignee\": \"David Kim\",\n      \"status\": \"done\",\n      \"points\": 2,\n      \"due\": \"2026-03-17\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-305\",\n      \"title\": \"Fix responsive layout on settings page\",\n      \"project\": \"Mobile App Redesign\",\n      \"assignee\": \"Emily Watson\",\n      \"status\": \"in_progress\",\n      \"points\": 2,\n      \"due\": \"2026-03-20\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-306\",\n      \"title\": \"Deprecate legacy auth middleware\",\n      \"project\": \"API Migration v2\",\n      \"assignee\": \"Raj Patel\",\n      \"status\": \"blocked\",\n      \"points\": 5,\n      \"due\": \"2026-03-19\",\n      \"blocked\": true,\n      \"overdue\": false,\n      \"blocker\": \"BLK-02\"\n    },\n    {\n      \"id\": \"T-307\",\n      \"title\": \"Update CI pipeline for mobile builds\",\n      \"project\": \"Mobile App Redesign\",\n      \"assignee\": \"David Kim\",\n      \"status\": \"in_progress\",\n      \"points\": 3,\n      \"due\": \"2026-03-21\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-308\",\n      \"title\": \"Design API rate limiting strategy\",\n      \"project\": \"API Migration v2\",\n      \"assignee\": \"James Okafor\",\n      \"status\": \"todo\",\n      \"points\": 3,\n      \"due\": \"2026-03-22\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-309\",\n      \"title\": \"Accessibility audit on onboarding screens\",\n      \"project\": \"Mobile App Redesign\",\n      \"assignee\": \"Lisa Moreno\",\n      \"status\": \"blocked\",\n      \"points\": 2,\n      \"due\": \"2026-03-18\",\n      \"blocked\": true,\n      \"overdue\": true,\n      \"blocker\": \"BLK-03\"\n    },\n    {\n      \"id\": \"T-310\",\n      \"title\": \"Migrate /orders endpoint to v2 schema\",\n      \"project\": \"API Migration v2\",\n      \"assignee\": \"James Okafor\",\n      \"status\": \"in_progress\",\n      \"points\": 5,\n      \"due\": \"2026-03-24\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-311\",\n      \"title\": \"Performance profiling on home screen\",\n      \"project\": \"Mobile App Redesign\",\n      \"assignee\": \"Sarah Chen\",\n      \"status\": \"todo\",\n      \"points\": 3,\n      \"due\": \"2026-03-25\",\n      \"blocked\": false,\n      \"overdue\": false\n    },\n    {\n      \"id\": \"T-312\",\n      \"title\": \"Write runbook for API v2 rollback\",\n      \"project\": \"API Migration v2\",\n      \"assignee\": \"David Kim\",\n      \"status\": \"todo\",\n      \"points\": 2,\n      \"due\": \"2026-03-24\",\n      \"blocked\": false,\n      \"overdue\": false\n    }\n  ]\n}"
+          },
+          {
+            "source_call_id": "get_team_workload-2-2",
+            "content": "{\n  \"team_size\": 6,\n  \"avg_capacity_pct\": 87,\n  \"members\": [\n    {\n      \"id\": \"tm_01\",\n      \"name\": \"Sarah Chen\",\n      \"role\": \"Senior Frontend\",\n      \"capacity_pct\": 95,\n      \"current_tasks\": 4,\n      \"max_tasks\": 5,\n      \"sprint_points_assigned\": 13\n    },\n    {\n      \"id\": \"tm_02\",\n      \"name\": \"Raj Patel\",\n      \"role\": \"Backend Engineer\",\n      \"capacity_pct\": 110,\n      \"current_tasks\": 6,\n      \"max_tasks\": 5,\n      \"sprint_points_assigned\": 18\n    },\n    {\n      \"id\": \"tm_03\",\n      \"name\": \"Emily Watson\",\n      \"role\": \"Full Stack\",\n      \"capacity_pct\": 60,\n      \"current_tasks\": 3,\n      \"max_tasks\": 5,\n      \"sprint_points_assigned\": 8\n    },\n    {\n      \"id\": \"tm_04\",\n      \"name\": \"David Kim\",\n      \"role\": \"DevOps / SRE\",\n      \"capacity_pct\": 85,\n      \"current_tasks\": 4,\n      \"max_tasks\": 5,\n      \"sprint_points_assigned\": 11\n    },\n    {\n      \"id\": \"tm_05\",\n      \"name\": \"Lisa Moreno\",\n      \"role\": \"QA Lead\",\n      \"capacity_pct\": 100,\n      \"current_tasks\": 5,\n      \"max_tasks\": 5,\n      \"sprint_points_assigned\": 13\n    },\n    {\n      \"id\": \"tm_06\",\n      \"name\": \"James Okafor\",\n      \"role\": \"Backend Engineer\",\n      \"capacity_pct\": 70,\n      \"current_tasks\": 3,\n      \"max_tasks\": 5,\n      \"sprint_points_assigned\": 8\n    }\n  ],\n  \"overloaded\": [\n    \"Raj Patel\"\n  ],\n  \"available\": [\n    \"Emily Watson\"\n  ]\n}"
+          },
+          {
+            "source_call_id": "get_blockers-2-3",
+            "content": "{\n  \"total\": 4,\n  \"needs_escalation\": 2,\n  \"blockers\": [\n    {\n      \"id\": \"BLK-01\",\n      \"title\": \"Auth service team hasn't provided v2 token spec\",\n      \"severity\": \"high\",\n      \"project\": \"API Migration v2\",\n      \"blocking_tasks\": [\n        \"T-302\"\n      ],\n      \"owner\": \"Raj Patel\",\n      \"raised_date\": \"2026-03-14\",\n      \"days_open\": 5,\n      \"escalation_needed\": true,\n      \"notes\": \"Requested from Platform team on Mar 14. Follow-up sent Mar 17, no response.\"\n    },\n    {\n      \"id\": \"BLK-02\",\n      \"title\": \"Legal review pending on data retention policy changes\",\n      \"severity\": \"medium\",\n      \"project\": \"API Migration v2\",\n      \"blocking_tasks\": [\n        \"T-306\"\n      ],\n      \"owner\": \"Raj Patel\",\n      \"raised_date\": \"2026-03-17\",\n      \"days_open\": 2,\n      \"escalation_needed\": false,\n      \"notes\": \"Legal team acknowledged, expected response by Mar 20.\"\n    },\n    {\n      \"id\": \"BLK-03\",\n      \"title\": \"Waiting for updated design assets from UX team\",\n      \"severity\": \"medium\",\n      \"project\": \"Mobile App Redesign\",\n      \"blocking_tasks\": [\n        \"T-309\"\n      ],\n      \"owner\": \"Lisa Moreno\",\n      \"raised_date\": \"2026-03-16\",\n      \"days_open\": 3,\n      \"escalation_needed\": true,\n      \"notes\": \"UX team is short-staffed. Original delivery was Mar 17.\"\n    },\n    {\n      \"id\": \"BLK-04\",\n      \"title\": \"CI runner out of disk space, builds failing intermittently\",\n      \"severity\": \"low\",\n      \"project\": \"Mobile App Redesign\",\n      \"blocking_tasks\": [],\n      \"owner\": \"David Kim\",\n      \"raised_date\": \"2026-03-18\",\n      \"days_open\": 1,\n      \"escalation_needed\": false,\n      \"notes\": \"David is cleaning up old artifacts. Should be fixed today.\"\n    }\n  ]\n}"
+          },
+          {
+            "source_call_id": "get_upcoming_deadlines-2-4",
+            "content": "{\n  \"window_days\": 7,\n  \"count\": 6,\n  \"deadlines\": [\n    {\n      \"date\": \"2026-03-20\",\n      \"day\": \"Fri Mar 20\",\n      \"item\": \"Onboarding flow screens ready for review\",\n      \"project\": \"Mobile App Redesign\",\n      \"owner\": \"Sarah Chen\",\n      \"risk\": \"green\"\n    },\n    {\n      \"date\": \"2026-03-20\",\n      \"day\": \"Fri Mar 20\",\n      \"item\": \"Settings page responsive fixes\",\n      \"project\": \"Mobile App Redesign\",\n      \"owner\": \"Emily Watson\",\n      \"risk\": \"green\"\n    },\n    {\n      \"date\": \"2026-03-21\",\n      \"day\": \"Sat Mar 21\",\n      \"item\": \"Payment flow integration tests complete\",\n      \"project\": \"Mobile App Redesign\",\n      \"owner\": \"Lisa Moreno\",\n      \"risk\": \"yellow\"\n    },\n    {\n      \"date\": \"2026-03-22\",\n      \"day\": \"Sun Mar 22\",\n      \"item\": \"API rate limiting design doc\",\n      \"project\": \"API Migration v2\",\n      \"owner\": \"James Okafor\",\n      \"risk\": \"green\"\n    },\n    {\n      \"date\": \"2026-03-24\",\n      \"day\": \"Tue Mar 24\",\n      \"item\": \"/orders endpoint v2 migration\",\n      \"project\": \"API Migration v2\",\n      \"owner\": \"James Okafor\",\n      \"risk\": \"yellow\"\n    },\n    {\n      \"date\": \"2026-03-24\",\n      \"day\": \"Tue Mar 24\",\n      \"item\": \"API v2 rollback runbook\",\n      \"project\": \"API Migration v2\",\n      \"owner\": \"David Kim\",\n      \"risk\": \"green\"\n    }\n  ]\n}"
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 4584,
+        "completion_tokens": 376,
+        "cache_tokens": 0,
+        "cost_usd": 0.0
+      },
+      "extra": {
+        "is_turn_complete": false,
+        "response": null,
+        "raw_content": "```json\n{\n  \"analysis\": \"Mike wants a quick standup check covering both Mobile App Redesign and API Migration v2. I need to pull current project health, sprint status, blockers, workload distribution, and upcoming deadlines to give him the full picture.\",\n  \"plan\": \"Gather all current project data: overall project health, current sprint progress, active blockers, team workload, and upcoming deadlines within the next week. This will give Mike a complete standup overview.\",\n  \"tool_calls\": [\n    {\n      \"tool_name\": \"get_projects\",\n      \"arguments\": {}\n    },\n    {\n      \"tool_name\": \"get_sprint_status\",\n      \"arguments\": {}\n    },\n    {\n      \"tool_name\": \"get_team_workload\",\n      \"arguments\": {}\n    },\n    {\n      \"tool_name\": \"get_blockers\",\n      \"arguments\": {}\n    },\n    {\n      \"tool_name\": \"get_upcoming_deadlines\",\n      \"arguments\": {\"days\": 7}\n    }\n  ],\n  \"is_turn_complete\": false,\n  \"response\": null\n}\n```"
+      }
+    }
+  ],
+  "billing": "source cost_usd is zero; billing unverified, not a measured free run"
+}
