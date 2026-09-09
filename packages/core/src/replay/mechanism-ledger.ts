@@ -64,7 +64,7 @@ function freeze<T>(value: T): T {
 function validate(event: MechanismEvent): void {
   if (event.schema !== "rewind.mechanism/v1") throw new Error("unsupported mechanism schema");
   for (const value of [event.eventId, event.requestId, event.idempotencyKey, event.tenant, event.scope, event.provider, event.model, event.configurationFingerprint, event.pricing?.version]) text(value);
-  if (!/^[a-f0-9]{64}$/.test(event.evidenceDigest)) throw new Error("event evidence digest must be SHA-256");
+  if (typeof event.evidenceDigest !== "string" || !/^[a-f0-9]{64}$/.test(event.evidenceDigest)) throw new Error("event evidence digest must be SHA-256");
   if (event.pricing.currency !== "USD" || !["simulated", "estimated", "provider-reported", "paired-provider-billed"].includes(event.pricing.costBasis)) throw new Error("unsupported pricing provenance");
   integer(event.ts); integer(event.eligibleUnits);
   let used: number;

@@ -11,6 +11,12 @@ function cache(id = "cache"): MechanismEvent {
 }
 const query = { tenant: "tenant", scope: "scope" };
 
+test("evidence digest must be a string, never a coercible array", () => {
+  const ledger = createMemoryMechanismLedger();
+  assert.throws(() => ledger.append({ ...replay(), evidenceDigest: ["a".repeat(64)] } as unknown as MechanismEvent), /digest/);
+  assert.equal(ledger.list(query).length, 0);
+});
+
 test("three independent requests sharing a record count three, transport retry counts once", () => {
   const ledger = createMemoryMechanismLedger();
   for (const id of ["one", "two", "three"]) assert.equal(ledger.append(replay(id)), true);
