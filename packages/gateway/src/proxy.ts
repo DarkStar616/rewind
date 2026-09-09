@@ -44,7 +44,7 @@ export interface RecordedHttpResponse {
 }
 
 /** Validate transport bytes and terminal success before any avoidance is credited. */
-function validHttpRecord(record: RecordedCall, adapter: ProviderAdapter): boolean {
+function validHttpRecord(record: RecordedCall, adapter: ProviderAdapter, url?: string): boolean {
   const rec = record.response as RecordedHttpResponse | undefined;
   if (!rec || !Number.isInteger(rec.status) || rec.status < 200 || rec.status >= 300 ||
       typeof rec.contentType !== "string" || typeof rec.bodyBase64 !== "string") return false;
@@ -56,7 +56,7 @@ function validHttpRecord(record: RecordedCall, adapter: ProviderAdapter): boolea
       record.usage?.cache_read_input_tokens, record.usage?.cache_creation_input_tokens].map((n) => n ?? 0);
     if (!counts.every((n) => Number.isSafeInteger(n) && n >= 0) ||
         !Number.isSafeInteger(counts.reduce((a, b) => a + b, 0))) return false;
-    return adapter.isRecordableSuccess(bytes, rec.contentType);
+    return adapter.isRecordableSuccess(bytes, rec.contentType, url);
   } catch { return false; }
 }
 
@@ -259,7 +259,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           // with identical bodies, and that must be a miss, never a cross-provider false hit. The
           // replayer strips the query (auth material) itself.
           decision = options.replayer.prepare
-            ? options.replayer.prepare(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url), (record) => validHttpRecord(record, adapter))
+            ? options.replayer.prepare(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url), (record) => validHttpRecord(record, adapter, req.url))
             : options.replayer.handle(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url));
         } catch (err) {
           // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
@@ -416,7 +416,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
               const full = Buffer.concat(chunks);
               // Record only a genuine, COMPLETE success on the replay-able endpoint. A 2xx that carries
               // an SSE error or a truncated stream is transient and must never be frozen into a replay.
-              if (record?.replayKey && status >= 200 && status < 300 && record.adapter.isRecordableSuccess(full, contentType)) {
+              if (record?.replayKey && status >= 200 && status < 300 && record.adapter.isRecordableSuccess(full, contentType, req.url)) {
                 try {
                   recordResponse(options.store, record.adapter, record.scope, record.replayKey, full, contentType, status);
                   log(`proxy: LIVE recorded scope=${record.scope} key=${record.replayKey.slice(0, 12)}`);

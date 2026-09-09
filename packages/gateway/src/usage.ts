@@ -68,10 +68,15 @@ export function pickUsageFields(u: unknown): ProviderUsage {
     details && typeof details === "object" && typeof (details as Record<string, unknown>).cached_tokens === "number"
       ? ((details as Record<string, unknown>).cached_tokens as number)
       : 0;
+  const writes = details && typeof details === "object" && typeof (details as Record<string, unknown>).cache_write_tokens === "number"
+    ? (details as Record<string, unknown>).cache_write_tokens as number : 0;
   if (out.input_tokens === undefined && typeof o.prompt_tokens === "number") {
+    if (![o.prompt_tokens, cached, writes].every((n) => Number.isSafeInteger(n) && n >= 0) ||
+        cached + writes > o.prompt_tokens) return {};
     // Split OpenAI's all-inclusive prompt_tokens into uncached (input) + cached (cache_read).
-    out.input_tokens = Math.max(0, o.prompt_tokens - cached);
+    out.input_tokens = Math.max(0, o.prompt_tokens - cached - writes);
     if (out.cache_read_input_tokens === undefined && cached > 0) out.cache_read_input_tokens = cached;
+    if (out.cache_creation_input_tokens === undefined && writes > 0) out.cache_creation_input_tokens = writes;
   }
   if (out.output_tokens === undefined && typeof o.completion_tokens === "number") {
     out.output_tokens = o.completion_tokens;

@@ -61,13 +61,12 @@ test("auto-detect: a Gemini generateContent path selects the gemini adapter", ()
   assert.equal(a?.id, "gemini");
 });
 
-test("the OpenAI Responses API endpoint is NOT matched (deferred post-1.0), so it never mis-records", () => {
-  // /v1/responses has a different wire format (status/output, response.completed) we don't yet fold;
-  // advertising it would reject every real result as non-recordable. Until then it must not match.
-  assert.equal(selectAdapter({}, "POST", "/v1/responses"), undefined);
-  const a = selectAdapter({ provider: "openai" }, "POST", "/v1/responses");
-  assert.equal(a?.matchPath("POST", "/v1/responses"), false);
-  assert.equal(a?.matchPath("POST", "/v1/chat/completions"), true);
+test("OpenAI selects Chat and Responses while terminal validation remains route-specific", () => {
+  const a = selectAdapter({}, "POST", "/v1/responses")!;
+  assert.equal(a.id, "openai");
+  assert.equal(a.matchPath("POST", "/v1/chat/completions"), true);
+  assert.equal(a.isRecordableSuccess(Buffer.from('{"choices":[]}'), "application/json", "/v1/responses"), false);
+  assert.equal(a.isRecordableSuccess(Buffer.from('{"object":"response","status":"completed","output":[]}'), "application/json", "/v1/chat/completions"), false);
 });
 
 test("replay identity folds the URL path: two Gemini models (named only in the URL) do NOT collide", () => {

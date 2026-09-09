@@ -7,14 +7,9 @@
  * a `choices` array and no top-level `error`. Usage comes from the final chunk's `usage` block (or the
  * body's `usage` for JSON), read through the shared field-picker.
  *
- * The newer Responses API (POST /v1/responses) is DELIBERATELY not matched here (deferred post-1.0):
- * its wire format is different — a non-streamed success carries `status`/`output` (not `choices`), a
- * streamed one terminates with a `response.completed` event (not `data: [DONE]`), and its usage block
- * uses `input_tokens`/`output_tokens` with `input_tokens_details.cached_tokens`. Matching it without
- * implementing those shapes would reject every real Responses result as non-recordable and mis-price
- * cached input, so we do not advertise it until the terminal + usage folds are built. Chat Completions
- * remains the OpenAI-compatible surface these providers all speak.
+ * Responses JSON and SSE use their own complete-terminal validator and inclusive usage fold.
  */
+import { completedResponse, looksLikeResponses, responsesUsage, validInclusiveUsage } from "./responses.ts";
 import type { ProviderAdapter } from "./provider-adapter.ts";
 import { pickUsageFields, normalizeUsage, type ExtractedUsage } from "../usage.ts";
 import type { ProviderUsage } from "../record-store.ts";
@@ -45,25 +40,27 @@ export const openaiAdapter: ProviderAdapter = {
   matchPath(method: string | undefined, url: string | undefined): boolean {
     if (method !== "POST") return false;
     const path = (url ?? "").split("?")[0];
-    // Only Chat Completions. The Responses API (/v1/responses) is deferred post-1.0 — see the header
-    // comment: matching it without its distinct terminal/usage shapes would reject every real result.
-    return path === "/v1/chat/completions";
+    return path === "/v1/chat/completions" || path === "/v1/responses";
   },
-  isRecordableSuccess(body: Buffer, contentType: string): boolean {
+  isRecordableSuccess(body: Buffer, contentType: string, url?: string): boolean {
     const text = body.toString("utf8");
+    const responses = url ? url.split("?")[0] === "/v1/responses" : looksLikeResponses(text);
+    if (responses) return completedResponse(text, looksLikeSse(text, contentType)) !== undefined;
+    if (looksLikeResponses(text)) return false;
     if (looksLikeSse(text, contentType)) {
       const hasDone = /^\s*data:\s*\[DONE\]\s*$/m.test(text);
       let hasChunk = false;
       let hasError = false;
       for (const evt of sseFrames(text)) {
         if ("error" in evt && evt.error) hasError = true;
+        if (!validInclusiveUsage(evt.usage, "chat")) hasError = true;
         if (Array.isArray(evt.choices)) hasChunk = true;
       }
       return hasDone && hasChunk && !hasError;
     }
     try {
-      const parsed = JSON.parse(text) as { choices?: unknown; error?: unknown };
-      if (parsed?.error) return false;
+      const parsed = JSON.parse(text) as { choices?: unknown; error?: unknown; usage?: unknown };
+      if (parsed?.error || !validInclusiveUsage(parsed?.usage, "chat")) return false;
       return Array.isArray(parsed?.choices);
     } catch {
       return false;
@@ -71,6 +68,10 @@ export const openaiAdapter: ProviderAdapter = {
   },
   extractUsage(raw: Buffer | string, contentType: string | undefined): ExtractedUsage {
     const text = typeof raw === "string" ? raw : raw.toString("utf8");
+    if (looksLikeResponses(text)) {
+      const response = completedResponse(text, looksLikeSse(text, contentType));
+      return response ? responsesUsage(response) : { usage: normalizeUsage({}) };
+    }
     let usage: ProviderUsage = {};
     let model: string | undefined;
     if (looksLikeSse(text, contentType)) {

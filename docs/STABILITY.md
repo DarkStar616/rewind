@@ -193,3 +193,11 @@ metadata through its own storage credentials. Expired bodies remain unavailable,
 Gateway HTTP/CLI wiring, claim-to-accounting atomicity, incomplete-stream staging integration and the
 full kill-point crash matrix are not delivered by this adapter packet. WAL hard limits and storage
 lifecycle residuals remain as documented above; durable mode is not yet a default profile.
+
+## Responses adapter addition (v1.1 development)
+
+The OpenAI adapter now recognizes POST `/v1/responses` as well as Chat Completions.
+`ProviderAdapter.isRecordableSuccess` accepts an optional request URL so transport validation
+rejects a Chat-shaped response on a Responses route and vice versa. Existing two-argument
+adapters remain compatible. The canonicalizer and existing synchronous replay semantics are
+unchanged; all Responses input, tools, reasoning and unknown fields retain their existing identity.

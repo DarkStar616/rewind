@@ -21,14 +21,14 @@ export interface ProviderAdapter {
   readonly id: "anthropic" | "openai" | "gemini";
   /** Is this a recordable model call for this provider?
    *  anthropic: POST /v1/messages
-   *  openai:    POST /v1/chat/completions (Responses API /v1/responses is deferred post-1.0)
+   *  openai:    POST /v1/chat/completions or /v1/responses
    *  gemini:    POST /v1beta/models/<model>:generateContent|:streamGenerateContent */
   matchPath(method: string | undefined, url: string | undefined): boolean;
   /** COMPLETE, non-error 2xx worth freezing? Per-provider terminal:
    *  anthropic: SSE has message_stop & no error / JSON type!=="error"
    *  openai:    SSE ends with `data: [DONE]`, ≥1 chunk, no error object / JSON has choices, no top-level error
    *  gemini:    a candidate with finishReason and no `error` field */
-  isRecordableSuccess(body: Buffer, contentType: string): boolean;
+  isRecordableSuccess(body: Buffer, contentType: string, url?: string): boolean;
   /** Provider-reported usage + model, JSON or streamed. Reuses meter/usage semantics. */
   extractUsage(raw: Buffer | string, contentType: string | undefined): ExtractedUsage;
 }
