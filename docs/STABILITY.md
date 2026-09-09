@@ -162,3 +162,34 @@ Staging stores ordered encrypted chunks under the database quota and a common TT
 cannot be read through the staging interface. Sealing authenticates the complete ordered digest.
 Callers must schedule `collectExpired()` after crashes and periodically. Staging is not wired to HTTP
 stream recording yet. Durable replay/event adapters and production receipts remain separate units.
+
+## v1.1 ordered occurrence adapter
+
+Gateway adds `createSqliteRecordStoreV2` and types `HttpOccurrence`, `TapeEpoch`, `TapeCursor`, `ConsumedOccurrence`,
+`RecordStoreV2`, `RecordStoreV2Options`. Existing synchronous `RecordStore` and `Replayer` contracts
+remain unchanged. The new adapter requires a fixed-tenant `SqliteStorage`; scope, epoch and ordinal
+select an immutable occurrence. The caller supplies the unmodified key from `canonicalizeRequest`.
+Identical prompts at different ordinals can retain different stochastic responses.
+
+`createEpoch` initializes an append-only sequence; `epoch` reads its length/revision; `append` requires
+its next ordinal. A transaction
+retry with identical bytes is idempotent; different bytes cannot overwrite a recorded position.
+`openCursor` creates an explicit replay cursor; `cursor` reloads its current revision. `peek` reads an
+explicit position without advancing or crediting it. `consume` atomically records a unique claim and
+advances the revision-bearing cursor. Independent competing claims conflict; retrying the same handle,
+key and transaction ID returns the original committed result without advancing again. A mismatch or
+strict miss never advances. Reusing a claimed ID with another request is an error, not live fallback.
+`rewind` explicitly moves a current cursor to a recorded position; its transaction is also idempotent.
+No equality-based stochastic auto-reuse occurs outside an explicitly selected tape cursor.
+
+HTTP occurrences use a length-limited versioned metadata frame followed by raw binary response bytes;
+bodies are not base64 JSON. Reads validate coordinates, expiry binding, exact body digest, HTTP status,
+header safety, usage counts and the selected provider adapter's terminal predicate. Structurally
+invalid authenticated frames receive a quarantine marker where storage permits; failures refuse
+bytes regardless of marker persistence. AEAD failures disable the underlying storage worker. This
+is corruption detection, not protection against an application deliberately rewriting all authenticated
+metadata through its own storage credentials. Expired bodies remain unavailable, including to retries.
+
+Gateway HTTP/CLI wiring, claim-to-accounting atomicity, incomplete-stream staging integration and the
+full kill-point crash matrix are not delivered by this adapter packet. WAL hard limits and storage
+lifecycle residuals remain as documented above; durable mode is not yet a default profile.

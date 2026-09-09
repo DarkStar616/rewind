@@ -73,3 +73,5 @@ export { openSqliteStorage } from "./storage/sqlite-store.ts";
 export type { SqliteStorageOptions, StorageMutation, StorageValue, StorageCommit, SqliteStorage } from "./storage/sqlite-store.ts";
 export { createEncryptedStaging } from "./storage/encrypted-staging.ts";
 export type { StagingOptions, StagedObject, EncryptedStaging } from "./storage/encrypted-staging.ts";
+export { createSqliteRecordStoreV2 } from "./record-store-v2.ts";
+export type { HttpOccurrence, TapeEpoch, TapeCursor, ConsumedOccurrence, RecordStoreV2, RecordStoreV2Options } from "./record-store-v2.ts";
