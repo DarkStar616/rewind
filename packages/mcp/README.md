@@ -156,14 +156,14 @@ Unknown profiles and options fail startup. The default remains `all`.
 
 | Profile | Tools | Approximate initialization tokens |
 | --- | --- | ---: |
-| `lean` | checkpoint, rewind, guard_effect | 661 |
-| `recovery` | lean tools plus list, replay, backtrack_candidates, backtrack_commit | 1,571 |
+| `lean` | checkpoint, rewind, guard_effect | 691 |
+| `recovery` | lean tools plus list, replay, backtrack_candidates, backtrack_commit | 1,609 |
 | `analytics` | savings | 271 |
-| `all` | All eight existing tools | 1,804 |
+| `all` | All eight existing tools | 1,841 |
 
 Measured through the MCP SDK on 2026-09-09: serialized tool definitions plus server instructions,
 characters divided by four and rounded up. The previous full surface measured 9,359 characters
-(2,340 approximate tokens); the new lean surface measured 2,643 characters. These are context-size
+(2,340 approximate tokens); the updated lean surface measured 2,762 characters. These are context-size
 estimates, not measured tokenization or dollar savings. Tests enforce the lean budget of 1,000.
 Clients may add their own protocol wrappers. Hidden tools cannot be called through that profile.
 

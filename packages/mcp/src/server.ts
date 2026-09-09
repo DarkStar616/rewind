@@ -121,7 +121,7 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   if (enabled.has("checkpoint")) server.registerTool(
     "checkpoint",
     {
-      description: "Snapshot the whole workspace; keep the returned id for rewind.",
+      description: "Snapshot at a material or risky boundary; keep the id and reuse it during unchanged read-only steps.",
       inputSchema: { label: z.string().optional() },
       outputSchema: { id: z.string(), label: z.string().optional(), ts: z.number() },
     },
@@ -268,7 +268,7 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   if (enabled.has("backtrack_candidates")) server.registerTool(
     "backtrack_candidates",
     {
-      description: "List checkpoints with failure memory. Recommended is the newest failing checkpoint.",
+      description: "List checkpoints with failure memory. Recommended is the newest checkpoint; prior failures are attached as memory.",
       inputSchema: {},
       outputSchema: {
         candidates: z.array(

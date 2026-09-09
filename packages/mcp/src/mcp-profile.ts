@@ -12,7 +12,7 @@ export function mcpProfile(value: unknown = "all"): { profile: McpProfile; tools
   const instructions = [
     `Rewind profile: ${profile}. Tier 0 is reversibility, not isolation or security.`,
     profile === "analytics" ? "Savings are estimates of avoided replay calls, not provider bills." :
-      "Checkpoint before a meaningful risky change; keep its id. Rewind restores the workspace to that id. " +
+      "Checkpoint before meaningful risky changes or after material workspace/effect changes; reuse the last id during unchanged read-only steps. Rewind restores the workspace to that id. " +
       "Before an irreversible external effect, call guard_effect with a stable effectKey; never execute a refused effect. " +
       "The guard records admission; it does not execute or sandbox the effect.",
     profile === "lean" ? "Use the recovery profile for history and failure memory; analytics for savings." :
