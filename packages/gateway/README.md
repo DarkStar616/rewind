@@ -30,3 +30,22 @@ npm install @agent-rewind/gateway
 
 Requires Node ≥ 20. Licence: **FSL-1.1-ALv2**. See the [monorepo](https://github.com/DarkStar616/rewind)
 for architecture and the full product breakdown.
+
+## Optional encrypted storage foundation
+
+`openSqliteStorage({ directory, tenant, wrappingKey })` opens an asynchronous SQLite worker. Use an
+absolute, dedicated owner-only directory and a 32-byte key supplied by your application; do not put
+keys in request headers, command-line arguments or source control. Values are binary and encrypted;
+namespace names remain public. The optional `better-sqlite3@12.11.1` driver may need a compiler and
+Node headers (Node 20 prebuilt coverage is incomplete). A requested durable open fails if the driver
+cannot load; compatibility installations do not require it.
+
+Use `commit(transactionId, mutations)` for atomic writes, `expectedRevision: null` for absence, or a
+returned revision for compare-and-swap. Reuse the same transaction ID and exact mutations after an
+ambiguous completion; conflicting retries fail. `get` and paginated `scan` exclude expired values.
+`createEncryptedStaging(storage)` adds bounded, ordered encrypted chunks and an explicit seal before
+reading. Schedule `collectExpired()` to remove abandoned/expired stages. Always await `close()`.
+
+This is a storage API foundation, not yet the CLI replay backend. Physical erasure, key rotation,
+transaction-receipt retention and the full packaging/crash-test matrix remain future work. WAL size
+under stalled external readers is not an absolute disk quota. See `docs/STABILITY.md` for the contract.

@@ -69,3 +69,7 @@ export type {
 } from "./analysis.ts";
 export { createFixedTenantResolver, encodeTrustedScope } from "./trusted-scope.ts";
 export type { TrustedScope, ScopeRequest, ScopeResolver } from "./trusted-scope.ts";
+export { openSqliteStorage } from "./storage/sqlite-store.ts";
+export type { SqliteStorageOptions, StorageMutation, StorageValue, StorageCommit, SqliteStorage } from "./storage/sqlite-store.ts";
+export { createEncryptedStaging } from "./storage/encrypted-staging.ts";
+export type { StagingOptions, StagedObject, EncryptedStaging } from "./storage/encrypted-staging.ts";

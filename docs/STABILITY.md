@@ -135,3 +135,30 @@ Omitting the resolver retains legacy caller-selected scope behavior for 1.x cons
 arbitrary-scope listener must never share a store with a trusted listener: its caller could supply a
 serialized trusted tuple. The supported pilot runs one Athena-owned local process/store per tenant;
 this injection seam is not remote authentication or a defense against other local processes.
+
+## v1.1 optional transactional storage
+
+Gateway adds values `openSqliteStorage`, `createEncryptedStaging` and types `SqliteStorageOptions`,
+`StorageMutation`, `StorageValue`, `StorageCommit`, `SqliteStorage`, `StagingOptions`, `StagedObject`,
+`EncryptedStaging`. Legacy stores are unchanged. `better-sqlite3@12.11.1` is an exact optional native
+dependency. Explicit durable opens fail actionably when unavailable; there is no memory fallback.
+
+The asynchronous worker API provides namespaced binary values, bounded scans, atomic mutation batches,
+compare-revision/absence conditions, durable transaction-ID retries, TTL collection and staging. One
+fixed tenant owns each private directory/database. Key labels and values are encrypted before SQL;
+HMAC coordinates, random AES-256-GCM nonces and authenticated schema/tenant/namespace/revision/expiry
+bind rows to their location. A random tenant data key is wrapped using the startup-supplied 32-byte
+key; callers own external key custody. Keep namespace names public, not sensitive content. Returned
+revision numbers are global monotonically increasing database revisions, avoiding ABA after expiry.
+
+SQLite uses WAL, FULL synchronous durability, IMMEDIATE transactions and a five-second busy timeout.
+Queue/value/response limits fail explicitly; database page and logical ciphertext quotas bound normal
+storage. WAL growth with externally stalled readers, transaction-receipt retention, physical erasure,
+key rotation, migration beyond schema 1, corruption recovery, and the complete OS/architecture install
+matrix remain unfinished. TTL means invisible to reads until explicit `collectExpired()` removes
+rows; encrypted historical pages/WAL/backups require later lifecycle handling. `close()` flushes WAL.
+
+Staging stores ordered encrypted chunks under the database quota and a common TTL; incomplete stages
+cannot be read through the staging interface. Sealing authenticates the complete ordered digest.
+Callers must schedule `collectExpired()` after crashes and periodically. Staging is not wired to HTTP
+stream recording yet. Durable replay/event adapters and production receipts remain separate units.
