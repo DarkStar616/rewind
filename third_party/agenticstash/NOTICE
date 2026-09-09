@@ -1,0 +1,43 @@
+@takk/agenticstash
+Copyright 2026 David C Cavalcante
+
+This product includes software developed by David C Cavalcante
+(https://takk.ag, davcavalcante@proton.me / say@takk.ag).
+
+Agentic Stash is a universal, zero-runtime-dependency library and CLI for
+deterministic record and replay of agent runs: it captures every source of
+non-determinism during a run and serves it back on replay, and it can fork a
+run, diff two runs, and seal a run with a tamper-evident integrity digest.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use the software in this repository except in compliance with the License.
+A copy of the License is in the LICENSE file at the root of this repository,
+and is also available at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+────────────────────────────────────────────────────────────────────────────
+THIRD-PARTY COMPONENTS
+────────────────────────────────────────────────────────────────────────────
+
+Agentic Stash has ZERO required runtime dependencies. Its optional peer
+dependencies are sibling @takk packages, resolved only when the matching
+bridge is used. Each is distributed under the Apache License, Version 2.0:
+
+  @takk/alkaline, @takk/keymesh, @takk/modelchain, @takk/behavioralai,
+  @takk/noeticos, @takk/racs, @takk/gaptime, @takk/krikos, @takk/mcpcustoms.
+
+The integrity seal uses the Web Crypto API (crypto.subtle), a platform
+standard available in Node, edge runtimes, and browsers, not a bundled
+dependency. The core pulls in no Node built-in; the CLI uses only node:fs and
+node:process.
+
+Development-only tooling (NOT shipped in the published package):
+
+  tsup: MIT
+  vitest: MIT
+  typescript: Apache-2.0
+  @biomejs/biome: MIT OR Apache-2.0
+  publint: MIT
+  size-limit: MIT
+  @arethetypeswrong/cli: MIT
