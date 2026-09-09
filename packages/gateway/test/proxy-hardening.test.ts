@@ -61,6 +61,63 @@ function post(proxy: RunningProxy, body: unknown, headers: Record<string, string
   });
 }
 
+test("malformed replay records never book credit before a live fallback", async () => {
+  const stub = await startStub({ body: () => JSON.stringify({ type: "message", content: [] }) });
+  const invalid = [
+    { broken: true },
+    { status: 200, contentType: "application/json", bodyBase64: "not base64!" },
+    { status: 500, contentType: "application/json", bodyBase64: Buffer.from('{"type":"message"}').toString("base64") },
+    { status: 200, contentType: "application/json", bodyBase64: Buffer.from('{"type":"error"}').toString("base64") },
+  ];
+  try {
+    for (const response of invalid) {
+      const savings = createMemoryReplaySavings();
+      const store = { get: () => ({ response, usage: { input_tokens: 17 }, model: "m" }), put: () => {} };
+      const proxy = await startProxy({ upstreamBase: stub.base, store, replayer: createReplayer(store, savings) });
+      try {
+        const result = await post(proxy, { model: "m", messages: [] });
+        await result.text();
+        assert.equal(result.headers.get("x-rewind"), "live");
+        assert.equal(savings.total().tokens, 0);
+      } finally { await proxy.close(); }
+    }
+    assert.equal(stub.hits, invalid.length);
+  } finally { await stub.close(); }
+});
+
+test("strict replay rejects a corrupt record without paying upstream", async () => {
+  const stub = await startStub({ body: () => '{"type":"message"}' });
+  const savings = createMemoryReplaySavings();
+  const store = { get: () => ({ response: { broken: true }, usage: { input_tokens: 17 }, model: "m" }), put: () => {} };
+  const proxy = await startProxy({ upstreamBase: stub.base, store, replayer: createReplayer(store, savings, { strict: true }) });
+  try {
+    const result = await post(proxy, { model: "m", messages: [] });
+    await result.text();
+    assert.equal(result.status, 409);
+    assert.equal(stub.hits, 0);
+    assert.equal(savings.total().tokens, 0);
+  } finally { await proxy.close(); await stub.close(); }
+});
+
+test("an accounting sink that writes then throws cannot trigger an upstream call", async () => {
+  const stub = await startStub({ body: () => '{"type":"message"}' });
+  const savings = createMemoryReplaySavings();
+  const store = createMemoryRecordStore();
+  const replayer = createReplayer(store, {
+    total: savings.total,
+    record(saving) { savings.record(saving); throw new Error("simulated post-write failure"); },
+  });
+  const proxy = await startProxy({ upstreamBase: stub.base, store, replayer });
+  try {
+    const body = { model: "m", messages: [] };
+    await (await post(proxy, body)).text();
+    const replay = await post(proxy, body);
+    await replay.text();
+    assert.equal(replay.headers.get("x-rewind"), "replay");
+    assert.equal(stub.hits, 1);
+  } finally { await proxy.close(); await stub.close(); }
+});
+
 // --- isRecordableSuccess unit ---
 
 test("isRecordableSuccess: rejects JSON errors, incomplete/error SSE; accepts complete ones", () => {

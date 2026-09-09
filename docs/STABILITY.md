@@ -110,3 +110,10 @@ Pricing basis/version and evidence/configuration provenance remain visible; mixe
 marked `mixed` and must not be presented as a provider bill. Producers remain responsible for truthful
 measurement/evidence; this pure ledger validates structure and arithmetic, not provider authenticity.
 Durable transactional integration, event production and CLI/MCP receipts are pending U21.
+# v1.1 replay preparation
+
+`Replayer.prepare` is an additive, optional side-effect-free lookup with transport validation and
+an idempotent deferred `commit`. The shipped proxy uses it to validate a complete HTTP record before
+crediting avoidance. `handle` keeps its existing immediate, content-addressed accounting contract.
+Consumer-supplied legacy replayers without `prepare` still own their accounting side effects; use
+the preparation contract for validated transport accounting.

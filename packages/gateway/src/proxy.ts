@@ -19,7 +19,7 @@
  *   - **No filesystem / clock of its own.** Records live in the injected store; savings in the injected
  *     sink. Swap either for a durable backend without touching this file.
  */
-import { createServer, request as httpRequest, type IncomingHttpHeaders, type Server } from "node:http";
+import { createServer, request as httpRequest, validateHeaderValue, type IncomingHttpHeaders, type Server } from "node:http";
 import { request as httpsRequest } from "node:https";
 
 import type { RecordStore, RecordedCall } from "./record-store.ts";
@@ -40,6 +40,23 @@ export interface RecordedHttpResponse {
   status: number;
   contentType: string;
   bodyBase64: string;
+}
+
+/** Validate transport bytes and terminal success before any avoidance is credited. */
+function validHttpRecord(record: RecordedCall, adapter: ProviderAdapter): boolean {
+  const rec = record.response as RecordedHttpResponse | undefined;
+  if (!rec || !Number.isInteger(rec.status) || rec.status < 200 || rec.status >= 300 ||
+      typeof rec.contentType !== "string" || typeof rec.bodyBase64 !== "string") return false;
+  try {
+    validateHeaderValue("content-type", rec.contentType);
+    const bytes = Buffer.from(rec.bodyBase64, "base64");
+    if (bytes.toString("base64") !== rec.bodyBase64) return false;
+    const counts = [record.usage?.input_tokens, record.usage?.output_tokens,
+      record.usage?.cache_read_input_tokens, record.usage?.cache_creation_input_tokens].map((n) => n ?? 0);
+    if (!counts.every((n) => Number.isSafeInteger(n) && n >= 0) ||
+        !Number.isSafeInteger(counts.reduce((a, b) => a + b, 0))) return false;
+    return adapter.isRecordableSuccess(bytes, rec.contentType);
+  } catch { return false; }
 }
 
 export interface ProxyOptions {
@@ -199,7 +216,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         const scope = (Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw) || "default";
         let parsed: Record<string, unknown> | undefined;
         let pruned = false; // did deterministic pruning change the body? (then forward the pruned bytes)
-        let decision: { served: "replay" | "live"; keyed: string; response?: unknown } | undefined;
+        let decision: { served: "replay" | "live"; keyed: string; response?: unknown; commit?: () => void } | undefined;
         try {
           parsed = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
           // Deterministic context pruning BEFORE keying, so the key reflects what the model actually
@@ -219,7 +236,9 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           // against a DIFFERENT upstream — two OpenAI-compatible vendors both speak /v1/chat/completions
           // with identical bodies, and that must be a miss, never a cross-provider false hit. The
           // replayer strips the query (auth material) itself.
-          decision = options.replayer.handle(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url));
+          decision = options.replayer.prepare
+            ? options.replayer.prepare(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url), (record) => validHttpRecord(record, adapter))
+            : options.replayer.handle(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url));
         } catch (err) {
           // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
           // NOT fall through to a paid upstream forward. Surface it; forward only on real parse faults.
@@ -243,6 +262,10 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
               "content-length": String(body.length),
               "x-rewind": "replay",
             });
+            // The upstream branch is now irrevocably skipped. Accounting failure must not send a
+            // paid request after a sink may already have persisted avoidance.
+            try { decision.commit?.(); }
+            catch { log("proxy: replay accounting failed; upstream remains skipped"); }
             res.end(body);
             log(`proxy: REPLAY scope=${scope} key=${decision.keyed.slice(0, 12)} (0 upstream tokens)`);
             return;
