@@ -1,8 +1,12 @@
 # Upstream source import staging
 
 These are pinned, unmodified Apache-2.0 source snapshots for the requested Rewind
-integrations. **They are review material, not enabled runtime features.** Their
-presence does not mean Bifrost, Headroom or agenticstash is running inside Rewind.
+integrations. The archives are review material, not standalone runtime dependencies. Their
+presence does not mean any complete upstream stack is running inside Rewind.
+The first selectively adapted feature is Headroom-derived prefix comparison in
+`packages/mcp/src/prefix-compare.ts`, exposed by `cache-compare`; its published
+license/notice copies live in `packages/mcp/third_party/headroom/`. All other
+integration work remains as described in the roadmap.
 
 `manifest.json` records repository URLs, full commit IDs, every selected source
 file's SHA-256 and each archive's SHA-256. `sources.tar.gz` contains original

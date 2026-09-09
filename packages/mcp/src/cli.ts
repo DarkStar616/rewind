@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { compareRequestFiles } from "./cache-compare.ts";
 import { analyzeInput } from "./analyze-input.ts";
 import { mcpProfile, parseMcpProfile } from "./mcp-profile.ts";
 /**
@@ -39,7 +40,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
-  "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
+  "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | cache-compare <previous.json> <current.json> | prune <json> | " +
   "analyze (--file <path>|--stdin|<json>) [--ndjson] [--legacy-json] | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
@@ -234,6 +235,10 @@ async function main(): Promise<number> {
   if (!cmd || cmd === "-h" || cmd === "--help") {
     errline(USAGE);
     return cmd ? 0 : 1;
+  }
+  if (cmd === "cache-compare") {
+    out(await compareRequestFiles(rest));
+    return 0;
   }
   return run(cmd, rest, buildEngine(cwd()));
 }

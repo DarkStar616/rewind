@@ -29,7 +29,8 @@
   "files": [
     "dist",
     "dist-plugin",
-    "README.md"
+    "README.md",
+    "third_party"
   ],
   "publishConfig": {
     "access": "public"

@@ -1,6 +1,6 @@
 {
   "schema": "rewind.oss-import/v1",
-  "status": "review snapshots; not production-integrated",
+  "status": "pinned reference snapshots; selective runtime adaptations listed per project",
   "projects": [
     {
       "name": "bifrost",
@@ -186,7 +186,15 @@
         }
       ],
       "archive": "sources.tar.gz",
-      "archiveSha256": "d4f750cca5d0ad224347d55ddbe0b503e359bded68bd9009822b4567166c6f88"
+      "archiveSha256": "d4f750cca5d0ad224347d55ddbe0b503e359bded68bd9009822b4567166c6f88",
+      "integrations": [
+        {
+          "source": "headroom/cache/prefix_tracker.py",
+          "target": "packages/mcp/src/prefix-compare.ts",
+          "mode": "modified TypeScript adaptation; advisory only",
+          "entrypoint": "agent-rewind cache-compare"
+        }
+      ]
     },
     {
       "name": "agenticstash",

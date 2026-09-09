@@ -225,3 +225,26 @@ count as replay opportunities. Invalid token counts and counter overflow are rej
 `--legacy-json` explicitly includes the previous redacted sample and scope breakdown;
 review captured content before sharing that expanded report. Errors contain bounded
 reasons and source byte counts/hashes, without request excerpts or filesystem paths.
+
+### Compare two requests' cache prefixes (v1.1 development)
+
+Save consecutive messages-style request bodies as JSON, then run:
+
+```sh
+agent-rewind cache-compare previous.json current.json
+```
+
+The compact report identifies unchanged history, appended messages, appended
+content blocks, or divergence and gives a recommendation. `firstChangedPath`
+points to the relevant message/block or request settings. Prompts and responses
+are not printed. No model call or workspace initialization occurs.
+
+This is a conservative content comparison adapted from Headroom, not proof of a
+provider cache hit. All request settings remain significant; object property
+order is ignored. Inputs must be regular UTF-8 JSON files, no more than 2 MiB each,
+with message arrays. Responses `input`-style bodies are not yet supported by this
+command. Invalid or oversized inputs exit 1 with an actionable error.
+
+In a source checkout before release, use `node packages/mcp/dist/cli.js` in place
+of `agent-rewind` after `npm run build`. Apache-2.0 attribution is shipped under
+`third_party/headroom/` in the MCP package.
