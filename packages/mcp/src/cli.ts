@@ -29,6 +29,7 @@ import {
   attestAnalysis,
   type AnalyzedCall,
 } from "@agent-rewind/gateway";
+import { parseGatewayConfig, gatewayManifest } from "./gateway-config.ts";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
 import { runStdioServer } from "./server.ts";
@@ -37,10 +38,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
-  "analyze <json> | gateway [--port <n>] [--upstream <url>] | mcp>";
-
-const DEFAULT_GATEWAY_PORT = 8788;
-const DEFAULT_UPSTREAM = "https://api.anthropic.com";
+  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -67,20 +65,6 @@ function parseSavingsFlags(args: readonly string[]): { scope?: string; since?: s
     else if (scope === undefined && !a.startsWith("-")) scope = a; // tolerate a bare positional scope
   }
   return { scope, since, json };
-}
-
-/** Parse the `gateway` subcommand flags: `--port <n>`, `--upstream <url>` (order-free). */
-function parseGatewayFlags(args: readonly string[]): { port: number; upstream: string } {
-  let port = DEFAULT_GATEWAY_PORT;
-  let upstream = DEFAULT_UPSTREAM;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--port") port = Number(args[++i]);
-    else if (a.startsWith("--port=")) port = Number(a.slice("--port=".length));
-    else if (a === "--upstream") upstream = args[++i];
-    else if (a.startsWith("--upstream=")) upstream = a.slice("--upstream=".length);
-  }
-  return { port, upstream };
 }
 
 function buildEngine(workdir: string): Engine {
@@ -220,19 +204,21 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       return 0;
     }
     case "gateway": {
+      if (rest.length === 1 && (rest[0] === "--help" || rest[0] === "-h")) {
+        errline(USAGE);
+        return 0;
+      }
       // The token-saving proxy. Point your agent's ANTHROPIC_BASE_URL at it: a byte-equivalent
       // request after a rewind is served from the record with zero upstream call, and the avoided
       // cost is booked to the SAME durable savings file `rewind savings` reads. Records live in
       // memory for this gateway session; the savings number persists across processes.
-      const { port, upstream } = parseGatewayFlags(rest);
-      if (!Number.isInteger(port) || port < 0 || port > 65535) {
-        errline(`gateway: --port must be an integer 0-65535, got ${JSON.stringify(port)}`);
-        return 1;
-      }
+      const config = parseGatewayConfig(rest, process.env);
+      const { port, upstream, preserveCache, pruneContext } = config;
       const savings = createFileReplaySavings({ path: join(cwd(), ".rewind", "savings.json") });
       const store = createMemoryRecordStore();
       const replayer = createReplayer(store, savings);
-      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, log: (m) => errline(m) });
+      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, preserveCache, pruneContext, log: (m) => errline(m) });
+      errline(`gateway configuration ${JSON.stringify(gatewayManifest(config))}`);
       errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
       errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
       errline("replays after a rewind cost 0 upstream tokens; run `rewind savings` to see the total. Ctrl-C to stop.");

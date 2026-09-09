@@ -86,25 +86,51 @@ an explicit checkpoint-id handle, and all durable state lives under `.rewind/` i
 ```
 agent-rewind checkpoint [label] | list | rewind <id> | replay <id> | guard <json>
        | savings [--json] | cache-report <json> | prune <json> | analyze <json>
-       | gateway [--port <n>] [--upstream <url>] | mcp
+       | gateway [--port <n>] [--upstream <url>] [--profile compat|lean]
+       [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context]
+       [--config <path>] | mcp
 ```
 
 A refused `guard` exits **2**, so a `PreToolUse` hook can block the offending tool call.
 
 ## Token-saving proxy (optional)
 
-Point your agent's base URL at the local gateway (`agent-rewind gateway`) and it saves tokens three
-ways — all priced from the provider's *own* usage numbers, floored so they never over-count. It works
-with **Anthropic**, **OpenAI**, **Google Gemini**, and any **OpenAI-compatible** provider (Kimi /
-Moonshot, DeepSeek, Together, Fireworks, Groq, OpenRouter, Nebius, xAI, vLLM, Ollama, …) — the provider
-is auto-detected from the request, or pinned explicitly.
+The default `agent-rewind gateway` preserves the existing request-body behavior (`compat`).
+Enable the existing Anthropic cache planner and duplicate tool-result pruning explicitly:
 
-- **Exact record/replay** — a **byte-identical** request (common after a rewind or a retry) is served
-  from the local record with **zero** upstream call; the saving is that whole call. Correctness-safe by
-  design: only byte-for-byte-equivalent requests replay, so it never serves a subtly-wrong answer.
-- **Prompt-cache preservation** — injects/keeps one `cache_control` breakpoint on the static prefix
-  (system prompt + tools) so it's re-read at ~1/10th the input price instead of full price each turn.
-- **Deterministic pruning** — collapses duplicate tool-output blocks losslessly, sending fewer tokens.
+```bash
+agent-rewind gateway --profile lean --prune-context
+# Immediate opt-out on the next startup:
+agent-rewind gateway --no-preserve-cache --no-prune-context
+```
+
+`lean` enables cache preservation; pruning remains opt-in because it changes model-visible content.
+`--preserve-cache` enables the cache planner independently of the profile. The gateway prints its
+active configuration and capability limits to stderr before its listening address. `max` fails with
+an actionable message until observation retrieval and its shaping guarantees are implemented.
+
+| Mechanism | Current behavior |
+| --- | --- |
+| Exact record/replay | Reuses recorded equivalent requests without an upstream call. Records are currently in memory and are cleared on restart; replay savings persist. |
+| Cache preservation | Adds an Anthropic prefix breakpoint when the client supplies none; other providers are skipped. Provider policy and usage determine the actual benefit. |
+| Pruning | Collapses repeated Anthropic-format tool results, preserving the first full result. Other formats are skipped. |
+
+The savings receipt currently reports replay savings only. Enabling cache/pruning does not yet add
+separate dollar attribution to that receipt. Pruning can reduce request size without reducing the
+provider bill; assess paired task outcomes and billed cost before enabling it broadly.
+
+Configuration precedence is profile defaults, file overrides, environment, then explicit CLI flags.
+Duplicate/conflicting CLI flags, unknown options, missing values and invalid configuration fail at
+startup. Use `--config gateway.json` (or `REWIND_CONFIG`) with this JSON shape:
+
+```json
+{"profile":"lean","port":8788,"upstream":"https://api.anthropic.com","pruneContext":false}
+```
+
+File fields are `profile`, `port`, `upstream`, `preserveCache`, and `pruneContext`. Their environment
+equivalents are `REWIND_PROFILE`, `REWIND_PORT`, `REWIND_UPSTREAM`, `REWIND_PRESERVE_CACHE`, and
+`REWIND_PRUNE_CONTEXT`. Boolean environment values must be exactly `true` or `false`. Supply provider
+authentication in request headers; upstream URLs must use a root path and cannot contain credentials, query strings or fragments.
 
 How many **tokens** a rewind recovers depends on **how late the run failed** (Benchmark B,
 deterministic): **9.1%** for an early failure → **41.2%** for a late one (step 8 of 10). It's a curve,
