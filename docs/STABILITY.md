@@ -65,7 +65,7 @@ Values (runtime):
 `ADAPTERS`, `DEFAULT_PRICE_TABLE`, `DEFAULT_REDACTORS`, `DROP`, `NOISE_FIELDS`,
 `StrictReplayMissError`, `analyzeCacheHygiene`, `analyzeTraffic`, `anthropicAdapter`,
 `attestAnalysis`, `avoidedCostMicros`, `billableSavedTokens`, `canonicalizeRequest`,
-`createMemoryRecordStore`, `createReplayer`, `divergeMessages`, `extractUsage`,
+`createFixedTenantResolver`, `encodeTrustedScope`, `createMemoryRecordStore`, `createReplayer`, `divergeMessages`, `extractUsage`,
 `extractUsageFor`, `geminiAdapter`, `hasCacheControl`, `isRecordableSuccessFor`,
 `meterAvoidance`, `meterCachePreservation`, `normalizeUsage`, `openAiUsageFetcher`, `openaiAdapter`,
 `pickUsageFields`, `planCacheBreakpoints`, `pruneToolOutputs`, `reconcileAgainstProviderBill`,
@@ -92,6 +92,8 @@ TypeScript export set: the MCP tool contract (`checkpoint`, `list`, `rewind`, `r
 by `packages/mcp/test/e2e-stdio.test.ts` and the server/CLI suites. The MCP tool names and their
 input/output handle shapes follow the same semver discipline as the library surfaces above.
 
+Gateway v1.1 additionally exports types `TrustedScope`, `ScopeRequest`, and `ScopeResolver`.
+
 ## Additive v1.1 mechanism measurements
 
 `createMemoryMechanismLedger` adds the pure `rewind.mechanism/v1` event contract. It does not replace
@@ -117,3 +119,19 @@ an idempotent deferred `commit`. The shipped proxy uses it to validate a complet
 crediting avoidance. `handle` keeps its existing immediate, content-addressed accounting contract.
 Consumer-supplied legacy replayers without `prepare` still own their accounting side effects; use
 the preparation contract for validated transport accounting.
+
+## v1.1 trusted local scope
+
+`ProxyOptions.resolveScope` injects an application-owned tenant/scope decision before optimization.
+`createFixedTenantResolver` binds tenant identity to process configuration and validates caller-selected
+subscopes; it never reads a tenant header. IDs are 1–128 ASCII letters/digits or `. _ : / -`, starting
+with a letter/digit. `encodeTrustedScope` serializes a tuple, avoiding delimiter ambiguity.
+
+Unresolved identity returns a generic 403. Explicit `scopeFailure: "passthrough"` forwards original
+bytes without replay, cache mutation, pruning, recording or savings. Both paths strip all `x-rewind-*`
+headers and the configured scope header from upstream traffic, including non-model endpoints.
+
+Omitting the resolver retains legacy caller-selected scope behavior for 1.x consumers. A legacy
+arbitrary-scope listener must never share a store with a trusted listener: its caller could supply a
+serialized trusted tuple. The supported pilot runs one Athena-owned local process/store per tenant;
+this injection seam is not remote authentication or a defense against other local processes.

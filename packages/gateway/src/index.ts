@@ -67,3 +67,5 @@ export type {
   AnalyzeOptions,
   AttestedAnalysis,
 } from "./analysis.ts";
+export { createFixedTenantResolver, encodeTrustedScope } from "./trusted-scope.ts";
+export type { TrustedScope, ScopeRequest, ScopeResolver } from "./trusted-scope.ts";

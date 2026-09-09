@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 import type { Engine, ExternalEffect } from "@agent-rewind/core";
 import {
+  createFixedTenantResolver,
   createMemoryRecordStore,
   createReplayer,
   startProxy,
@@ -38,7 +39,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
-  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp>";
+  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -217,7 +218,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       const savings = createFileReplaySavings({ path: join(cwd(), ".rewind", "savings.json") });
       const store = createMemoryRecordStore();
       const replayer = createReplayer(store, savings);
-      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, preserveCache, pruneContext, log: (m) => errline(m) });
+      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, preserveCache, pruneContext, resolveScope: config.tenant === undefined ? undefined : createFixedTenantResolver(config.tenant), log: (m) => errline(m) });
       errline(`gateway configuration ${JSON.stringify(gatewayManifest(config))}`);
       errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
       errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);

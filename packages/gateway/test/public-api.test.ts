@@ -57,8 +57,10 @@ const FROZEN = [
   "ProviderUsage", "ProviderUsageFetcher", "ProxyOptions", "PruneOptions", "PruneResult",
   "ReconciliationReport", "RecordKey", "RecordStore", "RecordedCall", "RecordedHttpResponse",
   "RedactContext", "RedactFn", "ReplayOutcome", "ReplayOutcomeLive", "ReplayOutcomeReplay", "Replayer",
+  "TrustedScope", "ScopeRequest", "ScopeResolver",
   "ReplayerOptions", "RunningProxy", "SavingsAnalysis", "ScopeAnalysis", "StrictReplayMissError",
   "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "createFixedTenantResolver", "encodeTrustedScope",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
   "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage",
@@ -74,6 +76,7 @@ const FROZEN = [
 const FROZEN_VALUES = [
   "ADAPTERS", "DEFAULT_PRICE_TABLE", "DEFAULT_REDACTORS", "DROP", "NOISE_FIELDS", "StrictReplayMissError",
   "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "createFixedTenantResolver", "encodeTrustedScope",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
   "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage",

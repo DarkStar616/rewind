@@ -45,3 +45,11 @@ test("explicit config files are read strictly, without exposing invalid contents
     assert.throws(() => parseGatewayConfig([], { REWIND_CONFIG: path }), { message: "gateway: config file must be readable JSON" });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+
+test("fixed tenant resolves through config, environment and CLI; invalid identity fails", () => {
+  assert.equal(parseGatewayConfig(["--tenant", "cli"], { REWIND_TENANT: "env" }, { tenant: "file" }).tenant, "cli");
+  assert.equal(parseGatewayConfig([], { REWIND_TENANT: "env" }, { tenant: "file" }).tenant, "env");
+  assert.equal(parseGatewayConfig([], {}, { tenant: "file" }).tenant, "file");
+  for (const tenant of ["", "bad tenant", "x".repeat(129), null]) assert.throws(() => parseGatewayConfig([], {}, { tenant }));
+});

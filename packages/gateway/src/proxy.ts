@@ -22,6 +22,7 @@
 import { createServer, request as httpRequest, validateHeaderValue, type IncomingHttpHeaders, type Server } from "node:http";
 import { request as httpsRequest } from "node:https";
 
+import { encodeTrustedScope, type ScopeResolver } from "./trusted-scope.ts";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
 import { StrictReplayMissError } from "./replay.ts";
@@ -79,6 +80,10 @@ export interface ProxyOptions {
   provider?: ProviderAdapter["id"];
   /** Header naming the isolation scope for records. Default "x-rewind-scope"; absent → "default". */
   scopeHeader?: string;
+  /** Trusted application/process identity. Omit only for legacy single-trust-domain compatibility. */
+  resolveScope?: ScopeResolver;
+  /** Unresolved identity refuses by default; explicit passthrough performs no optimization or credit. */
+  scopeFailure?: "refuse" | "passthrough";
   /**
    * Opt-in (default false): when the agent set NO cache_control, inject one ephemeral breakpoint on
    * the static prefix (tools/system) before forwarding, so the provider caches it. Departs from strict
@@ -119,10 +124,11 @@ const HOP_BY_HOP = new Set([
   "host",
 ]);
 
-function forwardableRequestHeaders(headers: IncomingHttpHeaders, bodyLen: number): Record<string, string> {
+function forwardableRequestHeaders(headers: IncomingHttpHeaders, bodyLen: number, scopeHeader: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) {
     if (v === undefined) continue;
+    if (k.toLowerCase().startsWith("x-rewind-") || k.toLowerCase() === scopeHeader) continue;
     if (HOP_BY_HOP.has(k.toLowerCase())) continue;
     if (k.toLowerCase() === "accept-encoding") continue; // overridden below
     out[k] = Array.isArray(v) ? v.join(", ") : v;
@@ -161,6 +167,7 @@ function readBody(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
+  if (options.scopeFailure !== undefined && !["refuse", "passthrough"].includes(options.scopeFailure)) throw new Error("invalid scope failure policy");
   const messagesPath = options.messagesPath ?? "/v1/messages";
   const scopeHeader = (options.scopeHeader ?? "x-rewind-scope").toLowerCase();
   const log = options.log ?? (() => {});
@@ -176,6 +183,23 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
     });
 
     async function handle(): Promise<void> {
+      const scopeRaw = req.headers[scopeHeader];
+      let scope = (Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw) || "default";
+      if (options.resolveScope) {
+        try {
+          scope = encodeTrustedScope(await options.resolveScope({ headers: req.headers, method: req.method, url: req.url }));
+        } catch {
+          log("proxy: trusted scope unresolved");
+          if (options.scopeFailure === "passthrough") {
+            await forward(await readBody(req), undefined);
+          } else {
+            req.resume();
+            res.writeHead(403, { "content-type": "application/json", "x-rewind": "scope-refused" });
+            res.end(JSON.stringify({ error: { type: "rewind_scope_unresolved", message: "trusted scope required" } }));
+          }
+          return;
+        }
+      }
       const rawBody = await readBody(req);
       // Pick the provider adapter for this request. Precedence, in order:
       //   1. An explicit `options.provider` pin wins outright — its adapter is used when it path-matches;
@@ -212,8 +236,6 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
       // Decide replay ONLY for a recordable model endpoint, and only when the body parses. Any failure
       // here falls through to a plain forward — Rewind never blocks a call it cannot help.
       if (adapter) {
-        const scopeRaw = req.headers[scopeHeader];
-        const scope = (Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw) || "default";
         let parsed: Record<string, unknown> | undefined;
         let pruned = false; // did deterministic pruning change the body? (then forward the pruned bytes)
         let decision: { served: "replay" | "live"; keyed: string; response?: unknown; commit?: () => void } | undefined;
@@ -368,7 +390,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             port: upstream.port || (upstream.protocol === "https:" ? 443 : 80),
             method: req.method,
             path: req.url,
-            headers: forwardableRequestHeaders(req.headers, rawBody.length),
+            headers: forwardableRequestHeaders(req.headers, rawBody.length, scopeHeader),
           },
           (upRes) => {
             const status = upRes.statusCode ?? 502;

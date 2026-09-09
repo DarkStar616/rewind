@@ -1,14 +1,16 @@
+import { createFixedTenantResolver } from "@agent-rewind/gateway";
 import { readFileSync } from "node:fs";
 
 export interface GatewayConfig {
+  tenant?: string;
   port: number;
   upstream: string;
   profile: "compat" | "lean";
   preserveCache: boolean;
   pruneContext: boolean;
 }
-const FIELDS = ["port", "upstream", "profile", "preserveCache", "pruneContext"] as const;
-const ENV_FIELDS = ["REWIND_PORT", "REWIND_UPSTREAM", "REWIND_PROFILE", "REWIND_PRESERVE_CACHE", "REWIND_PRUNE_CONTEXT"] as const;
+const FIELDS = ["port", "upstream", "profile", "preserveCache", "pruneContext", "tenant"] as const;
+const ENV_FIELDS = ["REWIND_PORT", "REWIND_UPSTREAM", "REWIND_PROFILE", "REWIND_PRESERVE_CACHE", "REWIND_PRUNE_CONTEXT", "REWIND_TENANT"] as const;
 
 /** Strict, explicit opt-in: profile defaults < file overrides < environment < CLI. */
 export function parseGatewayConfig(
@@ -25,7 +27,7 @@ export function parseGatewayConfig(
       "--preserve-cache": ["preserveCache", true], "--no-preserve-cache": ["preserveCache", false],
       "--prune-context": ["pruneContext", true], "--no-prune-context": ["pruneContext", false],
     };
-    const names: Record<string, string> = { "--port": "port", "--upstream": "upstream", "--profile": "profile", "--config": "config" };
+    const names: Record<string, string> = { "--port": "port", "--upstream": "upstream", "--profile": "profile", "--config": "config", "--tenant": "tenant" };
     const toggle = Object.hasOwn(switches, flag) ? switches[flag] : undefined;
     const key = toggle?.[0] ?? (Object.hasOwn(names, flag) ? names[flag] : undefined);
     if (!key) throw new Error("gateway: unknown option (see --help)");
@@ -73,12 +75,14 @@ export function parseGatewayConfig(
     if (value === false || value === "false") return false;
     throw new Error(`gateway: ${key} must be true or false`);
   };
-  return { port: Number(port), upstream: upstream as string, profile, preserveCache: boolean("preserveCache", profile === "lean"), pruneContext: boolean("pruneContext", false) };
+  if (values.tenant !== undefined) createFixedTenantResolver(values.tenant as string);
+  return { ...(values.tenant === undefined ? {} : { tenant: values.tenant as string }), port: Number(port), upstream: upstream as string, profile, preserveCache: boolean("preserveCache", profile === "lean"), pruneContext: boolean("pruneContext", false) };
 }
 
 export function gatewayManifest(config: GatewayConfig): unknown {
   return {
     schema: "rewind.gateway-config/v1", profile: config.profile,
+    identity: config.tenant === undefined ? { mode: "legacy-caller-scope" } : { mode: "fixed-local-tenant", tenant: config.tenant },
     preserveCache: config.preserveCache, pruneContext: config.pruneContext,
     capabilities: {
       preserveCache: { available: true, providers: ["anthropic"], otherProviders: "skipped" },

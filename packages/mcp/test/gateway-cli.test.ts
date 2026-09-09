@@ -12,6 +12,7 @@ const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 
 for (const variant of [
   { name: "activation", flags: ["--preserve-cache", "--prune-context"], active: true },
+  { name: "fixed tenant", flags: ["--tenant", "athena"], active: false },
   { name: "compatibility", flags: [], active: false },
   { name: "kill switches", flags: ["--profile", "lean", "--no-preserve-cache", "--no-prune-context"], active: false },
 ]) test(`gateway CLI ${variant.name}: upstream bytes and active manifest`, { timeout: 15000 }, async () => {
@@ -58,6 +59,12 @@ for (const variant of [
       assert.equal(receivedRaw, JSON.stringify(requestBody, null, 2));
       assert.match(stderr, /"preserveCache":false/);
       assert.match(stderr, /"pruneContext":false/);
+    }
+    if (variant.name === "fixed tenant") {
+      assert.match(stderr, /"tenant":"athena"/);
+      const refused = await fetch(`${url}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", "x-rewind-scope": "" }, body: JSON.stringify(requestBody) });
+      await refused.text();
+      assert.equal(refused.status, 403, "CLI tenant configuration must install the resolver");
     }
   } finally {
     child.kill("SIGTERM");

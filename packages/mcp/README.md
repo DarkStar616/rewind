@@ -86,7 +86,7 @@ an explicit checkpoint-id handle, and all durable state lives under `.rewind/` i
 ```
 agent-rewind checkpoint [label] | list | rewind <id> | replay <id> | guard <json>
        | savings [--json] | cache-report <json> | prune <json> | analyze <json>
-       | gateway [--port <n>] [--upstream <url>] [--profile compat|lean]
+       | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>]
        [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context]
        [--config <path>] | mcp
 ```
@@ -119,6 +119,12 @@ The savings receipt currently reports replay savings only. Enabling cache/prunin
 separate dollar attribution to that receipt. Pruning can reduce request size without reducing the
 provider bill; assess paired task outcomes and billed cost before enabling it broadly.
 
+For an Athena-managed tenant, run `agent-rewind gateway --tenant datami --profile lean` in that
+tenant's own working directory/process. The fixed tenant comes from configuration, never an HTTP
+header; `x-rewind-scope` selects only a validated subordinate scope. Invalid identity returns 403.
+Use one process/store per tenant and never share its store with a legacy gateway. This loopback
+configuration is not a remotely authenticated service. All `x-rewind-*` headers are stripped upstream.
+
 Configuration precedence is profile defaults, file overrides, environment, then explicit CLI flags.
 Duplicate/conflicting CLI flags, unknown options, missing values and invalid configuration fail at
 startup. Use `--config gateway.json` (or `REWIND_CONFIG`) with this JSON shape:
@@ -127,9 +133,9 @@ startup. Use `--config gateway.json` (or `REWIND_CONFIG`) with this JSON shape:
 {"profile":"lean","port":8788,"upstream":"https://api.anthropic.com","pruneContext":false}
 ```
 
-File fields are `profile`, `port`, `upstream`, `preserveCache`, and `pruneContext`. Their environment
+File fields are `profile`, `port`, `upstream`, `preserveCache`, `pruneContext`, and `tenant`. Their environment
 equivalents are `REWIND_PROFILE`, `REWIND_PORT`, `REWIND_UPSTREAM`, `REWIND_PRESERVE_CACHE`, and
-`REWIND_PRUNE_CONTEXT`. Boolean environment values must be exactly `true` or `false`. Supply provider
+`REWIND_PRUNE_CONTEXT`; `tenant` uses `REWIND_TENANT`. Boolean environment values must be exactly `true` or `false`. Supply provider
 authentication in request headers; upstream URLs must use a root path and cannot contain credentials, query strings or fragments.
 
 The executable nine-call mock benchmark reports **28.08% simulated cost savings**, with three
