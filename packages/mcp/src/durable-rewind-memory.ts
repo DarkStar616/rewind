@@ -43,7 +43,7 @@ export function createFileRewindMemory(opts: FileRewindMemoryOptions): RewindMem
   }
 
   function load(): PersistShape {
-    if (!existsSync(path)) return { version: 1, byScope: {} };
+    if (!existsSync(path)) return { version: 1, byScope: Object.create(null) };
     let parsed: unknown;
     try {
       parsed = JSON.parse(readFileSync(path, "utf8"));
@@ -54,11 +54,11 @@ export function createFileRewindMemory(opts: FileRewindMemoryOptions): RewindMem
       );
     }
     const raw = (parsed as { byScope?: unknown })?.byScope;
-    const byScope: Record<string, Record<string, AttemptRecord>> = {};
+    const byScope: Record<string, Record<string, AttemptRecord>> = Object.create(null);
     if (raw && typeof raw === "object") {
       for (const [scope, entries] of Object.entries(raw as Record<string, unknown>)) {
         if (!entries || typeof entries !== "object") continue;
-        const clean: Record<string, AttemptRecord> = {};
+        const clean: Record<string, AttemptRecord> = Object.create(null);
         for (const [key, rec] of Object.entries(entries as Record<string, unknown>)) {
           // Drop any record with a non-numeric seq — it can never be a valid allocation key and would
           // poison Math.max() into NaN. Fail SOFT on a single bad record rather than bricking the store.
@@ -87,7 +87,7 @@ export function createFileRewindMemory(opts: FileRewindMemoryOptions): RewindMem
   return {
     record(a: AttemptRecord): void {
       const shape = load();
-      const scopeMap = shape.byScope[a.scope] ?? (shape.byScope[a.scope] = {});
+      const scopeMap = shape.byScope[a.scope] ?? (shape.byScope[a.scope] = Object.create(null));
       const key = String(a.seq);
       if (scopeMap[key]) return; // first write wins
       scopeMap[key] = { ...a };
