@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { mcpProfile, parseMcpProfile } from "./mcp-profile.ts";
 /**
  * `rewind` — the universal terminal floor over the @agent-rewind/core engine.
  *
@@ -39,7 +40,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
-  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp>";
+  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -238,8 +239,9 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       // Launch the stdio MCP server over the same workspace. It owns its own engine (built from the
       // durable store), so the throwaway `engine` above is unused here. Resolves when the client
       // closes the pipe (stdin ends); until then the process stays alive serving JSON-RPC on stdout.
-      errline("starting the stdio MCP server (five tools: checkpoint, list, rewind, replay, guard_effect)");
-      await runStdioServer({ cwd: cwd(), log: (m) => errline(m) });
+      const profile = parseMcpProfile(rest, process.env);
+      errline(`MCP configuration ${JSON.stringify(mcpProfile(profile))}`);
+      await runStdioServer({ cwd: cwd(), profile, log: (m) => errline(m) });
       return 0;
     }
     default: {

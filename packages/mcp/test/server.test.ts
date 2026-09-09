@@ -66,10 +66,9 @@ test("MCP server exposes the five MVP tools plus the Slice 1.5 savings receipt",
         "rewind",
         "savings",
       ]);
-      // The honesty line (Tier-0 = reversibility, not isolation) must ride on the tool descriptions.
-      const rewindTool = tools.find((t) => t.name === "rewind");
-      assert.ok(rewindTool?.description && /reversibility/i.test(rewindTool.description));
-      assert.ok(rewindTool?.description && /not.*(isolation|security)/i.test(rewindTool.description));
+      // Honesty belongs once in server instructions, rather than repeated in every tool schema.
+      assert.match(client.getInstructions() ?? "", /reversibility.*not.*isolation.*security/i);
+
     } finally {
       await close();
     }

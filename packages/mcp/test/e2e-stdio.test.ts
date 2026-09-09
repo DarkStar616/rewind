@@ -43,10 +43,10 @@ before(() => {
 }, { timeout: 120_000 });
 
 /** Spawn the built server for `cwd` and connect a real MCP client over stdio. */
-async function connectStdio(cwd: string): Promise<{ client: Client; close: () => Promise<void> }> {
+async function connectStdio(cwd: string, profile?: string): Promise<{ client: Client; close: () => Promise<void> }> {
   const transport = new StdioClientTransport({
     command: execPath, // the same node running the test — not a PATH lookup
-    args: [SERVER_BIN, "mcp"],
+    args: [SERVER_BIN, "mcp", ...(profile ? ["--profile", profile] : [])],
     cwd, // the server snapshots/guards its process cwd; point it at the temp workspace
     stderr: "ignore",
   });
@@ -63,6 +63,20 @@ async function connectStdio(cwd: string): Promise<{ client: Client; close: () =>
 let dir: string;
 after(async () => {
   if (dir) await rm(dir, { recursive: true, force: true });
+});
+
+test("stdio e2e: built CLI selects lean tools and creates a checkpoint", { timeout: 60_000 }, async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "rewind-e2e-lean-"));
+  try {
+    await writeFile(join(workspace, "a.txt"), "profile checkpoint");
+    const { client, close } = await connectStdio(workspace, "lean");
+    try {
+      assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name).sort(), ["checkpoint", "guard_effect", "rewind"]);
+      const result = await client.callTool({ name: "checkpoint", arguments: { label: "lean" } });
+      assert.equal(result.isError, undefined);
+      assert.match(String((result.structuredContent as { id?: unknown } | undefined)?.id), /^[a-f0-9]{40}$/);
+    } finally { await close(); }
+  } finally { await rm(workspace, { recursive: true, force: true }); }
 });
 
 test("stdio e2e: initialize → tools/list surfaces the eight tools", { timeout: 60_000 }, async () => {

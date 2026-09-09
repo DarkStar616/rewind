@@ -22,6 +22,7 @@
  * evidence chain read ONLY the effect log / trace, never the filesystem — `chainHash` and the
  * spent-effect count come from `store` reads (head/list), not from inspecting files.
  */
+import { mcpProfile, type McpProfile } from "./mcp-profile.ts";
 import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -46,7 +47,6 @@ function nowMs(): number {
   return Date.now();
 }
 
-const TIER0_HONESTY = "Tier 0 is REVERSIBILITY, not isolation or security.";
 
 /**
  * The MCP server's advertised version, DERIVED from package.json so the server identity can never drift
@@ -65,6 +65,8 @@ const SERVER_VERSION: string = (() => {
 })();
 
 export interface RewindMcpServerOptions {
+  /** Explicit tool surface; all preserves the existing tool names. */
+  profile?: McpProfile;
   /** The workspace the server snapshots and guards. */
   cwd: string;
   /** Sink for advisory notices (reflink/CoW fallback, etc.). Default: console.warn via the backend. */
@@ -85,6 +87,8 @@ function ok(structured: Record<string, unknown>): {
  * pair in tests).
  */
 export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
+  const manifest = mcpProfile(opts.profile);
+  const enabled = new Set(manifest.tools);
   const { engine, store, rewindMemory } = buildAdapterEngine(opts.cwd, opts.log);
   // Server-level `instructions` are surfaced to the model by MCP clients (Claude Code, Cursor, …) on
   // connect, so the agent learns the WORKFLOW up front instead of reverse-engineering it from tool
@@ -92,20 +96,7 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   const server = new McpServer(
     { name: "agent-rewind", version: SERVER_VERSION },
     {
-      instructions:
-        "Agent Rewind gives you reversible execution for this workspace. Use it like this:\n" +
-        "1. Before any risky or multi-step change, call `checkpoint` (optionally with a label) to snapshot the " +
-        "WHOLE workspace — including files changed by shell/bash, not just your edit tools. It returns an `id`.\n" +
-        "2. If the work goes wrong, call `rewind` with that `id` to restore the entire workspace to that point. " +
-        "History is preserved, so you can also `replay` forward again. Use `list` to see checkpoints.\n" +
-        "3. Before an IRREVERSIBLE external effect (a payment, email, or API call that changes the outside " +
-        "world), call `guard_effect` with a stable `effectKey` for that action. The first call is admitted and " +
-        "recorded on a tamper-evident chain; if you retry the SAME effect after a rewind it is REFUSED — this is " +
-        "what stops a rewind from silently re-charging a card or re-sending an email. On a refusal, do NOT re-fire " +
-        "it; the returned reason explains why.\n" +
-        "Good habit: checkpoint before each meaningful step, and guard_effect before every side effect. " +
-        "Note: this tier is REVERSIBILITY, not isolation or security — it can undo the workspace and block " +
-        "replayed effects, but it is not a sandbox and does not stop the effect from happening the first time.",
+      instructions: manifest.instructions,
     },
   );
 
@@ -127,11 +118,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   });
 
   // ── checkpoint ────────────────────────────────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("checkpoint")) server.registerTool(
     "checkpoint",
     {
-      description:
-        `Snapshot the whole workspace and mint a durable checkpoint handle you pass back to rewind/replay. ${TIER0_HONESTY}`,
+      description: "Snapshot the whole workspace; keep the returned id for rewind.",
       inputSchema: { label: z.string().optional() },
       outputSchema: { id: z.string(), label: z.string().optional(), ts: z.number() },
     },
@@ -144,12 +134,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── list ──────────────────────────────────────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("list")) server.registerTool(
     "list",
     {
-      description:
-        `List every checkpoint, newest first, each with the count of external effects recorded on the ` +
-        `chain so far (a global figure in the MVP — effects are not yet attributed to one checkpoint). ${TIER0_HONESTY}`,
+      description: "List checkpoints newest first. effects is the global emitted-effect count, not a per-checkpoint count.",
       inputSchema: {},
       outputSchema: {
         checkpoints: z.array(
@@ -167,12 +155,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── rewind ────────────────────────────────────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("rewind")) server.registerTool(
     "rewind",
     {
-      description:
-        `Return the whole workspace tree to a checkpoint. Reports the effects that already fired and are ` +
-        `now refusable-on-replay (read from the tamper-evident chain, never the filesystem). ${TIER0_HONESTY}`,
+      description: "Restore the workspace to a checkpoint; report previously emitted effects that must not be repeated.",
       inputSchema: { id: z.string() },
       outputSchema: {
         revertedTo: z.string(),
@@ -193,12 +179,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── replay ────────────────────────────────────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("replay")) server.registerTool(
     "replay",
     {
-      description:
-        `Report the savings a checkpoint's recorded replays represent. The MVP re-runs nothing (steps=0); ` +
-        `it sums only genuinely avoided re-execution, deduped by call id. ${TIER0_HONESTY}`,
+      description: "Report estimated avoided replay tokens and cost for a checkpoint. Executes nothing (steps=0).",
       inputSchema: { id: z.string() },
       outputSchema: { steps: z.number(), tokensAvoided: z.number(), costAvoided: z.number() },
     },
@@ -210,13 +194,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── guard_effect ──────────────────────────────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("guard_effect")) server.registerTool(
     "guard_effect",
     {
-      description:
-        `Admit or refuse an external effect. The first emit of a key is admitted and recorded; re-firing ` +
-        `a spent key across a rewind is REFUSED and recorded, citing the original emit. chainHash is the ` +
-        `tamper-evident chain head after the decision. ${TIER0_HONESTY}`,
+      description: "Admit an external effect once per stable key, or refuse repetition. Returns the tamper-evident decision chain hash.",
       inputSchema: {
         descriptor: z.object({
           effectKey: z.string(),
@@ -262,13 +243,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── savings (Slice 1.5 honest receipt) ──────────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("savings")) server.registerTool(
     "savings",
     {
-      description:
-        `Report the honest token/cost savings: ONLY re-spend that was provably avoided (replay ` +
-        `cache-hits, deduped by call id), never a whole rewound run, wall-clock, or the provider's own ` +
-        `prompt-cache discount. Cost is a marked ESTIMATE from a per-model rate table, not a bill. ${TIER0_HONESTY}`,
+      description: "Report deduplicated avoided replay tokens and estimated USD cost. Excludes provider cache discounts; since is currently a label, not a filter.",
       inputSchema: { scope: z.string().optional(), since: z.string().optional() },
       outputSchema: {
         tokensSaved: z.number(),
@@ -287,14 +265,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── backtrack_candidates (recovery / accuracy) ───────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("backtrack_candidates")) server.registerTool(
     "backtrack_candidates",
     {
-      description:
-        `List the checkpoints you could selectively rewind to, NEWEST FIRST, each annotated with the ` +
-        `failures already recorded from it (the memory a re-attempt would inherit). 'recommended' is the ` +
-        `most-recent FAILING checkpoint — rewind to just before the work that keeps failing, not a full ` +
-        `restart. Pair with backtrack_commit. ${TIER0_HONESTY}`,
+      description: "List checkpoints with failure memory. Recommended is the newest failing checkpoint.",
       inputSchema: {},
       outputSchema: {
         candidates: z.array(
@@ -323,14 +297,10 @@ export function createRewindMcpServer(opts: RewindMcpServerOptions): McpServer {
   );
 
   // ── backtrack_commit (recovery / accuracy) ───────────────────────────────────────────────────────
-  server.registerTool(
+  if (enabled.has("backtrack_commit")) server.registerTool(
     "backtrack_commit",
     {
-      description:
-        `Selectively rewind the workspace to a checkpoint AND carry the failure forward. REQUIRES a ` +
-        `non-empty 'note' saying why the current branch is being abandoned — that note is what makes the ` +
-        `re-attempt smarter (this is the measured accuracy mechanism, not just undo). Returns the ` +
-        `accumulated failure memory for that checkpoint to inject into your next attempt. ${TIER0_HONESTY}`,
+      description: "Restore a checkpoint and persist the required failure note for the next attempt. Returns accumulated failure memory.",
       inputSchema: {
         checkpointId: z.string(),
         note: z.string().min(1, "a backtrack requires a non-empty note (the carried-forward lesson)"),

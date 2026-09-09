@@ -149,3 +149,24 @@ unverified: its runner and corpus were not located, so those percentages are wit
 
 - Full install guide, architecture, and the product breakdown: <https://github.com/DarkStar616/rewind>
 - Licence: **FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 future grant at 2 years).
+# MCP tool profiles (v1.1 development)
+
+Use `rewind mcp --profile lean` or set `REWIND_MCP_PROFILE=lean`. The CLI flag takes precedence.
+Unknown profiles and options fail startup. The default remains `all`.
+
+| Profile | Tools | Approximate initialization tokens |
+| --- | --- | ---: |
+| `lean` | checkpoint, rewind, guard_effect | 661 |
+| `recovery` | lean tools plus list, replay, backtrack_candidates, backtrack_commit | 1,571 |
+| `analytics` | savings | 271 |
+| `all` | All eight existing tools | 1,804 |
+
+Measured through the MCP SDK on 2026-09-09: serialized tool definitions plus server instructions,
+characters divided by four and rounded up. The previous full surface measured 9,359 characters
+(2,340 approximate tokens); the new lean surface measured 2,643 characters. These are context-size
+estimates, not measured tokenization or dollar savings. Tests enforce the lean budget of 1,000.
+Clients may add their own protocol wrappers. Hidden tools cannot be called through that profile.
+
+Checkpoint at meaningful risky boundaries and retain the returned id. The lean profile restores by
+id; switch to recovery for checkpoint discovery and failure memory. Tier 0 provides reversibility,
+not isolation or security. Text and structured result forms remain available for compatibility.
