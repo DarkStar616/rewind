@@ -32,9 +32,9 @@ export interface AnalyzedCall {
   usage: ProviderUsage;
   model: string;
   /**
-   * The request's headers. The output-affecting subset (`anthropic-version`, `anthropic-beta` — see
-   * canonical-request.ts KEY_HEADERS) is folded into the replay key exactly as the live gateway does, so
-   * two calls with the same body but a different API version/beta are NOT counted as a replay.
+   * The request's headers, excluding established auth/local/transport noise, are folded into the
+   * replay key. Unknown provider headers and content type remain significant; callers must capture
+   * the same header view used by their live gateway, excluding any configured local scope header.
    *
    * Semantics of absence matter: OMITTING this field means the headers are UNKNOWN, and an
    * unknown-headers call is never counted as a replay (it might have differed in a header we cannot see —

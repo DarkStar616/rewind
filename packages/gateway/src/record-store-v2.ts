@@ -19,7 +19,10 @@ export interface HttpOccurrence {
   response: { status: number; contentType: string; body: Uint8Array };
   expiresAt?: number;
 }
-export interface TapeEpoch { scope: string; epoch: string; length: number; revision: number }
+export interface TapeEpoch { scope: string; epoch: string; length: number; revision: number; identityGeneration?: 1 | 2 }
+export class LegacyIdentityGenerationError extends Error {
+  constructor() { super("legacy request identity generation; keep this history for inspection and start a new epoch"); }
+}
 export interface TapeCursor { scope: string; epoch: string; cursorId: string; ordinal: number; revision: number }
 export interface ConsumedOccurrence { occurrence: HttpOccurrence; cursor: TapeCursor; replayed: boolean }
 export interface RecordStoreV2 {
@@ -34,7 +37,7 @@ export interface RecordStoreV2 {
   consume(cursor: TapeCursor, replayKey: string, transactionId: string, options?: { strict?: boolean }): Promise<ConsumedOccurrence | undefined>;
 }
 export interface RecordStoreV2Options { maxBodyBytes?: number }
-interface Epoch { schema: "rewind.epoch/v1"; scope: string; epoch: string; length: number }
+interface Epoch { schema: "rewind.epoch/v1" | "rewind.epoch/v2"; scope: string; epoch: string; length: number; identityGeneration?: 1 | 2 }
 interface CursorState { schema: "rewind.cursor/v1"; scope: string; epoch: string; cursorId: string; ordinal: number }
 interface FrameMetadata extends Omit<HttpOccurrence, "response"> {
   schema: "rewind.occurrence/v1";
@@ -125,7 +128,9 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
     const row = await storage.get("epochs", coordinate("epoch", [scope, id]));
     if (!row) throw new Error("epoch missing");
     const value = JSON.parse(row.value.toString()) as Epoch;
-    if (value.schema !== "rewind.epoch/v1" || value.scope !== scope || value.epoch !== id) throw new Error("corrupt epoch metadata");
+    if (!["rewind.epoch/v1", "rewind.epoch/v2"].includes(value.schema) || value.scope !== scope || value.epoch !== id) throw new Error("corrupt epoch metadata");
+    if (value.schema === "rewind.epoch/v2" && value.identityGeneration !== 2) throw new Error("unsupported epoch identity generation");
+    if (value.schema === "rewind.epoch/v1") value.identityGeneration = 1;
     ordinal(value.length); return { row, value };
   }
   async function readCursor(scope: string, id: string): Promise<TapeCursor | undefined> {
@@ -166,19 +171,23 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
   return {
     async createEpoch(scope, id, transactionId) {
       text(scope, 1024); text(id); text(transactionId, 256);
-      await storage.commit(coordinate("create-epoch", [scope, id, transactionId]), [{ namespace: "epochs", key: coordinate("epoch", [scope, id]), value: bytes({ schema: "rewind.epoch/v1", scope, epoch: id, length: 0 }), expectedRevision: null }]);
+      if (await storage.get("epochs", coordinate("epoch", [scope, id]))) {
+        if ((await epoch(scope, id)).value.identityGeneration !== 2) throw new LegacyIdentityGenerationError();
+      }
+      await storage.commit(coordinate("create-epoch", [scope, id, transactionId]), [{ namespace: "epochs", key: coordinate("epoch", [scope, id]), value: bytes({ schema: "rewind.epoch/v2", scope, epoch: id, length: 0, identityGeneration: 2 }), expectedRevision: null }]);
     },
-    async epoch(scope, id) { const state = await epoch(scope, id); return { scope, epoch: id, length: state.value.length, revision: state.row.revision }; },
+    async epoch(scope, id) { const state = await epoch(scope, id); return { scope, epoch: id, length: state.value.length, revision: state.row.revision, identityGeneration: state.value.identityGeneration ?? 1 }; },
     async append(record, transactionId) {
       const encoded = encode(record, transactionId);
       // Own the input snapshot across awaits; caller mutations cannot change the committed frame.
       const owned = decode(encoded, record);
+      const state = await epoch(owned.scope, owned.epoch);
+      if (state.value.identityGeneration !== 2) throw new LegacyIdentityGenerationError();
       const existing = await load(owned);
       if (existing) {
         if (!existing.row.value.equals(encoded)) throw new Error("immutable occurrence conflict");
         return { revision: existing.row.revision, replayed: true };
       }
-      const state = await epoch(owned.scope, owned.epoch);
       if (state.value.length !== owned.ordinal) throw new Error("occurrence ordinal conflict");
       const result = await storage.commit(coordinate("append", [owned.scope, owned.epoch, transactionId]), [
         { namespace: "occurrences", key: occurrenceKey(owned), value: encoded, expectedRevision: null, ...(owned.expiresAt === undefined ? {} : { expiresAt: owned.expiresAt }) },
@@ -189,6 +198,7 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
     async openCursor(scope, id, cursorId, transactionId, start = 0) {
       text(cursorId); text(transactionId, 256); ordinal(start);
       const state = await epoch(scope, id);
+      if (state.value.identityGeneration !== 2) throw new LegacyIdentityGenerationError();
       if (start > state.value.length) throw new Error("cursor beyond epoch");
       const result = await storage.commit(coordinate("open-cursor", [scope, cursorId, transactionId]), [{ namespace: "cursors", key: cursorKey(scope, cursorId), value: bytes({ schema: "rewind.cursor/v1", scope, epoch: id, cursorId, ordinal: start }), expectedRevision: null }]);
       return { scope, epoch: id, cursorId, ordinal: start, revision: result.revisions[0] };
@@ -206,7 +216,9 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
     },
     async rewind(cursor, target, transactionId) {
       const snapshot = { ...cursor }; cursorState(snapshot); ordinal(target);
-      if (target > (await epoch(snapshot.scope, snapshot.epoch)).value.length) throw new Error("rewind beyond epoch");
+      const state = await epoch(snapshot.scope, snapshot.epoch);
+      if (state.value.identityGeneration !== 2) throw new LegacyIdentityGenerationError();
+      if (target > state.value.length) throw new Error("rewind beyond epoch");
       return (await transition("rewind", snapshot, target, transactionId, null)).cursor;
     },
     async peek(cursor, replayKey, settings = {}) { return (await peek({ ...cursor }, replayKey, settings.strict))?.record; },
@@ -214,6 +226,7 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
       const snapshot = { ...cursor };
       const strict = settings.strict;
       cursorState(snapshot); key(replayKey); text(transactionId, 256);
+      if ((await epoch(snapshot.scope, snapshot.epoch)).value.identityGeneration !== 2) throw new LegacyIdentityGenerationError();
       const prior = await storage.get("claims", coordinate("consume", [snapshot.scope, snapshot.cursorId, transactionId]));
       if (prior) {
         let claim: any;

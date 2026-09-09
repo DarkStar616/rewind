@@ -74,7 +74,7 @@ export interface Replayer {
   /**
    * Resolve a request body against the record store in the given scope. On a hit: serve the record
    * and book the avoided tokens. On a miss: 'live' (or throw, in strict mode). `headers` supplies the
-   * output-affecting request headers (anthropic-version/beta) that co-determine the key; `url` supplies
+   * request headers other than established auth/local/transport noise that co-determine the key; `url` supplies
    * the request target whose pathname (query stripped) co-determines the key — essential when the model
    * or the JSON-vs-SSE choice lives in the URL (e.g. Gemini) rather than the body.
    */

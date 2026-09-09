@@ -24,7 +24,7 @@ import { randomUUID } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 
 import { canonicalizeRequest } from "./canonical-request.ts";
-import type { RecordStoreV2, ConsumedOccurrence } from "./record-store-v2.ts";
+import { LegacyIdentityGenerationError, type RecordStoreV2, type ConsumedOccurrence } from "./record-store-v2.ts";
 import { encodeTrustedScope, type ScopeResolver } from "./trusted-scope.ts";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
@@ -141,7 +141,7 @@ const HOP_BY_HOP = new Set([
 ]);
 
 function forwardableRequestHeaders(headers: IncomingHttpHeaders, bodyLen: number, scopeHeader: string): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out: Record<string, string> = Object.create(null);
   for (const [k, v] of Object.entries(headers)) {
     if (v === undefined) continue;
     if (k.toLowerCase().startsWith("x-rewind-") || k.toLowerCase() === scopeHeader) continue;
@@ -284,6 +284,8 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         let decision: { served: "replay" | "live"; keyed: string; response?: unknown; commit?: () => void } | undefined;
         try {
           parsed = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
+          // Key the same local-header-stripped view that reaches the provider.
+          const identityHeaders = Object.fromEntries(Object.entries(req.headers).filter(([name]) => name.toLowerCase() !== scopeHeader));
           // Deterministic context pruning BEFORE keying, so the key reflects what the model actually
           // sees and replay stays exact over the pruned form.
           if (options.pruneContext) {
@@ -302,7 +304,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           // with identical bodies, and that must be a miss, never a cross-provider false hit. The
           // replayer strips the query (auth material) itself.
           if (options.tape) {
-            const replayKey = canonicalizeRequest(parsed, req.headers, keyUrl(options.upstreamBase, req.url));
+            const replayKey = canonicalizeRequest(parsed, identityHeaders, keyUrl(options.upstreamBase, req.url));
             if (options.tape.replayCursor) {
               await replayTape(scope, replayKey);
               return;
@@ -310,9 +312,14 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             await options.tape.store.createEpoch(scope, options.tape.epoch, "gateway-epoch-v1");
             decision = { served: "live", keyed: replayKey };
           } else decision = options.replayer.prepare
-            ? options.replayer.prepare(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url), (record) => validHttpRecord(record, adapter, req.url))
-            : options.replayer.handle(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url));
+            ? options.replayer.prepare(scope, parsed, identityHeaders, keyUrl(options.upstreamBase, req.url), (record) => validHttpRecord(record, adapter, req.url))
+            : options.replayer.handle(scope, parsed, identityHeaders, keyUrl(options.upstreamBase, req.url));
         } catch (err) {
+          if (err instanceof LegacyIdentityGenerationError) {
+            res.writeHead(409, { "content-type": "application/json", "x-rewind": "legacy-identity" });
+            res.end(JSON.stringify({ error: { type: "rewind_legacy_identity", message: err.message } }));
+            return;
+          }
           if (options.tape) {
             const status = err instanceof SyntaxError && options.tape.replayCursor ? 409 : 503;
             if (res.headersSent) res.destroy();
@@ -413,6 +420,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
     async function replayTape(scope: string, replayKey: string): Promise<void> {
       const tape = options.tape!;
       const cursorId = tape.replayCursor!;
+      if ((await tape.store.epoch(scope, tape.epoch)).identityGeneration !== 2) throw new LegacyIdentityGenerationError();
       const provided = req.headers["x-rewind-request-id"];
       if (provided !== undefined && (typeof provided !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(provided))) throw new Error("invalid replay request identity");
       const requestId = provided ?? randomUUID();
@@ -496,7 +504,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             const status = upRes.statusCode ?? 502;
             const contentType = (upRes.headers["content-type"] as string) ?? "application/json";
             // Copy response headers verbatim except hop-by-hop/length (we set our own length on end).
-            const outHeaders: Record<string, string> = { "x-rewind": "live" };
+            const outHeaders: Record<string, string> = Object.assign(Object.create(null), { "x-rewind": "live" });
             for (const [k, v] of Object.entries(upRes.headers)) {
               if (v === undefined || HOP_BY_HOP.has(k.toLowerCase())) continue;
               outHeaders[k] = Array.isArray(v) ? v.join(", ") : String(v);
