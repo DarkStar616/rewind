@@ -13,6 +13,7 @@
 import type { ReplaySavingsSink } from "@agent-rewind/core";
 
 import { canonicalizeRequest } from "./canonical-request.ts";
+import { replayEligible } from "./replay-eligibility.ts";
 import { totalRecordedTokens, type RecordStore, type RecordedCall } from "./record-store.ts";
 import { avoidedCostMicros, DEFAULT_PRICE_TABLE, type PriceTable } from "./meter.ts";
 
@@ -62,6 +63,8 @@ export class StrictReplayMissError extends Error {
 }
 
 export interface Replayer {
+  /** Explicit policy for transport bypasses. Missing policy refuses ineligible requests. */
+  allowLiveFallback?: boolean;
   /** Side-effect-free lookup. The transport validates the record, then commits only after choosing
    * replay irrevocably. Optional for compatibility with existing consumer-supplied replayers. */
   prepare?(
@@ -95,7 +98,7 @@ export function createReplayer(
   const priceTable = options.priceTable ?? DEFAULT_PRICE_TABLE;
   const prepare: NonNullable<Replayer["prepare"]> = (scope, body, headers, url, validate) => {
       const keyed = canonicalizeRequest(body, headers, url);
-      const recorded = store.get({ scope, replayKey: keyed });
+      const recorded = replayEligible(body) ? store.get({ scope, replayKey: keyed }) : undefined;
       if (!recorded || (validate && !validate(recorded))) {
         if (strict) throw new StrictReplayMissError(scope, keyed);
         return { served: "live", keyed };
@@ -120,6 +123,7 @@ export function createReplayer(
       } };
   };
   return {
+    allowLiveFallback: !strict,
     prepare,
     handle(scope, body, headers, url) {
       const outcome = prepare(scope, body, headers, url);

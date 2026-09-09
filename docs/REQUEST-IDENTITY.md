@@ -37,3 +37,17 @@ Header names are case-insensitive; ambiguous duplicate spellings or malformed
 values are rejected. Unclassified SDK tracing/retry headers can cause additional
 misses until evidence justifies treating them as neutral. Local Rewind headers
 and the configured scope header are removed before keying/forwarding.
+
+## Requests that require live execution
+
+Replay eligibility rejects declared hosted tools, search-model names, hosted prompt
+and conversation references, and remote image/file references in provider content
+slots. Client function schemas and arguments are not scanned as provider envelopes.
+Inline content remains eligible. These checks are conservative protocol checks,
+not proof that an arbitrary provider or future model has no external dependencies.
+
+Ineligible requests run live without recording in normal mode. Strict ordered
+replay returns HTTP 409 before opening or advancing a cursor. Custom `Replayer`
+implementations must declare `allowLiveFallback: true` to permit this live bypass;
+false or absent refuses it. `createReplayer` sets this policy from its strict option.
+Bypasses do not invoke custom replay hooks or book avoided tokens.

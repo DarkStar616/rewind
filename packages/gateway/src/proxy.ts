@@ -29,6 +29,7 @@ import { encodeTrustedScope, type ScopeResolver } from "./trusted-scope.ts";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
 import { StrictReplayMissError } from "./replay.ts";
+import { replayEligible } from "./replay-eligibility.ts";
 import { analyzeCacheHygiene } from "./cache-hygiene.ts";
 import { pruneToolOutputs } from "./prune.ts";
 import { selectAdapter, type ProviderAdapter } from "./providers/provider-adapter.ts";
@@ -286,6 +287,17 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           parsed = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
           // Key the same local-header-stripped view that reaches the provider.
           const identityHeaders = Object.fromEntries(Object.entries(req.headers).filter(([name]) => name.toLowerCase() !== scopeHeader));
+          if (!replayEligible(parsed)) {
+            // Custom replayers must explicitly authorize live bypass; method presence is not policy.
+            if (options.tape?.replayCursor || (!options.tape && options.replayer.allowLiveFallback !== true)) {
+              res.writeHead(409, { "content-type": "application/json", "x-rewind": "replay-ineligible" });
+              res.end(JSON.stringify({ error: { type: "rewind_replay_ineligible", message: "Hosted tools or remote state require live execution; strict replay cannot execute this request." } }));
+              return;
+            }
+            log("proxy: remote-state request forwarded without recording");
+            await forward(rawBody, undefined);
+            return;
+          }
           // Deterministic context pruning BEFORE keying, so the key reflects what the model actually
           // sees and replay stays exact over the pruned form.
           if (options.pruneContext) {
