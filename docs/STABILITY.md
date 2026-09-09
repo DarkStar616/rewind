@@ -153,10 +153,10 @@ revision numbers are global monotonically increasing database revisions, avoidin
 
 SQLite uses WAL, FULL synchronous durability, IMMEDIATE transactions and a five-second busy timeout.
 Queue/value/response limits fail explicitly; database page and logical ciphertext quotas bound normal
-storage. WAL growth with externally stalled readers, transaction-receipt retention, physical erasure,
+storage. Transaction-receipt retention, physical erasure,
 key rotation, migration beyond schema 1, corruption recovery, and the complete OS/architecture install
 matrix remain unfinished. TTL means invisible to reads until explicit `collectExpired()` removes
-rows; encrypted historical pages/WAL/backups require later lifecycle handling. `close()` flushes WAL.
+rows; encrypted historical pages/WAL/backups require later lifecycle handling. `close()` attempts a WAL checkpoint; an external reader can prevent truncation.
 
 Staging stores ordered encrypted chunks under the database quota and a common TTL; incomplete stages
 cannot be read through the staging interface. Sealing authenticates the complete ordered digest.
@@ -191,7 +191,7 @@ is corruption detection, not protection against an application deliberately rewr
 metadata through its own storage credentials. Expired bodies remain unavailable, including to retries.
 
 Gateway HTTP/CLI wiring, claim-to-accounting atomicity, incomplete-stream staging integration and the
-full kill-point crash matrix are not delivered by this adapter packet. WAL hard limits and storage
+full kill-point crash matrix are not delivered by this adapter packet. Storage
 lifecycle residuals remain as documented above; durable mode is not yet a default profile.
 
 ## Responses adapter addition (v1.1 development)
@@ -217,3 +217,19 @@ commits. Oversized responses flush and stream without recording. The additive
 `TapeProxyOptions.upstreamTimeoutMs` sets an absolute upstream deadline (default
 120 seconds); client disconnects cancel upstream work and release queued traffic.
 Storage commits already underway settle before the next queued request begins.
+
+## Managed WAL admission (v1.1 development)
+
+`SqliteStorageOptions.maxWalBytes` adds a separate WAL allowance (default twice the database limit
+plus 65,536 bytes). With cache spilling disabled and verified, each managed transaction reserves
+space for every allowed database page plus WAL frame/header overhead before writing. Admission runs
+under SQLite's IMMEDIATE writer lock. Near the allowance, the worker tries a non-waiting checkpoint;
+a pinned reader causes actionable write refusal until checkpointing can reclaim space. A completed
+transaction retry returns its receipt without requiring more write space.
+
+Pinned-reader tests cover one and two independent workers, unchanged data on refusal, idempotent
+retries and recovery when the reader finishes. This bounds cooperating Rewind writers under the same
+configuration, not arbitrary external SQLite writes, backups, or the whole directory. An OS quota is
+needed for those. Disabling spill can retain dirty database pages in worker memory until commit;
+choose database and queue limits together. See SQLite's [cache spill documentation](https://sqlite.org/pragma.html#pragma_cache_spill)
+and [WAL concurrency constraints](https://sqlite.org/wal.html).

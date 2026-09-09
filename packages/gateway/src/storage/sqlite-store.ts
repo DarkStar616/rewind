@@ -7,6 +7,8 @@ export interface SqliteStorageOptions {
   wrappingKey: Uint8Array;
   maxValueBytes?: number;
   maxDatabaseBytes?: number;
+  /** Managed WAL allowance, separate from database pages. Pinned readers cause write refusal. */
+  maxWalBytes?: number;
   maxQueuedRequests?: number;
   maxQueuedBytes?: number;
   maxResponseBytes?: number;
@@ -35,9 +37,10 @@ export async function openSqliteStorage(options: SqliteStorageOptions): Promise<
   if (typeof options.tenant !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(options.tenant)) throw new Error("invalid fixed storage tenant");
   if (!(options.wrappingKey instanceof Uint8Array) || options.wrappingKey.byteLength !== 32) throw new Error("storage wrapping key must contain 32 bytes");
   const config = { ...options, wrappingKey: Buffer.from(options.wrappingKey), maxValueBytes: options.maxValueBytes ?? 1024 * 1024, maxDatabaseBytes: options.maxDatabaseBytes ?? 64 * 1024 * 1024, maxQueuedRequests: options.maxQueuedRequests ?? 32, maxQueuedBytes: options.maxQueuedBytes ?? 16 * 1024 * 1024, maxResponseBytes: options.maxResponseBytes ?? 4 * 1024 * 1024, timeoutMs: options.timeoutMs ?? 30_000 };
-  for (const n of [config.maxValueBytes, config.maxDatabaseBytes, config.maxQueuedRequests, config.maxQueuedBytes, config.maxResponseBytes, config.timeoutMs]) if (!Number.isSafeInteger(n) || n <= 0) throw new Error("storage limits must be positive safe integers");
+  const maxWalBytes = options.maxWalBytes ?? config.maxDatabaseBytes * 2 + 65_536;
+  for (const n of [config.maxValueBytes, config.maxDatabaseBytes, maxWalBytes, config.maxQueuedRequests, config.maxQueuedBytes, config.maxResponseBytes, config.timeoutMs]) if (!Number.isSafeInteger(n) || n <= 0) throw new Error("storage limits must be positive safe integers");
   if (config.maxResponseBytes > config.maxQueuedBytes || config.maxValueBytes + 768 > config.maxResponseBytes || config.maxDatabaseBytes < 65536) throw new Error("inconsistent storage limits");
-  const worker = new Worker(new URL(import.meta.url.endsWith(".ts") ? "./storage-worker.ts" : "./storage-worker.js", import.meta.url), { workerData: config, execArgv: [] });
+  const worker = new Worker(new URL(import.meta.url.endsWith(".ts") ? "./storage-worker.ts" : "./storage-worker.js", import.meta.url), { workerData: { ...config, maxWalBytes }, execArgv: [] });
   config.wrappingKey.fill(0);
   let sequence = 0, queuedBytes = 0, stopped = false, closing = false;
   const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; bytes: number; timer: ReturnType<typeof setTimeout> }>();

@@ -47,8 +47,8 @@ ambiguous completion; conflicting retries fail. `get` and paginated `scan` exclu
 reading. Schedule `collectExpired()` to remove abandoned/expired stages. Always await `close()`.
 
 This is a storage API foundation, not yet the CLI replay backend. Physical erasure, key rotation,
-transaction-receipt retention and the full packaging/crash-test matrix remain future work. WAL size
-under stalled external readers is not an absolute disk quota. See `docs/STABILITY.md` for the contract.
+transaction-receipt retention and the full packaging/crash-test matrix remain future work. Managed WAL writes have a separate `maxWalBytes` allowance; pinned readers can cause explicit write
+refusal. This is not a whole-directory quota or a constraint on arbitrary external SQLite writers. See `docs/STABILITY.md` for the contract.
 
 ### Responses clients
 

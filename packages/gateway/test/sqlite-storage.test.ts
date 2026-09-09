@@ -7,6 +7,77 @@ import { tmpdir } from "node:os";
 import { openSqliteStorage } from "../src/storage/sqlite-store.ts";
 const key = Buffer.alloc(32, 7);
 
+test("schema initialization reserves WAL space before writing metadata", async () => {
+  const { createRequire } = await import("node:module");
+  const { chmod } = await import("node:fs/promises");
+  const Database = createRequire(import.meta.url)("better-sqlite3");
+  const dir = await mkdtemp(join(tmpdir(), "rewind-storage-wal-init-"));
+  const path = join(dir, "storage.sqlite"), db = new Database(path);
+  await chmod(path, 0o600);
+  db.pragma("journal_mode=WAL"); db.pragma("wal_autocheckpoint=0"); db.pragma("user_version=1");
+  const reader = new Database(path);
+  reader.exec("BEGIN"); reader.prepare("SELECT * FROM sqlite_master").all();
+  let opened: Awaited<ReturnType<typeof openSqliteStorage>> | undefined;
+  try {
+    for (let i = 0; i < 17; i++) db.pragma(`user_version=${i % 2}`);
+    const before = (await stat(path + "-wal")).size;
+    assert.ok(before < 80_000);
+    await assert.rejects(async () => { opened = await openSqliteStorage({ directory: dir, tenant: "tenant", wrappingKey: key,
+      maxDatabaseBytes: 65_536, maxWalBytes: 80_000 }); }, /WAL.*limit/);
+    assert.equal((await stat(path + "-wal")).size, before);
+    assert.equal(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table'").get().n, 0);
+  } finally { reader.exec("ROLLBACK"); reader.close(); db.close(); await opened?.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+test("a pinned reader cannot grow managed WAL writes beyond the configured allowance", async () => {
+  const { createRequire } = await import("node:module");
+  const Database = createRequire(import.meta.url)("better-sqlite3");
+  const dir = await mkdtemp(join(tmpdir(), "rewind-storage-wal-"));
+  const maxWalBytes = 200_000;
+  const store = await openSqliteStorage({ directory: dir, tenant: "tenant", wrappingKey: key,
+    maxDatabaseBytes: 65_536, maxValueBytes: 4096, maxResponseBytes: 8192, maxWalBytes });
+  const reader = new Database(join(dir, "storage.sqlite"));
+  try {
+    await store.commit("seed", [{ namespace: "records", key: "a", value: Buffer.alloc(4096) }]);
+    reader.exec("BEGIN"); reader.prepare("SELECT * FROM values_store").all();
+    let admitted = 0, refused = false;
+    for (let i = 1; i <= 20; i++) {
+      try { await store.commit(`wal-${i}`, [{ namespace: "records", key: "a", value: Buffer.alloc(4096, i) }]); admitted = i; }
+      catch (error) { assert.match(String(error), /WAL.*limit/); refused = true; break; }
+    }
+    assert.equal(refused, true, "writes must stop while a reader prevents checkpointing");
+    assert.ok(admitted > 0);
+    assert.ok((await stat(join(dir, "storage.sqlite-wal"))).size <= maxWalBytes);
+    assert.equal((await store.get("records", "a"))?.value[0], admitted, "refusal leaves the last committed value intact");
+    assert.equal((await store.commit("seed", [{ namespace: "records", key: "a", value: Buffer.alloc(4096) }])).replayed, true,
+      "an already committed retry needs no WAL reservation");
+    reader.exec("ROLLBACK");
+    await store.commit("after-reader", [{ namespace: "records", key: "a", value: Buffer.from("resumed") }]);
+    assert.equal((await store.get("records", "a"))?.value.toString(), "resumed");
+  } finally { reader.close(); await store.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+test("independent SQLite workers serialize WAL admission under a pinned reader", async () => {
+  const { createRequire } = await import("node:module");
+  const Database = createRequire(import.meta.url)("better-sqlite3");
+  const dir = await mkdtemp(join(tmpdir(), "rewind-storage-wal-race-"));
+  const options = { directory: dir, tenant: "tenant", wrappingKey: key, maxDatabaseBytes: 65_536,
+    maxValueBytes: 4096, maxResponseBytes: 8192, maxWalBytes: 200_000 };
+  const a = await openSqliteStorage(options), b = await openSqliteStorage(options);
+  const reader = new Database(join(dir, "storage.sqlite"));
+  try {
+    await a.commit("seed", [{ namespace: "records", key: "a", value: Buffer.alloc(4096) }]);
+    reader.exec("BEGIN"); reader.prepare("SELECT * FROM values_store").all();
+    const results = await Promise.allSettled(Array.from({ length: 20 }, (_, i) => (i % 2 ? a : b)
+      .commit(`race-${i}`, [{ namespace: "records", key: "a", value: Buffer.alloc(4096, i) }])));
+    assert.ok(results.some((result) => result.status === "fulfilled"));
+    assert.ok(results.some((result) => result.status === "rejected"));
+    for (const result of results) if (result.status === "rejected") assert.match(String(result.reason), /WAL.*limit/);
+    assert.ok((await stat(join(dir, "storage.sqlite-wal"))).size <= options.maxWalBytes);
+    reader.exec("ROLLBACK");
+  } finally { reader.close(); await a.close(); await b.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
 test("encrypted binary state survives restart and transaction retries are idempotent", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rewind-storage-"));
   try {

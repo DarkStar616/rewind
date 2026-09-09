@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { createRequire } from "node:module";
-import { mkdirSync, lstatSync, openSync, closeSync, constants } from "node:fs";
+import { mkdirSync, lstatSync, statSync, openSync, closeSync, constants } from "node:fs";
 import { join } from "node:path";
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:crypto";
 import type { SqliteStorageOptions, StorageMutation } from "./sqlite-store.ts";
@@ -11,6 +11,24 @@ let db: any;
 let dek: Buffer = Buffer.alloc(0);
 let tenantTag: string;
 let poisoned = false;
+let walReservation = 0;
+function walBytes(): number {
+  try { return statSync(join(config.directory, "storage.sqlite-wal")).size; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0; throw error; }
+}
+/** Reserve every permitted database page plus frame/header overhead. With cache spilling disabled,
+ * each dirty page is emitted once per transaction. Check under IMMEDIATE's writer lock so cooperating
+ * processes cannot both admit against the same free allowance. Arbitrary external writers are outside
+ * this guarantee; they must use the same policy or an OS filesystem quota. */
+function admitWalWrite(): void {
+  if (walBytes() + walReservation > config.maxWalBytes) fail("storage WAL size limit reached; finish readers to permit checkpointing");
+}
+function reclaimWal(): void {
+  if (walBytes() + walReservation <= config.maxWalBytes) return;
+  db.pragma("busy_timeout = 0");
+  try { db.pragma("wal_checkpoint(TRUNCATE)"); }
+  finally { db.pragma("busy_timeout = 5000"); }
+}
 const schema = 1;
 const fail = (message: string): never => { throw new Error(message); };
 const hmac = (key: Buffer, value: string): string => createHmac("sha256", key).update(value).digest("hex");
@@ -59,17 +77,24 @@ function init(): void {
   try { db = new Database(path); } catch { fail("Durable storage unavailable: SQLite native binding/open failed; install optional dependencies for this Node ABI; no memory fallback"); }
   db.pragma("busy_timeout = 5000"); db.pragma("journal_mode = WAL"); db.pragma("synchronous = FULL");
   const pageSize = db.pragma("page_size", { simple: true });
+  walReservation = (Math.floor(config.maxDatabaseBytes / pageSize) + 1) * (pageSize + 24) + 32;
+  if (!Number.isSafeInteger(walReservation) || config.maxWalBytes < walReservation) fail("storage WAL size limit must accommodate one maximum database transaction");
+  if (walBytes() > config.maxWalBytes) fail("storage WAL size limit exceeded at open");
+  db.pragma("cache_spill = OFF");
+  if (db.pragma("cache_spill", { simple: true }) !== 0) fail("storage WAL policy requires disabled cache spilling");
   if (db.pragma("page_count", { simple: true }) * pageSize > config.maxDatabaseBytes) fail("storage database quota exceeded at open");
   db.pragma(`max_page_count = ${Math.floor(config.maxDatabaseBytes / pageSize)}`);
   db.pragma("wal_autocheckpoint = 100"); db.pragma(`journal_size_limit = ${config.maxDatabaseBytes}`);
   const kek = Buffer.from(config.wrappingKey);
   tenantTag = hmac(kek, JSON.stringify(["tenant", config.tenant]));
   try {
+    if (db.pragma("user_version", { simple: true }) === 0) reclaimWal();
     db.transaction(() => {
       const version = db.pragma("user_version", { simple: true });
       if (version !== 0 && version !== schema) fail("unsupported storage schema version");
       if (version === 0) {
         if (db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table'").get().n !== 0) fail("unrecognized storage schema");
+        admitWalWrite();
         db.exec("CREATE TABLE metadata(id INTEGER PRIMARY KEY CHECK(id=1), tenant TEXT NOT NULL, wrapped BLOB NOT NULL, revision INTEGER NOT NULL); CREATE TABLE values_store(namespace TEXT NOT NULL,id TEXT NOT NULL,revision INTEGER NOT NULL,expires INTEGER,deleted INTEGER NOT NULL,payload BLOB NOT NULL, PRIMARY KEY(namespace,id)); CREATE TABLE transactions_store(id TEXT PRIMARY KEY,digest TEXT NOT NULL,result BLOB NOT NULL)");
         dek = randomBytes(32);
         db.prepare("INSERT INTO metadata VALUES(1,?,?,0)").run(tenantTag, seal(kek, dek, JSON.stringify([schema, tenantTag, "data-key"])));
@@ -120,12 +145,14 @@ function commit(transactionId: string, mutations: StorageMutation[]): any {
   if (new Set(ids).size !== ids.length) fail("duplicate mutation coordinates");
   const tx = hmac(dek, JSON.stringify(["transaction", transactionId]));
   const digest = hmac(dek, JSON.stringify(normalized));
+  reclaimWal();
   return db.transaction(() => {
     const prior = db.prepare("SELECT * FROM transactions_store WHERE id=?").get(tx);
     if (prior) {
       if (prior.digest !== digest) fail("transaction identity conflict");
       return { ...JSON.parse(unseal(dek, prior.result, JSON.stringify([schema, tenantTag, tx, digest])).toString()), replayed: true };
     }
+    admitWalWrite();
     const now = Date.now();
     for (const [i, m] of mutations.entries()) {
       const row = db.prepare("SELECT * FROM values_store WHERE namespace=? AND id=?").get(m.namespace, ids[i]);
@@ -161,7 +188,8 @@ try {
         case "get": result = get(args.namespace, args.key); break;
         case "scan": result = scan(args); break;
         case "commit": result = commit(args.transactionId, args.mutations); break;
-        case "collect": result = db.transaction(() => {
+        case "collect": reclaimWal(); result = db.transaction(() => {
+          admitWalWrite();
           const expired: Array<{ namespace: string; id: string }> = [];
           for (const row of db.prepare("SELECT * FROM values_store").iterate()) {
             decode(row);
