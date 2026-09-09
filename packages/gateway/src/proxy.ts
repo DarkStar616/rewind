@@ -29,7 +29,6 @@ import { encodeTrustedScope, type ScopeResolver } from "./trusted-scope.ts";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
 import { StrictReplayMissError } from "./replay.ts";
-import { planCacheBreakpoints } from "./cache-preserve.ts";
 import { analyzeCacheHygiene } from "./cache-hygiene.ts";
 import { pruneToolOutputs } from "./prune.ts";
 import { selectAdapter, type ProviderAdapter } from "./providers/provider-adapter.ts";
@@ -357,7 +356,9 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         // warn (never mutate/block) when the agent's own request poisons its cacheable prefix.
         if (parsed) {
           try {
-            const hygiene = analyzeCacheHygiene(parsed);
+            // Preserve legacy cross-provider advisory behavior until provider-specific
+            // hygiene policies are implemented; Anthropic owns its current capability.
+            const hygiene = adapter.analyzeCacheHygiene?.(parsed) ?? analyzeCacheHygiene(parsed);
             if (!hygiene.cacheable) {
               const first = hygiene.prefixPoisoners[0];
               log(
@@ -386,10 +387,10 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         // `cache_control` object to the static prefix (tools/system). OpenAI caches automatically (no
         // such field) and Gemini uses a different explicit-cache mechanism — injecting `cache_control`
         // into their tool/message objects would make an otherwise-valid live request fail upstream. So
-        // gate it on the anthropic adapter; other providers forward untouched.
-        if (options.preserveCache && parsed && adapter.id === "anthropic") {
+        // invoke the optional provider capability; only Anthropic implements it today.
+        if (options.preserveCache && parsed && adapter.planCacheBreakpoints) {
           try {
-            const plan = planCacheBreakpoints(parsed);
+            const plan = adapter.planCacheBreakpoints(parsed);
             if (plan.injected) {
               forwardBody = Buffer.from(JSON.stringify(plan.body), "utf8");
               log(`proxy: cache-preserve ${plan.reason} scope=${scope}`);

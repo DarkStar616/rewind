@@ -10,14 +10,20 @@
  *
  * The replay KEY is deliberately NOT here: it is a generic hash over the canonicalised request body,
  * identical for every provider. No adapter may make the key provider-specific or introduce a false
- * cache hit — adapters touch recording/metering/terminal-detection only.
+ * cache hit — adapters expose recording, metering, terminal detection and optional cache capabilities.
  */
+import type { CachePlan } from "../cache-preserve.ts";
+import type { CacheHygieneReport } from "../cache-hygiene.ts";
 import type { ExtractedUsage } from "../usage.ts";
 import { anthropicAdapter } from "./anthropic.ts";
 import { openaiAdapter } from "./openai.ts";
 import { geminiAdapter } from "./gemini.ts";
 
 export interface ProviderAdapter {
+  /** Optional output-neutral cache metadata planning; canonical replay identity stays in the gateway. */
+  planCacheBreakpoints?(body: Record<string, unknown>): CachePlan;
+  /** Optional provider-specific advisory analysis; must not mutate or block the request. */
+  analyzeCacheHygiene?(body: Record<string, unknown>): CacheHygieneReport;
   readonly id: "anthropic" | "openai" | "gemini";
   /** Is this a recordable model call for this provider?
    *  anthropic: POST /v1/messages
