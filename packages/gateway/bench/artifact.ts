@@ -52,8 +52,8 @@ export function validateTraceProvenance(value: unknown): void {
       typeof source.repository !== "string" || !source.repository.startsWith("https://") ||
       typeof source.path !== "string" || !source.path ||
       typeof source.license !== "string" || !source.license ||
-      !/^[a-f0-9]{40}$/.test(source.revision ?? "") ||
-      !/^[a-f0-9]{64}$/.test(source.sourceSha256 ?? "") ||
+      typeof source.revision !== "string" || !/^[a-f0-9]{40}$/.test(source.revision) ||
+      typeof source.sourceSha256 !== "string" || !/^[a-f0-9]{64}$/.test(source.sourceSha256) ||
       !Array.isArray(trace.steps) || trace.steps.length === 0 || trace.replayEligible !== false) {
     throw new Error("trace provenance incomplete or unsupported replay eligibility");
   }

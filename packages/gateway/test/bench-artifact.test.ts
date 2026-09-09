@@ -45,3 +45,14 @@ test("missing provenance fails closed instead of emitting a benchmark claim", ()
     assert.throws(() => validateTraceProvenance(fixture), /provenance/);
   }
 });
+
+
+test("provenance digests reject regex-coercible arrays", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const fixture = JSON.parse(await readFile(new URL("../bench/fixtures/atif-excerpt.json", import.meta.url), "utf8"));
+  for (const field of ["revision", "sourceSha256"]) {
+    const altered = structuredClone(fixture);
+    altered.source[field] = [altered.source[field]];
+    assert.throws(() => validateTraceProvenance(altered), /provenance/);
+  }
+});
