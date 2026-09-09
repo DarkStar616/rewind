@@ -211,3 +211,17 @@ absolute 120-second upstream deadline releases stalled work. SDK callers can set
 terminal staging remain U26 work. Multi-process recording of
 the same epoch can conflict; run one writer. Physical WAL limits and broader
 storage lifecycle certification remain separate acceptance work.
+## Bounded traffic analysis (v1.1 development)
+
+Run `rewind analyze --file capture.ndjson --ndjson`, or pipe a capture to
+`rewind analyze --stdin`. JSON arrays and a positional JSON argument remain supported.
+NDJSON is processed incrementally, with limits of 2 MiB per record, 128 MiB total,
+100,000 distinct request keys and 1,000 scopes. JSON arrays use a 16 MiB buffer limit.
+
+The default attested report contains aggregate counters and a source byte count/hash,
+without prompt samples or scope labels. These are hypothetical exact-request repeat
+opportunities, not realized savings. Unknown request headers or upstream origins never
+count as replay opportunities. Invalid token counts and counter overflow are rejected.
+`--legacy-json` explicitly includes the previous redacted sample and scope breakdown;
+review captured content before sharing that expanded report. Errors contain bounded
+reasons and source byte counts/hashes, without request excerpts or filesystem paths.

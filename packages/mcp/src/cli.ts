@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { analyzeInput } from "./analyze-input.ts";
 import { mcpProfile, parseMcpProfile } from "./mcp-profile.ts";
 /**
  * `rewind` — the universal terminal floor over the @agent-rewind/core engine.
@@ -29,9 +30,6 @@ import {
   startProxy,
   analyzeCacheHygiene,
   pruneToolOutputs,
-  analyzeTraffic,
-  attestAnalysis,
-  type AnalyzedCall,
 } from "@agent-rewind/gateway";
 import { parseGatewayConfig, gatewayManifest } from "./gateway-config.ts";
 import { buildAdapterEngine } from "./build-engine.ts";
@@ -42,7 +40,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
-  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
+  "analyze (--file <path>|--stdin|<json>) [--ndjson] [--legacy-json] | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -112,7 +110,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       try {
         effect = JSON.parse(rest[0]);
       } catch {
-        errline(`guard: the effect descriptor is not valid JSON: ${rest[0]}`);
+        errline(`guard: effect descriptor is not valid JSON; bytes=${Buffer.byteLength(rest[0])}`);
         return 1;
       }
       const outcome = await engine.guard(effect as ExternalEffect);
@@ -146,7 +144,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       try {
         body = JSON.parse(rest[0]);
       } catch {
-        errline(`cache-report: the request body is not valid JSON: ${rest[0]}`);
+        errline(`cache-report: request body is not valid JSON; bytes=${Buffer.byteLength(rest[0])}`);
         return 1;
       }
       const report = analyzeCacheHygiene(body);
@@ -165,7 +163,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       try {
         body = JSON.parse(rest[0]);
       } catch {
-        errline(`prune: the request body is not valid JSON: ${rest[0]}`);
+        errline(`prune: request body is not valid JSON; bytes=${Buffer.byteLength(rest[0])}`);
         return 1;
       }
       const r = pruneToolOutputs(body);
@@ -173,38 +171,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       return 0;
     }
     case "analyze": {
-      // Free Savings Analysis: read a JSON array of observed calls ({scope, body, usage, model, headers}),
-      // report how many were byte-replayable and what that would have cost, and attest the report on the
-      // hash chain so the reader can verify it. `headers` must be present ({} when there are none) for a
-      // call to be eligible as a replay — omitting it means UNKNOWN headers, conservatively never a
-      // replay. No upstream calls — this is a read-only shadow analysis. The surfaced sample is redacted
-      // by default, so the printed report is safe to share.
-      if (!rest[0]) {
-        errline(
-          "analyze requires a JSON array of calls: [{scope, body, usage, model, headers}, ...]. Include " +
-            "`headers` on each call (use {} when there are no anthropic-version/anthropic-beta headers) — a " +
-            "call that omits headers is treated as UNKNOWN and never counted as a replay, so duplicates " +
-            "would report zero savings.",
-        );
-        return 1;
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rest[0]);
-      } catch {
-        errline(`analyze: the input is not valid JSON: ${rest[0]}`);
-        return 1;
-      }
-      if (!Array.isArray(parsed)) {
-        errline("analyze: expected a JSON ARRAY of calls");
-        return 1;
-      }
-      const attested = attestAnalysis(analyzeTraffic(parsed as AnalyzedCall[]));
-      // Emit ONLY the evidence chain (plus its root hash), NOT a second top-level copy of the analysis.
-      // The single authoritative report is `chain[0].detail` — the exact bytes verifyChain re-hashes.
-      // A separate top-level `analysis` copy could be edited while the chain still verified, so it is
-      // deliberately omitted: the recipient runs verifyChain(chain) and reads chain[0].detail.
-      out({ chain: attested.chain, rootHash: attested.rootHash });
+      out(await analyzeInput(rest));
       return 0;
     }
     case "gateway": {

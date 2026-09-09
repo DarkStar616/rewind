@@ -49,7 +49,7 @@ function exportedNames(path: string): string[] {
 
 // The frozen surface — values + types. Keep sorted.
 const FROZEN = [
-  "ADAPTERS", "AnalysisTotals", "AnalyzeOptions", "AnalyzedCall", "AttestedAnalysis", "BillableSavings",
+  "ADAPTERS", "AnalysisTotals", "AnalyzeOptions", "TrafficAnalyzer", "TrafficAnalyzerOptions", "AnalyzedCall", "AttestedAnalysis", "BillableSavings",
   "CacheHygieneReport", "CachePlan", "CachePreservationCredit", "ComponentRates", "DEFAULT_PRICE_TABLE",
   "DEFAULT_REDACTORS", "DROP", "Divergence", "DivergenceKind", "DivergenceReport", "ExtractedUsage",
   "HygieneIssue", "HygieneReason", "MeteredAvoidance", "NOISE_FIELDS", "OpenAiUsageAggregate",
@@ -61,7 +61,7 @@ const FROZEN = [
   "TrustedScope", "ScopeRequest", "ScopeResolver",
   "SqliteStorageOptions", "StorageMutation", "StorageValue", "StorageCommit", "SqliteStorage", "StagingOptions", "StagedObject", "EncryptedStaging",
   "ReplayerOptions", "RunningProxy", "SavingsAnalysis", "ScopeAnalysis", "StrictReplayMissError",
-  "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "analyzeCacheHygiene", "analyzeTraffic", "createTrafficAnalyzer", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
   "createFixedTenantResolver", "encodeTrustedScope", "openSqliteStorage", "createEncryptedStaging", "createSqliteRecordStoreV2",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
@@ -77,7 +77,7 @@ const FROZEN = [
 // importing the module — a type-only export never appears here.
 const FROZEN_VALUES = [
   "ADAPTERS", "DEFAULT_PRICE_TABLE", "DEFAULT_REDACTORS", "DROP", "NOISE_FIELDS", "StrictReplayMissError",
-  "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "analyzeCacheHygiene", "analyzeTraffic", "createTrafficAnalyzer", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
   "createFixedTenantResolver", "encodeTrustedScope", "openSqliteStorage", "createEncryptedStaging", "createSqliteRecordStoreV2",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",

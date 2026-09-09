@@ -233,3 +233,12 @@ configuration, not arbitrary external SQLite writes, backups, or the whole direc
 needed for those. Disabling spill can retain dirty database pages in worker memory until commit;
 choose database and queue limits together. See SQLite's [cache spill documentation](https://sqlite.org/pragma.html#pragma_cache_spill)
 and [WAL concurrency constraints](https://sqlite.org/wal.html).
+
+## Incremental traffic analysis (v1.1 development)
+
+`createTrafficAnalyzer` is additive, with bounded digest/scope indexes and optional
+sample retention (off by default). Returned reports are snapshots. Existing
+`analyzeTraffic` keeps the batch signature and sample behavior. Both reject malformed
+usage and unsafe aggregate arithmetic before changing accumulator state. Missing usage
+still counts as zero. The CLI supports file/stdin NDJSON and emits a compact attested
+summary by default; `--legacy-json` restores the expanded report explicitly.

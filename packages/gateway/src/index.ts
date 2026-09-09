@@ -58,13 +58,15 @@ export type {
 } from "./reconcile.ts";
 export { divergeMessages } from "./diverge.ts";
 export type { DivergenceReport, Divergence, DivergenceKind } from "./diverge.ts";
-export { analyzeTraffic, attestAnalysis } from "./analysis.ts";
+export { analyzeTraffic, attestAnalysis, createTrafficAnalyzer } from "./analysis.ts";
 export type {
   AnalyzedCall,
   SavingsAnalysis,
   ScopeAnalysis,
   AnalysisTotals,
   AnalyzeOptions,
+  TrafficAnalyzer,
+  TrafficAnalyzerOptions,
   AttestedAnalysis,
 } from "./analysis.ts";
 export { createFixedTenantResolver, encodeTrustedScope } from "./trusted-scope.ts";
