@@ -178,9 +178,9 @@ characters (32 random bytes). Keep that key for reopening this tenant's store.
 It is never accepted as a CLI argument or JSON configuration field.
 
 ```sh
-rewind gateway --storage sqlite --tenant athena --epoch trial-1
+agent-rewind gateway --storage sqlite --tenant athena --epoch trial-1
 # Stop recording, then replay the ordered responses (strict misses return 409):
-rewind gateway --storage sqlite --tenant athena --epoch trial-1 --replay-cursor review-1
+agent-rewind gateway --storage sqlite --tenant athena --epoch trial-1 --replay-cursor review-1
 ```
 
 Storage defaults to `.rewind/storage`; override with `--storage-directory`.
@@ -248,3 +248,8 @@ command. Invalid or oversized inputs exit 1 with an actionable error.
 In a source checkout before release, use `node packages/mcp/dist/cli.js` in place
 of `agent-rewind` after `npm run build`. Apache-2.0 attribution is shipped under
 `third_party/headroom/` in the MCP package.
+
+Use `--record-only` to explicitly clear a replay cursor inherited from configuration or
+`REWIND_REPLAY_CURSOR`. This makes live upstream calls and requires SQLite mode. It
+cannot be combined with `--replay-cursor`. Explicit `null` configuration values are
+rejected; omit a field to use its default.

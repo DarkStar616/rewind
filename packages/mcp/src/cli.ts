@@ -41,7 +41,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | cache-compare <previous.json> <current.json> | prune <json> | " +
-  "analyze (--file <path>|--stdin|<json>) [--ndjson] [--legacy-json] | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
+  "analyze (--file <path>|--stdin|<json>) [--ndjson] [--legacy-json] | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>|--record-only] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -201,7 +201,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
         errline(`gateway configuration ${JSON.stringify(gatewayManifest(config))}`);
         errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
         errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
-        errline(durable ? "ordered tape enabled; savings receipt integration pending. Ctrl-C to stop." : "replays after a rewind cost 0 upstream tokens; run `rewind savings` to see the total. Ctrl-C to stop.");
+        errline(durable ? "ordered tape enabled; savings receipt integration pending. Ctrl-C to stop." : "replays after a rewind cost 0 upstream tokens; run `agent-rewind savings` to see the total. Ctrl-C to stop.");
         await new Promise<void>((resolveStop) => {
           const stop = () => {
             process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop);

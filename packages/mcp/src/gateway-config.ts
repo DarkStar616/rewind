@@ -27,6 +27,13 @@ export function parseGatewayConfig(
   let configPath = env.REWIND_CONFIG;
   for (let i = 0; i < args.length; i++) {
     const [flag, ...equalValue] = args[i].split("=");
+    if (flag === "--record-only") {
+      if (equalValue.length) throw new Error("gateway: --record-only takes no value");
+      if (seen.has("replayCursor")) throw new Error("gateway: duplicate or conflicting replayCursor option");
+      seen.add("replayCursor");
+      cli.replayCursor = undefined;
+      continue;
+    }
     const switches: Record<string, [string, boolean]> = {
       "--preserve-cache": ["preserveCache", true], "--no-preserve-cache": ["preserveCache", false],
       "--prune-context": ["pruneContext", true], "--no-prune-context": ["pruneContext", false],
@@ -47,7 +54,7 @@ export function parseGatewayConfig(
       else cli[key] = value;
     }
   }
-  let file: unknown = fileConfig ?? {};
+  let file: unknown = fileConfig === undefined ? {} : fileConfig;
   if (fileConfig === undefined && configPath !== undefined) {
     try { file = JSON.parse(readFileSync(configPath, "utf8")); }
     catch { throw new Error("gateway: config file must be readable JSON"); }
@@ -55,6 +62,7 @@ export function parseGatewayConfig(
   if (!file || typeof file !== "object" || Array.isArray(file)) throw new Error("gateway: config must be an object");
   for (const key of Object.keys(file)) {
     if (!(FIELDS as readonly string[]).includes(key)) throw new Error("gateway: unknown config field");
+    if ((file as Record<string, unknown>)[key] === null) throw new Error(`gateway: ${key} cannot be null; omit it to use the default`);
   }
   const environment = Object.fromEntries(FIELDS.flatMap((field, i) => env[ENV_FIELDS[i]] === undefined ? [] : [[field, env[ENV_FIELDS[i]]]]));
   const values: Record<string, unknown> = { ...file, ...environment, ...cli };
@@ -82,6 +90,7 @@ export function parseGatewayConfig(
   if (values.tenant !== undefined) createFixedTenantResolver(values.tenant as string);
   const storage = values.storage ?? "memory";
   if (storage !== "memory" && storage !== "sqlite") throw new Error("gateway: storage must be memory or sqlite");
+  if (storage !== "sqlite" && seen.has("replayCursor")) throw new Error("gateway: replay cursor and record-only require sqlite");
   if (storage === "sqlite" && (values.tenant === undefined || values.epoch === undefined)) throw new Error("gateway: sqlite requires tenant and epoch");
   if (storage === "memory" && [values.epoch, values.replayCursor, values.storageDirectory].some(v => v !== undefined)) throw new Error("gateway: epoch, replay cursor and storage directory require sqlite");
   for (const key of ["epoch", "replayCursor"]) if (values[key] !== undefined && (typeof values[key] !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(values[key] as string))) throw new Error(`gateway: invalid ${key}`);
