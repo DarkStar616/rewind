@@ -91,3 +91,42 @@ test("gateway CLI invalid flags exit before opening a listener", async () => {
     }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test("sqlite CLI records distinct occurrences and replays across process restarts", { timeout: 20000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rewind-cli-tape-"));
+  let hits = 0;
+  const upstream = createServer(async (req, res) => {
+    for await (const _ of req) { /* drain */ }
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ type: "message", model: "test", content: [{type:"text", text: String(++hits)}], usage: { input_tokens: 3, output_tokens: 1 } }));
+  });
+  upstream.listen(0, "127.0.0.1"); await once(upstream, "listening");
+  const flags = ["gateway", "--storage", "sqlite", "--tenant", "test", "--epoch", "one", "--port", "0", "--upstream", `http://127.0.0.1:${(upstream.address() as {port:number}).port}`];
+  const key = "ab".repeat(32);
+  async function run(replay: boolean, action: (url: string) => Promise<void>) {
+    const child = spawn(process.execPath, [CLI, ...flags, ...(replay ? ["--replay-cursor", "reader"] : [])], { cwd: dir, env: { ...cleanEnv, REWIND_STORAGE_KEY: key }, stdio: ["ignore", "ignore", "pipe"] });
+    const exited = once(child, "exit"); let stderr = "";
+    try {
+      const url = await new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(stderr)), 5000);
+        child.stderr.on("data", chunk => { stderr += chunk; const found = stderr.match(/listening on (http:\/\/[^ ]+)/); if (found) { clearTimeout(timer); resolve(found[1]); } });
+        child.once("exit", () => { clearTimeout(timer); reject(new Error(stderr)); });
+      });
+      assert.doesNotMatch(stderr, new RegExp(key));
+      await action(url);
+    } finally { child.kill("SIGTERM"); await exited; }
+  }
+  const request = async (url: string) => {
+    const res = await fetch(`${url}/v1/messages`, { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({model:"test",messages:[{role:"user",content:"same"}]}) });
+    assert.equal(res.status, 200); return res.text();
+  };
+  try {
+    const invalid = spawnSync(process.execPath, [CLI, ...flags], {cwd:dir, env: {...cleanEnv,REWIND_STORAGE_KEY:"secret-invalid"},encoding:"utf8",timeout:5000});
+    assert.equal(invalid.status,1); assert.match(invalid.stderr,/64 hex/); assert.doesNotMatch(invalid.stderr,/secret-invalid|listening on/);
+    let first = "", second = "";
+    await run(false, async url => { first = await request(url); second = await request(url); assert.notEqual(first,second); });
+    await run(true, async url => { assert.equal(await request(url),first); });
+    await run(true, async url => { assert.equal(await request(url),second); });
+    assert.equal(hits,2);
+  } finally { upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); await rm(dir,{recursive:true,force:true}); }
+});

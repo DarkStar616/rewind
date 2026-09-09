@@ -54,7 +54,7 @@ const FROZEN = [
   "DEFAULT_REDACTORS", "DROP", "Divergence", "DivergenceKind", "DivergenceReport", "ExtractedUsage",
   "HygieneIssue", "HygieneReason", "MeteredAvoidance", "NOISE_FIELDS", "OpenAiUsageAggregate",
   "OpenAiUsageBucket", "OpenAiUsageResult", "PriceTable", "ProviderAdapter",
-  "ProviderUsage", "ProviderUsageFetcher", "ProxyOptions", "PruneOptions", "PruneResult",
+  "ProviderUsage", "ProviderUsageFetcher", "TapeProxyOptions", "ProxyOptions", "PruneOptions", "PruneResult",
   "ReconciliationReport", "RecordKey", "RecordStore", "RecordedCall", "RecordedHttpResponse",
   "RedactContext", "RedactFn", "ReplayOutcome", "ReplayOutcomeLive", "ReplayOutcomeReplay", "Replayer",
   "HttpOccurrence", "TapeEpoch", "TapeCursor", "ConsumedOccurrence", "RecordStoreV2", "RecordStoreV2Options",

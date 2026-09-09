@@ -3,14 +3,18 @@ import { readFileSync } from "node:fs";
 
 export interface GatewayConfig {
   tenant?: string;
+  storage: "memory" | "sqlite";
+  epoch?: string;
+  replayCursor?: string;
+  storageDirectory?: string;
   port: number;
   upstream: string;
   profile: "compat" | "lean";
   preserveCache: boolean;
   pruneContext: boolean;
 }
-const FIELDS = ["port", "upstream", "profile", "preserveCache", "pruneContext", "tenant"] as const;
-const ENV_FIELDS = ["REWIND_PORT", "REWIND_UPSTREAM", "REWIND_PROFILE", "REWIND_PRESERVE_CACHE", "REWIND_PRUNE_CONTEXT", "REWIND_TENANT"] as const;
+const FIELDS = ["port", "upstream", "profile", "preserveCache", "pruneContext", "tenant", "storage", "epoch", "replayCursor", "storageDirectory"] as const;
+const ENV_FIELDS = ["REWIND_PORT", "REWIND_UPSTREAM", "REWIND_PROFILE", "REWIND_PRESERVE_CACHE", "REWIND_PRUNE_CONTEXT", "REWIND_TENANT", "REWIND_STORAGE", "REWIND_EPOCH", "REWIND_REPLAY_CURSOR", "REWIND_STORAGE_DIRECTORY"] as const;
 
 /** Strict, explicit opt-in: profile defaults < file overrides < environment < CLI. */
 export function parseGatewayConfig(
@@ -27,7 +31,7 @@ export function parseGatewayConfig(
       "--preserve-cache": ["preserveCache", true], "--no-preserve-cache": ["preserveCache", false],
       "--prune-context": ["pruneContext", true], "--no-prune-context": ["pruneContext", false],
     };
-    const names: Record<string, string> = { "--port": "port", "--upstream": "upstream", "--profile": "profile", "--config": "config", "--tenant": "tenant" };
+    const names: Record<string, string> = { "--port": "port", "--upstream": "upstream", "--profile": "profile", "--config": "config", "--tenant": "tenant", "--storage": "storage", "--epoch": "epoch", "--replay-cursor": "replayCursor", "--storage-directory": "storageDirectory" };
     const toggle = Object.hasOwn(switches, flag) ? switches[flag] : undefined;
     const key = toggle?.[0] ?? (Object.hasOwn(names, flag) ? names[flag] : undefined);
     if (!key) throw new Error("gateway: unknown option (see --help)");
@@ -76,7 +80,13 @@ export function parseGatewayConfig(
     throw new Error(`gateway: ${key} must be true or false`);
   };
   if (values.tenant !== undefined) createFixedTenantResolver(values.tenant as string);
-  return { ...(values.tenant === undefined ? {} : { tenant: values.tenant as string }), port: Number(port), upstream: upstream as string, profile, preserveCache: boolean("preserveCache", profile === "lean"), pruneContext: boolean("pruneContext", false) };
+  const storage = values.storage ?? "memory";
+  if (storage !== "memory" && storage !== "sqlite") throw new Error("gateway: storage must be memory or sqlite");
+  if (storage === "sqlite" && (values.tenant === undefined || values.epoch === undefined)) throw new Error("gateway: sqlite requires tenant and epoch");
+  if (storage === "memory" && [values.epoch, values.replayCursor, values.storageDirectory].some(v => v !== undefined)) throw new Error("gateway: epoch, replay cursor and storage directory require sqlite");
+  for (const key of ["epoch", "replayCursor"]) if (values[key] !== undefined && (typeof values[key] !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(values[key] as string))) throw new Error(`gateway: invalid ${key}`);
+  if (values.storageDirectory !== undefined && (typeof values.storageDirectory !== "string" || !values.storageDirectory || /[\x00-\x1f\x7f]/.test(values.storageDirectory))) throw new Error("gateway: invalid storage directory");
+  return { storage, epoch: values.epoch as string | undefined, replayCursor: values.replayCursor as string | undefined, storageDirectory: values.storageDirectory as string | undefined, ...(values.tenant === undefined ? {} : { tenant: values.tenant as string }), port: Number(port), upstream: upstream as string, profile, preserveCache: boolean("preserveCache", profile === "lean"), pruneContext: boolean("pruneContext", false) };
 }
 
 export function gatewayManifest(config: GatewayConfig): unknown {
@@ -90,7 +100,7 @@ export function gatewayManifest(config: GatewayConfig): unknown {
       observationRetrieval: { available: false },
       max: { available: false },
     },
-    replayStorage: "memory; cleared on restart",
-    savingsReceipt: "replay only; cache/prune dollar attribution not yet available",
+    replayStorage: config.storage === "sqlite" ? { engine: "encrypted-sqlite", mode: config.replayCursor ? "ordered-replay" : "record-only", epoch: config.epoch, cursor: config.replayCursor, directory: config.storageDirectory ?? ".rewind/storage" } : "memory; cleared on restart",
+    savingsReceipt: config.storage === "sqlite" ? "ordered replay receipt integration pending; no savings booked" : "replay only; cache/prune dollar attribution not yet available",
   };
 }

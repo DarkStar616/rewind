@@ -170,3 +170,44 @@ Clients may add their own protocol wrappers. Hidden tools cannot be called throu
 Checkpoint at meaningful risky boundaries and retain the returned id. The lean profile restores by
 id; switch to recovery for checkpoint discovery and failure memory. Tier 0 provides reversibility,
 not isolation or security. Text and structured result forms remain available for compatibility.
+
+### Explicit durable ordered tape (v1.1 development)
+
+Set `REWIND_STORAGE_KEY` securely in the process environment to exactly 64 hex
+characters (32 random bytes). Keep that key for reopening this tenant's store.
+It is never accepted as a CLI argument or JSON configuration field.
+
+```sh
+rewind gateway --storage sqlite --tenant athena --epoch trial-1
+# Stop recording, then replay the ordered responses (strict misses return 409):
+rewind gateway --storage sqlite --tenant athena --epoch trial-1 --replay-cursor review-1
+```
+
+Storage defaults to `.rewind/storage`; override with `--storage-directory`.
+Equivalent non-secret environment fields are `REWIND_STORAGE`, `REWIND_TENANT`,
+`REWIND_EPOCH`, `REWIND_REPLAY_CURSOR`, and `REWIND_STORAGE_DIRECTORY`; JSON uses
+`storage`, `tenant`, `epoch`, `replayCursor`, and `storageDirectory`. Existing
+configuration precedence applies. A tenant needs its own directory and key.
+The optional SQLite native driver must be installed successfully; missing driver,
+missing key, wrong key and corrupt storage fail visibly without memory fallback.
+
+Without a cursor, every eligible live call is appended as a distinct occurrence,
+including identical requests. With a cursor, responses are consumed in order and
+the cursor resumes across process restarts. Set a unique `x-rewind-request-id`
+for each logical replay call and reuse it only when retrying that same call to
+recover the original response without consuming another position. Control headers
+are stripped upstream. Unsupported mutations are refused; GET/HEAD metadata calls
+may still reach the upstream. Conflicts and storage failures return 503 without a
+paid model fallback. Ordered replay is not yet included in `rewind savings`.
+
+This remains opt-in: the default memory mode is unchanged. The gateway serializes
+tape requests within one process (queue limit 64). Request/response eligibility is
+512 KiB; oversized recording traffic passes through with an explicit skip log.
+Eligible responses are held in full until recording commits, delaying first-token
+delivery. On crossing the eligibility limit, held bytes are flushed and the rest
+streams without recording. A client disconnect cancels its upstream request; an
+absolute 120-second upstream deadline releases stalled work. SDK callers can set
+`tape.upstreamTimeoutMs`. Full request streaming/backpressure and incremental
+terminal staging remain U26 work. Multi-process recording of
+the same epoch can conflict; run one writer. Physical WAL limits and broader
+storage lifecycle certification remain separate acceptance work.

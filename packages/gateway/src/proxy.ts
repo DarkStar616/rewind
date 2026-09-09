@@ -20,8 +20,11 @@
  *     sink. Swap either for a durable backend without touching this file.
  */
 import { createServer, request as httpRequest, validateHeaderValue, type IncomingHttpHeaders, type Server } from "node:http";
+import { randomUUID } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 
+import { canonicalizeRequest } from "./canonical-request.ts";
+import type { RecordStoreV2, ConsumedOccurrence } from "./record-store-v2.ts";
 import { encodeTrustedScope, type ScopeResolver } from "./trusted-scope.ts";
 import type { RecordStore, RecordedCall } from "./record-store.ts";
 import type { Replayer } from "./replay.ts";
@@ -60,7 +63,21 @@ function validHttpRecord(record: RecordedCall, adapter: ProviderAdapter, url?: s
   } catch { return false; }
 }
 
+export interface TapeProxyOptions {
+  store: RecordStoreV2;
+  epoch: string;
+  replayCursor?: string;
+  maxRecordBytes?: number;
+  maxQueuedRequests?: number;
+  /** Absolute upstream deadline, including response body, in milliseconds. */
+  upstreamTimeoutMs?: number;
+  /** Called only for a fresh persisted replay claim; failures never trigger an upstream call. */
+  onAvoided?: (claim: ConsumedOccurrence, requestId: string) => Promise<void>;
+}
+
 export interface ProxyOptions {
+  /** Explicit ordered mode. No cursor records live occurrences; a cursor permits strict replay only. */
+  tape?: TapeProxyOptions;
   /** Port to bind; 0 lets the OS pick (read the real port back from the return value). */
   port?: number;
   /** Upstream base URL, e.g. "https://api.anthropic.com". */
@@ -159,6 +176,7 @@ function keyUrl(upstreamBase: string, reqUrl: string | undefined): string {
 /** Read a whole request/response body into a single Buffer. */
 function readBody(stream: NodeJS.ReadableStream): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    if ((stream as NodeJS.ReadableStream & { destroyed?: boolean }).destroyed) { reject(new Error("request closed before body read")); return; }
     const chunks: Buffer[] = [];
     stream.on("data", (c: Buffer) => chunks.push(c));
     stream.on("end", () => resolve(Buffer.concat(chunks)));
@@ -168,6 +186,16 @@ function readBody(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   if (options.scopeFailure !== undefined && !["refuse", "passthrough"].includes(options.scopeFailure)) throw new Error("invalid scope failure policy");
+  if (options.tape && !options.resolveScope) throw new Error("durable tape requires a trusted scope resolver");
+  if (options.tape && options.scopeFailure === "passthrough") throw new Error("tape mode requires refusal on scope failure");
+  if (options.tape && (typeof options.tape.epoch !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(options.tape.epoch) || (options.tape.replayCursor !== undefined && (typeof options.tape.replayCursor !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(options.tape.replayCursor))))) throw new Error("invalid tape epoch/cursor");
+  const upstreamTimeoutMs = options.tape?.upstreamTimeoutMs ?? 120_000;
+  if (!Number.isSafeInteger(upstreamTimeoutMs) || upstreamTimeoutMs < 1 || upstreamTimeoutMs > 2_147_483_647) throw new Error("invalid upstream timeout");
+  const maxRecordBytes = options.tape?.maxRecordBytes ?? 512 * 1024;
+  const maxQueuedRequests = options.tape?.maxQueuedRequests ?? 64;
+  if (!Number.isSafeInteger(maxRecordBytes) || maxRecordBytes < 1 || !Number.isSafeInteger(maxQueuedRequests) || maxQueuedRequests < 1) throw new Error("invalid tape limits");
+  let tapeTail = Promise.resolve();
+  let queuedTapeRequests = 0;
   const messagesPath = options.messagesPath ?? "/v1/messages";
   const scopeHeader = (options.scopeHeader ?? "x-rewind-scope").toLowerCase();
   const log = options.log ?? (() => {});
@@ -175,12 +203,22 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   const client = upstream.protocol === "https:" ? httpsRequest : httpRequest;
 
   const server = createServer((req, res) => {
-    // Everything is async; guard the whole handler so no throw escapes to crash the process.
-    void handle().catch((err) => {
-      log(`proxy: unhandled error, failing to a 502: ${err instanceof Error ? err.message : String(err)}`);
-      if (!res.headersSent) res.writeHead(502, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: { type: "rewind_proxy_error", message: "upstream unreachable" } }));
-    });
+    // Install the error listener before an async resolver or queued request can be abandoned.
+    req.on("error", () => {});
+    const failed = (err: unknown): void => {
+      log(options.tape ? "proxy: durable request failed; no automatic upstream fallback" : `proxy: unhandled error: ${err instanceof Error ? err.message : String(err)}`);
+      if (res.headersSent) { res.destroy(); return; }
+      res.writeHead(options.tape ? 503 : 502, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { type: "rewind_proxy_error", message: options.tape ? "durable storage unavailable or cursor conflict" : "upstream unreachable" } }));
+    };
+    if (options.tape) {
+      if (queuedTapeRequests >= maxQueuedRequests) { req.resume(); res.writeHead(503); res.end("durable request queue full"); return; }
+      queuedTapeRequests++;
+      const previous = tapeTail;
+      let release!: () => void;
+      tapeTail = new Promise<void>((resolve) => { release = resolve; });
+      void previous.then(() => res.destroyed ? undefined : handle()).catch(failed).finally(() => { queuedTapeRequests--; release(); });
+    } else void handle().catch(failed);
 
     async function handle(): Promise<void> {
       const scopeRaw = req.headers[scopeHeader];
@@ -201,6 +239,12 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         }
       }
       const rawBody = await readBody(req);
+      if (res.destroyed) return;
+      if (options.tape && rawBody.length > maxRecordBytes) {
+        if (options.tape.replayCursor) { res.writeHead(409); res.end("strict replay request exceeds eligibility limit"); }
+        else { log("proxy: request exceeds tape eligibility limit; forwarding without recording"); await forward(rawBody, undefined); }
+        return;
+      }
       // Pick the provider adapter for this request. Precedence, in order:
       //   1. An explicit `options.provider` pin wins outright — its adapter is used when it path-matches;
       //      a pinned request that does not match (and is not the anthropic legacy case) is treated as
@@ -258,10 +302,25 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           // against a DIFFERENT upstream — two OpenAI-compatible vendors both speak /v1/chat/completions
           // with identical bodies, and that must be a miss, never a cross-provider false hit. The
           // replayer strips the query (auth material) itself.
-          decision = options.replayer.prepare
+          if (options.tape) {
+            const replayKey = canonicalizeRequest(parsed, req.headers, keyUrl(options.upstreamBase, req.url));
+            if (options.tape.replayCursor) {
+              await replayTape(scope, replayKey);
+              return;
+            }
+            await options.tape.store.createEpoch(scope, options.tape.epoch, "gateway-epoch-v1");
+            decision = { served: "live", keyed: replayKey };
+          } else decision = options.replayer.prepare
             ? options.replayer.prepare(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url), (record) => validHttpRecord(record, adapter, req.url))
             : options.replayer.handle(scope, parsed, req.headers, keyUrl(options.upstreamBase, req.url));
         } catch (err) {
+          if (options.tape) {
+            const status = err instanceof SyntaxError && options.tape.replayCursor ? 409 : 503;
+            if (res.headersSent) res.destroy();
+            else { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify({ error: { type: "rewind_tape_unavailable", message: "invalid request, unavailable history, or cursor conflict" } })); }
+            log("proxy: tape operation refused; no upstream call");
+            return;
+          }
           // A STRICT replay miss is a deliberate refusal to pay for a call the caller forbade — it must
           // NOT fall through to a paid upstream forward. Surface it; forward only on real parse faults.
           if (err instanceof StrictReplayMissError) {
@@ -343,8 +402,36 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         return;
       }
 
+      if (options.tape?.replayCursor && req.method !== "GET" && req.method !== "HEAD") {
+        res.writeHead(409); res.end("strict replay does not forward unsupported mutations"); return;
+      }
       // Non-messages traffic: forward transparently, no replay, no record.
       await forward(rawBody, undefined);
+    }
+
+    async function replayTape(scope: string, replayKey: string): Promise<void> {
+      const tape = options.tape!;
+      const cursorId = tape.replayCursor!;
+      const provided = req.headers["x-rewind-request-id"];
+      if (provided !== undefined && (typeof provided !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(provided))) throw new Error("invalid replay request identity");
+      const requestId = provided ?? randomUUID();
+      let current = await tape.store.cursor(scope, cursorId);
+      if (!current) current = await tape.store.openCursor(scope, tape.epoch, cursorId, "gateway-open-cursor-v1");
+      if (current.epoch !== tape.epoch) throw new Error("cursor belongs to another epoch");
+      const cursor = await tape.store.cursorForClaim(scope, cursorId, requestId) ?? current;
+      if (res.destroyed) return;
+      const claim = await tape.store.consume(cursor, replayKey, requestId);
+      if (!claim) {
+        res.writeHead(409, { "content-type": "application/json", "x-rewind": "strict-miss" });
+        res.end(JSON.stringify({ error: { type: "rewind_strict_replay_miss", message: "ordered occurrence absent or request differs" } }));
+        return;
+      }
+      const response = claim.occurrence.response;
+      res.writeHead(response.status, { "content-type": response.contentType, "content-length": String(response.body.byteLength), "x-rewind": "replay", "x-rewind-request-id": requestId });
+      if (!claim.replayed && tape.onAvoided) {
+        try { await tape.onAvoided(claim, requestId); } catch { log("proxy: durable avoidance callback failed; upstream remains skipped"); }
+      }
+      res.end(Buffer.from(response.body));
     }
 
     /** Forward the raw body upstream, stream the response back live, and (on a messages 2xx) record it. */
@@ -357,10 +444,20 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
         // request object, an `error`, and the client can disconnect — without this guard two of them
         // would each call res.end() and the second throws ERR_STREAM_WRITE_AFTER_END inside an event
         // handler, crashing the proxy. Fail-open means the proxy stays up no matter what.
-        let settled = false;
+        let settled = false, cancelled = false, committing = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let upstreamResponse: import("node:http").IncomingMessage | undefined;
+        const cancel = (): void => {
+          if (settled || res.writableFinished) return;
+          cancelled = true;
+          upReq.destroy(); upstreamResponse?.destroy();
+          if (!committing) done();
+        };
         const done = (): void => {
           if (settled) return;
           settled = true;
+          clearTimeout(timer);
+          res.removeListener("close", cancel);
           resolve();
         };
         const endQuietly = (): void => {
@@ -381,7 +478,7 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
           done();
         };
         // A client that hangs up mid-flight must not leave this promise pending forever.
-        res.on("error", () => done());
+        res.on("error", () => { if (!options.tape) done(); });
 
         const upReq = client(
           {
@@ -393,6 +490,8 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             headers: forwardableRequestHeaders(req.headers, rawBody.length, scopeHeader),
           },
           (upRes) => {
+            upstreamResponse = upRes;
+            if (cancelled || settled) { upRes.destroy(); return; }
             const status = upRes.statusCode ?? 502;
             const contentType = (upRes.headers["content-type"] as string) ?? "application/json";
             // Copy response headers verbatim except hop-by-hop/length (we set our own length on end).
@@ -403,39 +502,68 @@ export function startProxy(options: ProxyOptions): Promise<RunningProxy> {
             }
             res.writeHead(status, outHeaders);
             const chunks: Buffer[] = [];
+            let buffered = 0, eligible = true;
             upRes.on("data", (c: Buffer) => {
-              chunks.push(c); // buffer a copy for metering...
-              try {
-                res.write(c); // ...while streaming live for TTFT (client may have gone — ignore)
-              } catch {
-                /* client write failed; the res 'error'/'close' path will settle */
+              if (cancelled || settled) return;
+              buffered += c.length;
+              if (options.tape && eligible && buffered > maxRecordBytes) {
+                eligible = false;
+                for (const held of chunks) res.write(held);
+                chunks.length = 0;
               }
+              if (eligible) chunks.push(c);
+              if (!options.tape || !eligible) res.write(c);
             });
             upRes.on("end", () => {
-              endQuietly();
+              clearTimeout(timer);
+              if (cancelled || settled) { done(); return; }
+              committing = true;
+              void (async () => {
+              if (!options.tape) endQuietly();
               const full = Buffer.concat(chunks);
+              if (options.tape && !eligible) log("proxy: response exceeds tape eligibility limit; not recorded");
               // Record only a genuine, COMPLETE success on the replay-able endpoint. A 2xx that carries
               // an SSE error or a truncated stream is transient and must never be frozen into a replay.
-              if (record?.replayKey && status >= 200 && status < 300 && record.adapter.isRecordableSuccess(full, contentType, req.url)) {
+              if (eligible && record?.replayKey && status >= 200 && status < 300 && record.adapter.isRecordableSuccess(full, contentType, req.url)) {
                 try {
-                  recordResponse(options.store, record.adapter, record.scope, record.replayKey, full, contentType, status);
+                  if (options.tape) {
+                    const state = await options.tape.store.epoch(record.scope, options.tape.epoch);
+                    if (cancelled) { done(); return; }
+                    const { usage, model } = record.adapter.extractUsage(full, contentType);
+                    await options.tape.store.append({ scope: record.scope, epoch: options.tape.epoch, ordinal: state.length, replayKey: record.replayKey, requestUrl: req.url, provider: record.adapter.id, model: model ?? "unknown", usage, response: { status, contentType, body: full } }, randomUUID());
+                  } else recordResponse(options.store, record.adapter, record.scope, record.replayKey, full, contentType, status);
                   log(`proxy: LIVE recorded scope=${record.scope} key=${record.replayKey.slice(0, 12)}`);
                 } catch (err) {
+                  if (options.tape) throw err;
                   log(`proxy: record failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
                 }
-              } else if (record?.replayKey && status >= 200 && status < 300) {
+              } else if (eligible && record?.replayKey && status >= 200 && status < 300) {
                 log(`proxy: NOT recording an incomplete/error 2xx response scope=${record.scope}`);
               }
+              if (options.tape && !cancelled) { if (eligible) res.write(full); endQuietly(); }
               done();
+              })().catch(() => { log("proxy: durable recording failed before response completion"); res.destroy(); done(); });
             });
             upRes.on("error", () => {
               // Mid-stream upstream failure after headers were sent — we can't 502 now; just close.
-              endQuietly();
-              done();
+              if (options.tape) { cancelled = true; res.destroy(); if (!committing) done(); }
+              else { endQuietly(); done(); }
             });
           },
         );
+        if (options.tape) {
+          res.once("close", cancel);
+          timer = setTimeout(() => {
+            if (settled) return;
+            cancelled = true;
+            if (!res.headersSent) { res.writeHead(504); res.end("upstream deadline exceeded"); }
+            else res.destroy();
+            upReq.destroy(); upstreamResponse?.destroy();
+            if (!committing) done();
+          }, upstreamTimeoutMs);
+        }
         upReq.on("error", (err) => {
+          if (cancelled || settled) return;
           // Upstream genuinely unreachable (or errored before any response): surface a 502 if we still
           // can, else close. Never fabricate a model response.
           log(`proxy: upstream error: ${err instanceof Error ? err.message : String(err)}`);

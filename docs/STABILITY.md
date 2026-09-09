@@ -201,3 +201,19 @@ The OpenAI adapter now recognizes POST `/v1/responses` as well as Chat Completio
 rejects a Chat-shaped response on a Responses route and vice versa. Existing two-argument
 adapters remain compatible. The canonicalizer and existing synchronous replay semantics are
 unchanged; all Responses input, tools, reasoning and unknown fields retain their existing identity.
+
+### Ordered SQLite gateway integration (v1.1 development)
+
+`ProxyOptions.tape` and `TapeProxyOptions` add opt-in record-only or strict ordered
+replay over `RecordStoreV2`. `HttpOccurrence.requestUrl` preserves endpoint-aware
+response validation; `cursorForClaim` retrieves the original position for an
+idempotent consume retry. Existing synchronous memory store/replayer contracts
+are unchanged. An avoidance callback runs only for a fresh, committed consume;
+callback failure cannot trigger an upstream call. It is not a transactional
+accounting outbox: a crash can lose callback delivery (U21 remains pending).
+
+Durable proxy responses within the eligibility limit are buffered until append
+commits. Oversized responses flush and stream without recording. The additive
+`TapeProxyOptions.upstreamTimeoutMs` sets an absolute upstream deadline (default
+120 seconds); client disconnects cancel upstream work and release queued traffic.
+Storage commits already underway settle before the next queued request begins.

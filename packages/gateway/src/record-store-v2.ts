@@ -11,6 +11,8 @@ export interface HttpOccurrence {
   ordinal: number;
   /** Output of canonicalizeRequest, accepted verbatim. Storage never changes replay identity. */
   replayKey: string;
+  /** Provider endpoint path used for terminal-format validation. */
+  requestUrl?: string;
   provider: ProviderAdapter["id"];
   model: string;
   usage: ProviderUsage;
@@ -26,6 +28,7 @@ export interface RecordStoreV2 {
   append(occurrence: HttpOccurrence, transactionId: string): Promise<{ revision: number; replayed: boolean }>;
   openCursor(scope: string, epoch: string, cursorId: string, transactionId: string, ordinal?: number): Promise<TapeCursor>;
   cursor(scope: string, cursorId: string): Promise<TapeCursor | undefined>;
+  cursorForClaim(scope: string, cursorId: string, transactionId: string): Promise<TapeCursor | undefined>;
   rewind(cursor: TapeCursor, ordinal: number, transactionId: string): Promise<TapeCursor>;
   peek(cursor: TapeCursor, replayKey: string, options?: { strict?: boolean }): Promise<HttpOccurrence | undefined>;
   consume(cursor: TapeCursor, replayKey: string, transactionId: string, options?: { strict?: boolean }): Promise<ConsumedOccurrence | undefined>;
@@ -66,6 +69,7 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
   function validate(record: HttpOccurrence): void {
     position(record); if (record.ordinal === Number.MAX_SAFE_INTEGER) throw new Error("occurrence ordinal overflow"); key(record.replayKey); text(record.model, 256);
     if (record.expiresAt !== undefined && (!Number.isSafeInteger(record.expiresAt) || record.expiresAt < 0)) throw new Error("invalid occurrence expiry");
+    if (record.requestUrl !== undefined) text(record.requestUrl, 4096);
     const response = record.response;
     if (!response || !Number.isInteger(response.status) || response.status < 200 || response.status >= 300 || typeof response.contentType !== "string" || response.contentType.length > 256 || !(response.body instanceof Uint8Array) || response.body.byteLength > maxBody) throw new Error("invalid occurrence HTTP response/size");
     validateHeaderValue("content-type", response.contentType);
@@ -73,7 +77,7 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
     const counts = ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"].map((field) => (record.usage as Record<string, unknown>)[field] === undefined ? 0 : (record.usage as Record<string, unknown>)[field]);
     if (!counts.every((count) => Number.isSafeInteger(count) && (count as number) >= 0) || !Number.isSafeInteger((counts as number[]).reduce((a, b) => a + b, 0))) throw new Error("invalid occurrence usage counts");
     const adapter = ADAPTERS.find((candidate) => candidate.id === record.provider);
-    if (!adapter || !adapter.isRecordableSuccess(Buffer.from(response.body), response.contentType)) throw new Error("occurrence is not a complete provider success");
+    if (!adapter || !adapter.isRecordableSuccess(Buffer.from(response.body), response.contentType, record.requestUrl)) throw new Error("occurrence is not a complete provider success");
     const extracted = adapter.extractUsage(Buffer.from(response.body), response.contentType);
     const fields = ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] as const;
     if (fields.some((field) => (record.usage[field] ?? 0) !== (extracted.usage[field] ?? 0))) throw new Error("occurrence usage differs from provider bytes");
@@ -95,7 +99,7 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
     const meta = JSON.parse(raw.subarray(8, 8 + length).toString()) as FrameMetadata;
     const body = Buffer.from(raw.subarray(8 + length));
     if (meta.schema !== "rewind.occurrence/v1" || meta.scope !== expected.scope || meta.epoch !== expected.epoch || meta.ordinal !== expected.ordinal || meta.bodyLength !== body.length || typeof meta.bodySha256 !== "string" || meta.bodySha256 !== sha(body) || typeof meta.transactionDigest !== "string" || !/^[a-f0-9]{64}$/.test(meta.transactionDigest)) throw new Error("corrupt occurrence coordinates/digest");
-    const record: HttpOccurrence = { scope: meta.scope, epoch: meta.epoch, ordinal: meta.ordinal, replayKey: meta.replayKey, provider: meta.provider, model: meta.model, usage: meta.usage, response: { status: meta.status, contentType: meta.contentType, body }, ...(meta.expiresAt === undefined ? {} : { expiresAt: meta.expiresAt }) };
+    const record: HttpOccurrence = { scope: meta.scope, epoch: meta.epoch, ordinal: meta.ordinal, replayKey: meta.replayKey, ...(meta.requestUrl === undefined ? {} : { requestUrl: meta.requestUrl }), provider: meta.provider, model: meta.model, usage: meta.usage, response: { status: meta.status, contentType: meta.contentType, body }, ...(meta.expiresAt === undefined ? {} : { expiresAt: meta.expiresAt }) };
     validate(record); return record;
   }
   async function load(location: Pick<HttpOccurrence, "scope" | "epoch" | "ordinal">): Promise<{ row: StorageValue; record: HttpOccurrence } | undefined> {
@@ -190,6 +194,16 @@ export function createSqliteRecordStoreV2(storage: SqliteStorage, options: Recor
       return { scope, epoch: id, cursorId, ordinal: start, revision: result.revisions[0] };
     },
     cursor: readCursor,
+    async cursorForClaim(scope, cursorId, transactionId) {
+      text(scope, 1024); text(cursorId); text(transactionId, 256);
+      const prior = await storage.get("claims", coordinate("consume", [scope, cursorId, transactionId]));
+      if (!prior) return undefined;
+      let claim: any;
+      try { claim = JSON.parse(prior.value.toString()); } catch { throw new Error("corrupt cursor claim"); }
+      if (claim.schema !== "rewind.cursor-claim/v1" || claim.kind !== "consume" || claim.cursor?.scope !== scope || claim.cursor?.cursorId !== cursorId) throw new Error("corrupt cursor claim binding");
+      cursorState(claim.cursor);
+      return { ...claim.cursor };
+    },
     async rewind(cursor, target, transactionId) {
       const snapshot = { ...cursor }; cursorState(snapshot); ordinal(target);
       if (target > (await epoch(snapshot.scope, snapshot.epoch)).value.length) throw new Error("rewind beyond epoch");

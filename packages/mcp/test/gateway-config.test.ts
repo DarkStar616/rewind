@@ -53,3 +53,10 @@ test("fixed tenant resolves through config, environment and CLI; invalid identit
   assert.equal(parseGatewayConfig([], {}, { tenant: "file" }).tenant, "file");
   for (const tenant of ["", "bad tenant", "x".repeat(129), null]) assert.throws(() => parseGatewayConfig([], {}, { tenant }));
 });
+
+test("sqlite mode requires explicit tenant and epoch and rejects secrets in config", () => {
+  assert.throws(() => parseGatewayConfig(["--storage", "sqlite"], {}), /tenant.*epoch/);
+  const config = parseGatewayConfig(["--storage", "sqlite", "--tenant", "a", "--epoch", "e", "--replay-cursor", "r"], {});
+  assert.equal(config.storage, "sqlite"); assert.equal(config.replayCursor, "r");
+  for (const file of [{storage: "memory", epoch: "e"}, {storage: "sqlite", tenant: "a", epoch: ["e"]}, {storageKey: "secret"}]) assert.throws(() => parseGatewayConfig([], {}, file));
+});

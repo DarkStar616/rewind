@@ -17,12 +17,14 @@ import { mcpProfile, parseMcpProfile } from "./mcp-profile.ts";
  * chain; a refusal exits 2 so a PreToolUse hook can BLOCK the offending tool call.
  */
 import { writeSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { argv, cwd, exit } from "node:process";
 import type { Engine, ExternalEffect } from "@agent-rewind/core";
 import {
   createFixedTenantResolver,
   createMemoryRecordStore,
+  openSqliteStorage,
+  createSqliteRecordStoreV2,
   createReplayer,
   startProxy,
   analyzeCacheHygiene,
@@ -40,7 +42,7 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
   "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
-  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
+  "analyze <json> | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -219,20 +221,28 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       const savings = createFileReplaySavings({ path: join(cwd(), ".rewind", "savings.json") });
       const store = createMemoryRecordStore();
       const replayer = createReplayer(store, savings);
-      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, preserveCache, pruneContext, resolveScope: config.tenant === undefined ? undefined : createFixedTenantResolver(config.tenant), log: (m) => errline(m) });
-      errline(`gateway configuration ${JSON.stringify(gatewayManifest(config))}`);
-      errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
-      errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
-      errline("replays after a rewind cost 0 upstream tokens; run `rewind savings` to see the total. Ctrl-C to stop.");
-      // Stay alive serving requests until a termination signal; close the listener cleanly then exit.
-      await new Promise<void>((resolve) => {
-        const stop = () => {
-          errline("rewind gateway shutting down");
-          void proxy.close().then(resolve, resolve);
-        };
-        process.once("SIGINT", stop);
-        process.once("SIGTERM", stop);
-      });
+      let durable: Awaited<ReturnType<typeof openSqliteStorage>> | undefined;
+      try {
+        if (config.storage === "sqlite") {
+          const key = process.env.REWIND_STORAGE_KEY;
+          if (typeof key !== "string" || !/^[0-9a-fA-F]{64}$/.test(key)) throw new Error("gateway: sqlite requires REWIND_STORAGE_KEY containing exactly 32 bytes encoded as 64 hex characters");
+          durable = await openSqliteStorage({ directory: resolve(cwd(), config.storageDirectory ?? ".rewind/storage"), tenant: config.tenant!, wrappingKey: Buffer.from(key, "hex") });
+        }
+        const tape = durable ? { store: createSqliteRecordStoreV2(durable), epoch: config.epoch!, replayCursor: config.replayCursor } : undefined;
+        const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, tape, preserveCache, pruneContext, resolveScope: config.tenant === undefined ? undefined : createFixedTenantResolver(config.tenant), log: (m) => errline(m) });
+        errline(`gateway configuration ${JSON.stringify(gatewayManifest(config))}`);
+        errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
+        errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
+        errline(durable ? "ordered tape enabled; savings receipt integration pending. Ctrl-C to stop." : "replays after a rewind cost 0 upstream tokens; run `rewind savings` to see the total. Ctrl-C to stop.");
+        await new Promise<void>((resolveStop) => {
+          const stop = () => {
+            process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop);
+            errline("rewind gateway shutting down");
+            void proxy.close().then(resolveStop, resolveStop);
+          };
+          process.once("SIGINT", stop); process.once("SIGTERM", stop);
+        });
+      } finally { await durable?.close(); }
       return 0;
     }
     case "mcp": {

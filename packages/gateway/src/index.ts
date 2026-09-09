@@ -37,7 +37,7 @@ export { anthropicAdapter } from "./providers/anthropic.ts";
 export { openaiAdapter } from "./providers/openai.ts";
 export { geminiAdapter } from "./providers/gemini.ts";
 export { startProxy } from "./proxy.ts";
-export type { ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
+export type { TapeProxyOptions, ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
 export { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from "./cache-preserve.ts";
 export type { CachePlan, CachePreservationCredit } from "./cache-preserve.ts";
 export { analyzeCacheHygiene } from "./cache-hygiene.ts";
