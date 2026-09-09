@@ -177,3 +177,31 @@ dashboard**. Every trusted player anchors to the provider's billing, not their o
   language-aligned interop lane; LiteLLM (Python, 56k★) is the gravitational center to sit beside.
 - **Study Cline's shadow-git checkpoint** implementation as prior art for the workspace-rewind substrate.
 - **Watch Humanlayer** — the only player whose approval-gating overlaps the effect barrier conceptually.
+
+## 2026-09-09 — Ultimate token-saving + cross-provider client usability (OpenAI & Anthropic endpoints)
+
+Full actionable playbook: **[`docs/TOKEN-SAVING-PROSPECT-2026-09-09.md`](TOKEN-SAVING-PROSPECT-2026-09-09.md)**. 4 verified lanes (HF · GitHub token-saving · gateways+clients · papers). Stats pulled live from HF API / `gh api` / paper PDFs / official docs on 2026-09-09.
+
+**Reframing finding:** prompt-cache traffic (creation+reads) is **~80–87% of a coding agent's bill**, output a minority ("Token Reduction Is Not Cost Reduction", arxiv 2607.12161, 2,848 billed runs). The money is in **cache reuse, not context shrinkage** — exactly Rewind's record/replay + cache-preservation. Same study: an arm cutting 38.4% of tool tokens *raised* billed cost +6.8% and broke patches (27/40→15/40).
+
+### Ranked — what to build/rip (savings ÷ correctness-risk ÷ effort)
+
+| Rank | Item | Source lane | Verdict + exact-replay | Rip / grounded in | Verified stats |
+|---|---|---|---|---|---|
+| 1 | **Prompt-cache breakpoint optimizer** (auto-place `cache_control` at longest stable prefix) | B + D | IMPLEMENT core · **preserves** | OpenRouter mapping; `cacheguardian`, `prompt-cache-gate`, `anthropic-cache`; vendor docs | Anthropic read 0.1×; OpenAI 50%; Gemini ~90% |
+| 2 | **Prefix-stability invariant/guard** (never mutate prefix) | D | IMPLEMENT-bounded · **preserves** | TokenPilot 2606.17016, Irminsul 2605.05696 | TTFT spikes 10–16s on prefix void |
+| 3 | **Cache-preserving Anthropic↔OpenAI translation** | C | IMPLEMENT · **preserves** | OpenRouter; Envoy AI GW → `theagentrouter/agent-router` (Apache, 2,010★) | bidirectional incl. streaming/tool_use/thinking |
+| 4 | **Honest savings bench harness** on real traces | A | IMPLEMENT · N/A | HF `obaydata/mcp-agent-trajectory-benchmark` (apache), `MaxDevv/real-pi-coding-agent-traces` (other), `LongBench-v2` (apache) | 992 / 6,584 / 73,011 dl |
+| 5 | **Deterministic append-only NL-only compaction** (opt-in, off replay path) | B + D | IMPLEMENT-bounded later · **threatens served path** | ACON 2510.00615; "Less Context, Better Agents" 2606.10209; caution Governance Decay 2606.22528 | 26–54% peak-token cut w/ success gain; but compaction silently drops safety constraints |
+| — | **Semantic auto-serve** | A/B/D | **AVOID** · threatens | vCache 2502.03771 (CC BY-NC, reimpl); GPTCache (8,185★, ~14mo stale) | correct vs wrong hits overlap 0.84 vs 0.85 |
+| — | **Proxy-layer KV reuse** | B/D | **AVOID** (wrong layer) | LMCache 11,719★, CacheBlend (no license) | needs inference-server control |
+| — | **Token compression for code** | A/B/D | **AVOID** (corroborated) | CompressionAttack 2510.22963; 2604.02985; 2607.12161 | ASR 0.71; patches 27/40→15/40; cost +6.8% |
+
+### Cross-provider client "point-at-Rewind" matrix (verified verbatim)
+Claude Code `ANTHROPIC_BASE_URL` (+ `ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_API_KEY`; non-anthropic host disables MCP tool-search + Remote Control) · aider `OPENAI_API_BASE`/`--openai-api-base` or `ANTHROPIC_API_BASE` (provider-prefixed model) · Codex CLI config.toml `model_provider`+`base_url`+`wire_api` (⚠️ may now need `responses` → Rewind would need a `/v1/responses` adapter) · OpenCode `opencode.json` `options.baseURL` via `@ai-sdk/openai-compatible` · Cline GUI OpenAI-Compatible Base URL (GUI-only) · **Cursor 🚫 cloud-routed, cannot reach localhost — needs a Cloudflare Tunnel/ngrok.**
+
+### Moat confirmation
+No public repo ties **byte-exact record/replay to checkpoint/rewind as production token-saving** — it exists only as CI fixtures/mocks (`llm_cassette`, `mock-llm-service`); the whole "token-saving cache" category is semantic/approximate (can serve a wrong answer). Rewind's space is unoccupied. Closest distribution competitor: `maximhq/bifrost` (`npx -y @maximhq/bifrost`, L1-exact/L2-semantic).
+
+### Checked, didn't hold up
+License landmines: `naver/provence` (cc-by-nc-nd), vCache (CC BY-NC), CacheBlend (no license) → reimplement/avoid. Wrong-domain: `MeanCache` = image-gen; `RequestChain` = Android/ASP.NET. Stale/maintenance: GPTCache (~14mo), Helicone (maintenance mode). UNVERIFIED: Codex `wire_api` default (load-bearing), aider `ANTHROPIC_API_BASE` on aider's own page, Martian/Unify/Requesty status. No HF corpus of raw LLM request/response logs exists — Rewind must generate its own bench.
