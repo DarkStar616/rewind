@@ -56,3 +56,36 @@ tree AND effect state, explicit force bypass, and discoverable new labels. A
 workspace-only comparison is insufficient. The existing checkpoint contract
 must remain the default. Cross-process effect races need an explicit oracle;
 process-local serialization alone is not a cross-process guarantee.
+
+## OSS integration review addendum
+
+The user explicitly authorized incorporating Bifrost, Headroom and agenticstash
+on 2026-09-09. Source acquisition and provenance are complete; runtime integration
+is pending. This overrides the historical no-import preference, but does not
+explicitly change the human-authored correctness-test rule above.
+
+Concrete proposed test-authoring scope for approval:
+
+- Request identity and generation migration: meaningful body/header differences
+  cannot false-hit, including own/nested `__proto__`; old-generation tapes remain
+  isolated and historical data is not silently rewritten.
+- Eligibility and recovery: hosted or effectful tools cannot enter ordinary
+  automatic replay; checkpoint/effect state binds the selected tape epoch/cursor.
+- Cache policy: TTL, read bypass, no-store and concurrency semantics remain
+  explicit; Bifrost lowercasing/trimming never changes exact replay identity.
+- Headroom adaptation: prefix diagnostics preserve opaque tool payloads;
+  retrieval retains original bytes, honors tenant ownership and expiry, and never
+  substitutes plaintext or memory storage when encrypted persistence fails.
+- agenticstash exchange: bounded binary-preserving exports; Rewind's authoritative
+  digest binds all required fields, missing references and global order. The
+  upstream seal is supplementary and cannot authorize a replay or effect.
+- Accounting: committed claims/receipts survive crashes and retries without
+  duplicate credit; unknown rates remain unknown; original recorded call price
+  is not mislabeled as a realized avoided bill.
+
+Existing human-owned tests and fixtures remain unchanged. New tests would extend
+the acceptance coverage, with upstream comparison cases, negative/property cases,
+and cross-process checks. No test-authoring exception has been assumed or applied.
+
+The complete integration boundaries and delivery order are in
+[the OSS roadmap](../plans/2026-09-09-002-research-driven-efficiency-roadmap.md).
