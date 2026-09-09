@@ -53,12 +53,13 @@ const FROZEN = [
   "CanonicalJsonError", "Change", "EFFECT_EMITTED", "EFFECT_REPLAY_REFUSED", "EffectAdmission",
   "EffectLedger", "EffectLedgerOptions", "EffectOutcome", "EffectRefusal", "Engine", "EngineOptions",
   "EvidenceLedger", "EvidenceLedgerError", "ExternalEffect", "GENESIS_HASH", "GitBackendOptions",
+  "MechanismEvent", "MechanismQuery", "MechanismProjection", "MechanismLedger",
   "LedgerOptions", "LedgerQuery", "Outcome", "REPLAY_REFUSED_REASON", "RefusableEffect", "ReplayResult",
   "ReplaySaving", "ReplaySavingsSink", "ReplaySavingsTotal", "RestoreFailedError", "RestoreResult",
   "RevertIndeterminateError", "RewindMemoryStore", "RewindResult", "UnhashedEntry", "VerifyResult",
   "WorldBackend", "WorldRef", "backtrackCandidates", "canonicalize", "computeEntryHash",
   "createEffectLedger", "createEngine", "createGitBackend", "createMemoryEvidenceLedger",
-  "createMemoryReplaySavings", "createMemoryRewindStore", "memoryForCheckpoint", "recommendedCheckpoint",
+  "createMemoryMechanismLedger", "createMemoryReplaySavings", "createMemoryRewindStore", "memoryForCheckpoint", "recommendedCheckpoint",
   "refId", "shouldCheckpoint", "verifyChain",
 ].sort();
 
@@ -68,7 +69,7 @@ const FROZEN_VALUES = [
   "CanonicalJsonError", "EFFECT_EMITTED", "EFFECT_REPLAY_REFUSED", "EvidenceLedgerError", "GENESIS_HASH",
   "REPLAY_REFUSED_REASON", "RestoreFailedError", "RevertIndeterminateError", "backtrackCandidates",
   "canonicalize", "computeEntryHash", "createEffectLedger", "createEngine", "createGitBackend",
-  "createMemoryEvidenceLedger", "createMemoryReplaySavings", "createMemoryRewindStore",
+  "createMemoryEvidenceLedger", "createMemoryMechanismLedger", "createMemoryReplaySavings", "createMemoryRewindStore",
   "memoryForCheckpoint", "recommendedCheckpoint", "refId", "shouldCheckpoint", "verifyChain",
 ].sort();
 

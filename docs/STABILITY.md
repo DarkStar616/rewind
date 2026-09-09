@@ -44,7 +44,7 @@ Values (runtime):
 `CanonicalJsonError`, `EFFECT_EMITTED`, `EFFECT_REPLAY_REFUSED`, `EvidenceLedgerError`,
 `GENESIS_HASH`, `REPLAY_REFUSED_REASON`, `RestoreFailedError`, `RevertIndeterminateError`,
 `backtrackCandidates`, `canonicalize`, `computeEntryHash`, `createEffectLedger`, `createEngine`,
-`createGitBackend`, `createMemoryEvidenceLedger`, `createMemoryReplaySavings`,
+`createGitBackend`, `createMemoryEvidenceLedger`, `createMemoryMechanismLedger`, `createMemoryReplaySavings`,
 `createMemoryRewindStore`, `memoryForCheckpoint`, `recommendedCheckpoint`, `refId`,
 `shouldCheckpoint`, `verifyChain`
 
@@ -53,7 +53,8 @@ Types:
 `AttemptRecord`, `AuditEntry`, `AuditEntryInput`, `AuthorityResolver`, `BacktrackCandidate`,
 `Change`, `EffectAdmission`, `EffectLedger`, `EffectLedgerOptions`, `EffectOutcome`,
 `EffectRefusal`, `Engine`, `EngineOptions`, `EvidenceLedger`, `ExternalEffect`,
-`GitBackendOptions`, `LedgerOptions`, `LedgerQuery`, `Outcome`, `RefusableEffect`,
+`GitBackendOptions`, `LedgerOptions`, `LedgerQuery`, `MechanismEvent`, `MechanismQuery`,
+`MechanismProjection`, `MechanismLedger`, `Outcome`, `RefusableEffect`,
 `ReplayResult`, `ReplaySaving`, `ReplaySavingsSink`, `ReplaySavingsTotal`, `RestoreResult`,
 `RewindMemoryStore`, `RewindResult`, `UnhashedEntry`, `VerifyResult`, `WorldBackend`, `WorldRef`
 
@@ -90,3 +91,22 @@ TypeScript export set: the MCP tool contract (`checkpoint`, `list`, `rewind`, `r
 `guard_effect`, plus the recovery/savings tools) and the `agent-rewind` CLI. These are covered
 by `packages/mcp/test/e2e-stdio.test.ts` and the server/CLI suites. The MCP tool names and their
 input/output handle shapes follow the same semver discipline as the library surfaces above.
+
+## Additive v1.1 mechanism measurements
+
+`createMemoryMechanismLedger` adds the pure `rewind.mechanism/v1` event contract. It does not replace
+or change `ReplaySavingsSink` or wire production receipts. Records, request occurrences, events and
+transport retry identities are distinct. IDs are tenant/scope-local; retry keys additionally include the mechanism so one transport request
+can emit separate cache/shaping/control events. Query requires a tenant and uses
+`since <= ts < until` numeric epoch milliseconds. Returned stored events are deeply frozen copies.
+Conflicting retries and replay/cache/shaping overlap on one request fail explicitly.
+
+Replay avoidance, live cache traffic, shaping, and control overhead have separate projections and
+eligible-unit denominators. Character-only shaping is advisory; it never becomes tokens or dollars.
+Cache reads/writes are discounted traffic, never eliminated tokens. Gateway attribution requires
+provider-reported usage, non-simulated pricing evidence and gateway-owned policy. Five-minute/hour writes use separately supplied
+rates; read discounts floor and premiums ceil in integer micro-USD. Net cache benefit can be negative.
+Pricing basis/version and evidence/configuration provenance remain visible; mixed cost bases are
+marked `mixed` and must not be presented as a provider bill. Producers remain responsible for truthful
+measurement/evidence; this pure ledger validates structure and arithmetic, not provider authenticity.
+Durable transactional integration, event production and CLI/MCP receipts are pending U21.

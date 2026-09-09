@@ -57,3 +57,5 @@ export type {
   RewindMemoryStore,
   BacktrackCandidate,
 } from "./recovery/recovery.ts";
+export { createMemoryMechanismLedger } from "./replay/mechanism-ledger.ts";
+export type { MechanismEvent, MechanismQuery, MechanismProjection, MechanismLedger } from "./replay/mechanism-ledger.ts";
