@@ -164,6 +164,14 @@ export function createTrafficAnalyzer(opts: TrafficAnalyzerOptions = {}): Traffi
         if (count !== undefined && (!Number.isSafeInteger(count) || count < 0)) throw new Error("invalid analysis usage");
       }
       if (!Number.isSafeInteger(totalUsageTokens(c.usage ?? {}))) throw new Error("invalid analysis usage");
+      if (c.headers !== undefined) {
+        if (!c.headers || typeof c.headers !== "object" || Array.isArray(c.headers) ||
+            ![Object.prototype, null].includes(Object.getPrototypeOf(c.headers)) ||
+            Object.values(c.headers).some((value) => value !== undefined && typeof value !== "string" &&
+              !(Array.isArray(value) && value.every((part) => typeof part === "string")))) {
+          throw new Error("invalid analysis headers");
+        }
+      }
       const existing = scopes.get(c.scope);
       if (!existing && scopes.size >= maxScopes) throw new Error("analysis scope cardinality limit exceeded");
       const href = absoluteHref(c.url);

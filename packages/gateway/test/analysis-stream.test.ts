@@ -42,3 +42,12 @@ test("invalid usage and aggregate overflow are rejected atomically", () => {
   assert.throws(() => stream.add({ ...call, scope: "two", usage: { input_tokens: 1 } }), /analysis counter limit exceeded/);
   assert.deepEqual(stream.result(), acrossScopes);
 });
+
+test("invalid capture headers cannot prove request equality", () => {
+  const stream = analysis.createTrafficAnalyzer();
+  const call = { scope: "one", body: {}, model: "test", url: "https://provider.test/v1/responses", usage: {} };
+  for (const headers of [null, [], "unknown", { "anthropic-version": 123 }, { "anthropic-beta": ["valid", 123] }]) {
+    assert.throws(() => stream.add({ ...call, headers: headers as never }), /invalid analysis headers/);
+  }
+  assert.equal(stream.result().total.calls, 0);
+});

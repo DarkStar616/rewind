@@ -54,7 +54,7 @@ export async function analyzeInput(args: readonly string[], stdin: AsyncIterable
       "invalid JSON", "expected a call object", "expected a JSON array of calls",
       "input size limit exceeded", "NDJSON record size limit exceeded", "JSON buffer size limit exceeded",
       "analysis scope cardinality limit exceeded", "analysis key cardinality limit exceeded",
-      "analysis counter limit exceeded", "invalid analysis call/scope", "invalid analysis usage",
+      "analysis counter limit exceeded", "invalid analysis call/scope", "invalid analysis usage", "invalid analysis headers",
     ]);
     const reason = error instanceof Error && safeReasons.has(error.message)
       ? error.message : "input unavailable or invalid call";
