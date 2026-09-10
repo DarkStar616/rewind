@@ -1,17 +1,20 @@
 # Agent Rewind
 
-**Reversible execution for AI agents. Checkpoint the whole workspace, rewind a failed run to
-any step, and never let an agent re-fire a spent external effect across a retry or a revert.**
+**Token-saving recovery for AI agents. Checkpoint the whole workspace, resume failed runs without
+repaying for eligible model calls, and prevent spent external effects from firing twice.**
 
 Agent Rewind is a small, portable substrate that drops into any AI coding agent (Claude Code, Cursor,
-Cline, Windsurf, Codex CLI) as a single MCP server, and gives it three things the agent does not
+Cline, Windsurf, Codex CLI) as a single MCP server, and gives it four things the agent does not
 have on its own:
 
 1. **Whole-workspace checkpoints** — a copy-on-write snapshot of the working tree at each step,
    including changes made by shell commands, not just the agent's file-edit tools.
 2. **Agent Rewind to any checkpoint** — resume a multi-step run from where it went wrong instead of
    starting over.
-3. **An effect barrier** — a refuse-and-record guard so that when a run is rewound, an external
+3. **Token-saving replay and cache controls** — an optional local gateway that reuses eligible recorded
+   model responses at zero upstream cost, preserves Anthropic prompt-cache breakpoints, and can prune
+   repeated tool results.
+4. **An effect barrier** — a refuse-and-record guard so that when a run is rewound, an external
    effect that already happened (a payment, an email, a provisioning call) cannot be silently
    replayed. The refusal is recorded on a tamper-evident hash chain.
 
@@ -29,12 +32,20 @@ codex mcp add agent-rewind -- npx -y @agent-rewind/mcp mcp
 
 Then, in plain terms: the agent **checkpoints** before risky work, **rewinds** to undo (bash changes
 included), and **guards** irreversible effects so a retry after a rewind can't re-charge a card or
-re-send an email. The server tells the agent this workflow on connect. Full guide:
+re-send an email. For token savings, the optional gateway records eligible calls and serves exact
+replays locally after a rewind or retry. The server tells the agent this workflow on connect. Full guide:
 [`docs/install/README.md`](docs/install/README.md).
 
 **Use cases:** long multi-step tasks (recover from a bad step without redoing everything) · agents that
 deploy/migrate/pay/email (safe undo that can't double-fire) · cheaper repetitive runs (the optional
 record/replay + prompt-cache proxy) · safe experimentation (checkpoint, try, rewind).
+
+**Measured token recovery:** Benchmark B ran 120 deterministic trials of a 10-step task and measured a
+curve from **9.1%** recovered tokens after an early failure to **41.2%** after a late failure at step 8.
+The condition matters: 41.2% is the late-failure result, not a universal savings promise. The repository
+also ships a Nebius runner that prices the same rewind/replay scenario from real provider-reported token
+usage. Neither result is a production-traffic or universal dollar-savings estimate. See the
+[benchmark evidence and claim rules](docs/BENCHMARKS.md).
 
 ## What shipped in v1.1.0
 
