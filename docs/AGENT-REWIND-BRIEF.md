@@ -1,7 +1,7 @@
 # Agent Rewind — briefing (paste this into an AI to write a doc or an email)
 
 *Self-contained. Claims are marked where they are proven and where limits remain. Product name:
-**Agent Rewind**. v1.0.0 is live; v1.1.0 is the release candidate described below.*
+**Agent Rewind**. v1.1.0 is live on npm and in the public source repository.*
 
 ---
 
@@ -37,10 +37,9 @@ Rewind does not turn a hosted model into an offline one.
 
 ---
 
-## Status: v1.1.0 release candidate
+## Status: v1.1.0 is live
 
-The current public npm release is v1.0.0. The following v1.1.0 packages are prepared for publication
-and must be verified from the registry after they are published:
+All three v1.1.0 packages are published and report `1.1.0` as their latest npm release:
 
 - `@agent-rewind/core@1.1.0` — the reversible-execution engine + effect barrier + hash chain
 - `@agent-rewind/gateway@1.1.0` — the token-saving record/replay LLM proxy
@@ -49,7 +48,7 @@ and must be verified from the registry after they are published:
 **Source:** https://github.com/DarkStar616/rewind · **Licence:** FSL-1.1-ALv2 (source-available, becomes
 Apache-2.0 after 2 years).
 
-**Proven working end-to-end** (run against the published package): checkpoint a workspace → change a
+**Proven working end-to-end**: checkpoint a workspace → change a
 file via `bash` → rewind → the file is restored → the agent re-fires a spent effect → it's **refused
 and recorded** → the tamper-evident chain **verifies**. All confirmed. ✅
 
@@ -109,36 +108,28 @@ systems**, and you can use either without the other:
 Three levers in the optional local proxy, all priced from the **provider's own usage numbers** and
 floored, so they never over-count:
 
-1. **Exact record/replay (the big lever).** The proxy records each model request+response. When a
-   **byte-identical** request comes through again — which happens constantly after a rewind, or when an
-   agent retries a step — it serves the recorded response locally and makes **zero** upstream API call.
-   The saving is the *entire* cost of that avoided call. It's correctness-safe by construction: it only
-   replays a request that is byte-for-byte equivalent, so it can never serve a subtly-wrong answer (this
-   is the key difference from "semantic" caches, which guess and can be wrong).
+1. **Exact record/replay (the big lever).** The proxy records each eligible model request+response. When a
+   request with the same canonical replay identity comes through again — common after a rewind or retry —
+   it serves the recorded response locally and makes **zero** upstream API call. The saving is the entire
+   cost of that avoided call. The replay key covers the output-affecting request fields Rewind knows about;
+   requests with hosted or remote state bypass automatic replay, and unknown future provider fields require
+   maintenance. This is stricter than a semantic cache, which guesses whether two requests are similar.
 2. **Prompt-cache preservation.** Providers (e.g. Anthropic) let you mark a stable prefix — the system
    prompt + tool definitions — with a `cache_control` breakpoint so it's cached and re-read at roughly
    **one-tenth** the normal input price. Agents often forget to set this or set it badly. The proxy
    injects/preserves one breakpoint on the static prefix, so that big unchanging prefix is billed at the
    cheap cache-read rate every turn instead of full price. Saving = (input rate − cache-read rate) ×
    cached tokens.
-3. **Deterministic pruning (smaller lever).** Collapses duplicate tool-output blocks (the same file read
-   five times) into one — losslessly, so the model still sees the content once — sending fewer tokens.
+3. **Deterministic pruning (smaller lever).** Collapses repeated Anthropic-format tool-result blocks
+   while preserving the first full result. This changes model-visible context, so it is opt-in and must
+   be evaluated against task outcomes as well as request size.
 
-**The savings benchmark (Benchmark B, 120 trials, deterministic).** How much a rewind recovers depends
-on **how late the run failed** — it's a *curve, not a constant*:
-
-| When the run fails | Tokens recovered |
-|---|---|
-| early (step 2 of 10) | **9.1%** |
-| mid (step 5 of 10) | **25.6%** |
-| **late (step 8 of 10)** | **41.2%** |
-
-So the honest headline is **"recover up to 41.2% of the tokens a *late-failing* run burned"** — the
-condition (late failure) must ride with the number. **Do not** state a bare "41.2%" with no condition;
-the same benchmark is 9.1% for an early failure. Two more caveats the benchmark itself declares: the
-ceiling for a *single* interruption is **50%**, and it's a deterministic workload (temperature 0), so it
-does not yet capture real run-to-run variance. *(An independent in-repo (synthetic) bench of the same replay
-mechanism corroborates the curve — ~28% at a step-5 rewind, scaling to ~39% on a deep rewind.)*
+**The savings benchmark.** The executable nine-call mock scenario reports **28.08% avoided simulated
+cost**, with three replayed calls out of nine; a unique-call negative control reports zero. Run
+`npm run --silent bench:json` to reproduce it with source hashes and denominators. It is one synthetic
+condition, not live provider billing, recovered-token percentage, or a general savings estimate. The
+previously quoted 120-trial early/mid/late curve is withdrawn because its runner and corpus were not
+found in the repository.
 
 ## How accuracy improves (the mechanism)
 
@@ -170,10 +161,10 @@ future work. Don't attribute those research numbers to Agent Rewind directly.
 
 ## What's proven vs. honest limits (do not overclaim)
 
-**Proven** (automated tests + live verification): the checkpoint/rewind/effect-barrier/hash-chain
-guarantees are covered by **334 passing tests** (run `npm run check`), ran green **40+ times with zero flakiness**, went
-through **repeated rounds of independent (different-AI-vendor) code review that converged clean**, and the
-published package was **installed from npm and run end-to-end**.
+**Proven** (automated tests + release verification): the checkpoint/rewind/effect-barrier/hash-chain
+guarantees are covered by **443 passing tests** (run `npm run check`), typechecking and builds pass, and
+the v1.1.0 release demo exercises Responses replay, encrypted SQLite reopen/replay, and a real MCP
+checkpoint through the SDK. Cross-vendor review is a bug-finding aid, not certification.
 
 **Honest limits — state these, don't hide them:**
 - The default tier is **reversibility, not isolation or security**. It can undo the workspace and block
@@ -182,10 +173,8 @@ published package was **installed from npm and run end-to-end**.
   tier.
 - Copy-on-write snapshot *speed* depends on the filesystem (fast on APFS/btrfs/XFS/ReFS; still correct
   but slower on ext4).
-- The **41.2%** savings figure is real and measured (Benchmark B), but it is the **late-failure** point
-  of a curve (9.1% early → 41.2% late) on a **deterministic synthetic workload** — always state the
-  late-failure condition, never a bare "41.2%". It is **not** a live-traffic / real-dollar measurement
-  yet, and the single-interruption ceiling is 50%.
+- The executable **28.08%** result is a deterministic mock scenario, not a live-traffic or real-dollar
+  measurement and not a general product savings estimate. The historical 41.2% figure is withdrawn.
 
 ---
 
@@ -208,7 +197,7 @@ published package was **installed from npm and run end-to-end**.
 | Price | Free and local; source-available under FSL-1.1-ALv2. Planned paid layer: a share of *verified* token savings. |
 | Works with | Claude Code, Cursor, Codex CLI, Cline, Windsurf (any MCP client) |
 | Requires | Node ≥ 20. No account, no API key. |
-| npm | Current public: all 1.0.0. Release candidate: all 1.1.0. |
+| npm | `@agent-rewind/core`, `@agent-rewind/gateway`, and `@agent-rewind/mcp`: latest is 1.1.0. |
 | Repo | https://github.com/DarkStar616/rewind |
 | One-line pitch | "An undo button for AI coding agents — that can't accidentally re-charge a card." |
 
@@ -218,8 +207,8 @@ published package was **installed from npm and run end-to-end**.
 
 - **The hook:** *AI agents are great until they aren't — and "just retry" can re-send the email.* Agent
   Agent Rewind is the safe undo.
-- **For developers:** one line to install, works with the agent you already use, nothing leaves your
-  machine.
+- **For developers:** one line to install, works with the agent you already use, and keeps Rewind state
+  local. Live gateway requests still go to the configured model provider.
 - **For the skeptical/technical reader:** every safety claim is test-backed and the log is
   independently verifiable — lead with the honesty, it's the credibility.
 - **Call to action:** `npx -y @agent-rewind/mcp mcp` — try it in any repo in 30 seconds.

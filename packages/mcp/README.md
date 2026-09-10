@@ -149,9 +149,10 @@ unverified: its runner and corpus were not located, so those percentages are wit
 
 - Full install guide, architecture, and the product breakdown: <https://github.com/DarkStar616/rewind>
 - Licence: **FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 future grant at 2 years).
-# MCP tool profiles (v1.1 development)
 
-Use `rewind mcp --profile lean` or set `REWIND_MCP_PROFILE=lean`. The CLI flag takes precedence.
+## MCP tool profiles (v1.1.0)
+
+Use `agent-rewind mcp --profile lean` or set `REWIND_MCP_PROFILE=lean`. The CLI flag takes precedence.
 Unknown profiles and options fail startup. The default remains `all`.
 
 | Profile | Tools | Approximate initialization tokens |
@@ -171,7 +172,7 @@ Checkpoint at meaningful risky boundaries and retain the returned id. The lean p
 id; switch to recovery for checkpoint discovery and failure memory. Tier 0 provides reversibility,
 not isolation or security. Text and structured result forms remain available for compatibility.
 
-### Explicit durable ordered tape (v1.1 development)
+### Explicit durable ordered tape (v1.1.0)
 
 Set `REWIND_STORAGE_KEY` securely in the process environment to exactly 64 hex
 characters (32 random bytes). Keep that key for reopening this tenant's store.
@@ -198,7 +199,7 @@ for each logical replay call and reuse it only when retrying that same call to
 recover the original response without consuming another position. Control headers
 are stripped upstream. Unsupported mutations are refused; GET/HEAD metadata calls
 may still reach the upstream. Conflicts and storage failures return 503 without a
-paid model fallback. Ordered replay is not yet included in `rewind savings`.
+paid model fallback. Ordered replay is not yet included in `agent-rewind savings`.
 
 This remains opt-in: the default memory mode is unchanged. The gateway serializes
 tape requests within one process (queue limit 64). Request/response eligibility is
@@ -211,10 +212,11 @@ absolute 120-second upstream deadline releases stalled work. SDK callers can set
 terminal staging remain U26 work. Multi-process recording of
 the same epoch can conflict; run one writer. Physical WAL limits and broader
 storage lifecycle certification remain separate acceptance work.
-## Bounded traffic analysis (v1.1 development)
 
-Run `rewind analyze --file capture.ndjson --ndjson`, or pipe a capture to
-`rewind analyze --stdin`. JSON arrays and a positional JSON argument remain supported.
+## Bounded traffic analysis (v1.1.0)
+
+Run `agent-rewind analyze --file capture.ndjson --ndjson`, or pipe a capture to
+`agent-rewind analyze --stdin`. JSON arrays and a positional JSON argument remain supported.
 NDJSON is processed incrementally, with limits of 2 MiB per record, 128 MiB total,
 100,000 distinct request keys and 1,000 scopes. JSON arrays use a 16 MiB buffer limit.
 
@@ -226,7 +228,7 @@ count as replay opportunities. Invalid token counts and counter overflow are rej
 review captured content before sharing that expanded report. Errors contain bounded
 reasons and source byte counts/hashes, without request excerpts or filesystem paths.
 
-### Compare two requests' cache prefixes (v1.1 development)
+### Compare two requests' cache prefixes (v1.1.0)
 
 Save consecutive messages-style request bodies as JSON, then run:
 

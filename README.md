@@ -17,7 +17,7 @@ have on its own:
 
 ## Quick start
 
-Live on npm — no account, no API key, Node ≥ 20:
+Public source and npm packages — no Rewind account or Rewind API key, Node ≥ 20:
 
 ```bash
 # Claude Code
@@ -35,6 +35,25 @@ re-send an email. The server tells the agent this workflow on connect. Full guid
 **Use cases:** long multi-step tasks (recover from a bad step without redoing everything) · agents that
 deploy/migrate/pay/email (safe undo that can't double-fire) · cheaper repetitive runs (the optional
 record/replay + prompt-cache proxy) · safe experimentation (checkpoint, try, rewind).
+
+## What shipped in v1.1.0
+
+- **Smaller MCP context:** `lean`, `recovery`, `analytics`, and `all` tool profiles let clients load
+  only the tools needed for a session. The measured `lean` definition set is about 691 tokens using
+  the documented characters/4 estimate; it is not a provider-billed token measurement.
+- **OpenAI Responses support:** the gateway understands `/v1/responses`, validates completed JSON and
+  SSE responses, and replays the exact recorded response bytes for eligible requests.
+- **Durable ordered replay:** an opt-in encrypted SQLite tape records distinct stochastic responses,
+  survives restarts, and replays them in order. It requires an explicit tenant, epoch, and 32-byte key.
+- **Safer gateway controls:** explicit compatibility and lean profiles, strict configuration parsing,
+  fixed-tenant scope isolation, replay eligibility checks for hosted state, bounded queues, and
+  upstream cancellation/deadlines.
+- **Bounded analysis tools:** streaming NDJSON traffic analysis and cache-prefix comparison emit compact
+  reports without printing prompts or responses by default.
+
+The default remains the compatibility profile with in-memory replay. Durable storage and context
+pruning are opt-in. See the [v1.1.0 changelog](CHANGELOG.md#110--2026-09-10) and the
+[MCP/gateway reference](packages/mcp/README.md) for configuration and limits.
 
 ## Why this exists
 
@@ -71,13 +90,14 @@ default as a security boundary. Honesty about that line is part of the product.
 
 ## Status
 
-**Live on npm.** Three packages, verified installable and working end-to-end from the registry:
+**v1.1.0 is live.** The source repository is public and all three packages report `1.1.0` as their
+latest npm release:
 
 - [`@agent-rewind/mcp`](https://www.npmjs.com/package/@agent-rewind/mcp) — the CLI + MCP server people install
 - [`@agent-rewind/core`](https://www.npmjs.com/package/@agent-rewind/core) — the reversible-execution engine, effect barrier, and hash chain
 - [`@agent-rewind/gateway`](https://www.npmjs.com/package/@agent-rewind/gateway) — the token-saving record/replay proxy
 
-Backed by 334 tests (green, run repeatedly with zero flakiness) and repeated rounds of independent
+Backed by 443 tests (green in the release verification run) and repeated rounds of independent
 cross-vendor (codex) code review. See [`docs/AGENT-REWIND-BRIEF.md`](docs/AGENT-REWIND-BRIEF.md) for the full
 plain-English breakdown (how token savings and accuracy work, use cases, and honest limits),
 [`docs/PRODUCT-BREAKDOWN.md`](docs/PRODUCT-BREAKDOWN.md) for the evidence-tagged technical breakdown,
@@ -86,5 +106,6 @@ and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the shape.
 ## Licence
 
 **FSL-1.1-ALv2** — the [Functional Source License 1.1](https://fsl.software/), which converts to
-Apache-2.0 two years after each release. Source-available and free for you to use and modify; the
-future Apache grant keeps it open long-term. Hosted and enterprise features are the commercial layer.
+Apache-2.0 two years after each release. The source is available to use, copy, modify, and distribute
+under the FSL terms, including its competing-use restriction. Hosted and enterprise features are the
+commercial layer.

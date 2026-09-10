@@ -1,6 +1,6 @@
 # API Stability — Agent Rewind 1.0
 
-This document is the public-API contract for the `@agent-rewind/*` packages as of **1.0.0**.
+This document is the public-API contract for the `@agent-rewind/*` packages as of **1.1.0**.
 It is enforced, not aspirational: the frozen export surfaces below are snapshotted by
 `packages/core/test/public-api.test.ts` and `packages/gateway/test/public-api.test.ts`,
 which derive the live export set from each package's `src/index.ts` on every run and fail
@@ -194,7 +194,7 @@ Gateway HTTP/CLI wiring, claim-to-accounting atomicity, incomplete-stream stagin
 full kill-point crash matrix are not delivered by this adapter packet. Storage
 lifecycle residuals remain as documented above; durable mode is not yet a default profile.
 
-## Responses adapter addition (v1.1 development)
+## Responses adapter addition (v1.1.0)
 
 The OpenAI adapter now recognizes POST `/v1/responses` as well as Chat Completions.
 `ProviderAdapter.isRecordableSuccess` accepts an optional request URL so transport validation
@@ -202,7 +202,7 @@ rejects a Chat-shaped response on a Responses route and vice versa. Existing two
 adapters remain compatible. The canonicalizer and existing synchronous replay semantics are
 unchanged; all Responses input, tools, reasoning and unknown fields retain their existing identity.
 
-### Ordered SQLite gateway integration (v1.1 development)
+### Ordered SQLite gateway integration (v1.1.0)
 
 `ProxyOptions.tape` and `TapeProxyOptions` add opt-in record-only or strict ordered
 replay over `RecordStoreV2`. `HttpOccurrence.requestUrl` preserves endpoint-aware
@@ -218,7 +218,7 @@ commits. Oversized responses flush and stream without recording. The additive
 120 seconds); client disconnects cancel upstream work and release queued traffic.
 Storage commits already underway settle before the next queued request begins.
 
-## Managed WAL admission (v1.1 development)
+## Managed WAL admission (v1.1.0)
 
 `SqliteStorageOptions.maxWalBytes` adds a separate WAL allowance (default twice the database limit
 plus 65,536 bytes). With cache spilling disabled and verified, each managed transaction reserves
@@ -234,7 +234,7 @@ needed for those. Disabling spill can retain dirty database pages in worker memo
 choose database and queue limits together. See SQLite's [cache spill documentation](https://sqlite.org/pragma.html#pragma_cache_spill)
 and [WAL concurrency constraints](https://sqlite.org/wal.html).
 
-## Incremental traffic analysis (v1.1 development)
+## Incremental traffic analysis (v1.1.0)
 
 `createTrafficAnalyzer` is additive, with bounded digest/scope indexes and optional
 sample retention (off by default). Returned reports are snapshots. Existing

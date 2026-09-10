@@ -1,6 +1,6 @@
 # Request identity generation 2
 
-The v1.1 development gateway now uses domain-separated generation-2 request keys.
+The v1.1.0 gateway uses domain-separated generation-2 request keys.
 This repairs prototype-named JSON field loss, retains unknown provider headers and
 content type, and restricts cache-hint removal to request/message/block boundaries.
 Tool inputs, schemas and unknown request data remain significant. Unknown cache
