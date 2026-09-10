@@ -4,17 +4,24 @@ Derived 2026-08-18 from the competitive `/deep-prospect` (see `deep-prospect-log
 verify-and-synthesize workflow. Every item is graded against **what Agent Rewind already ships**, so nothing
 here re-builds the moat. Sacred invariant throughout: **exact-replay determinism**.
 
-## Direct answer: "can we add agenticstash in as well?"
+## Current OSS reuse direction — supersedes the 2026-08-18 no-import preference
 
-**Study its design; import ZERO code; do NOT add it as a dependency.** agenticstash
-(`@takk/agenticstash`, Apache-2.0) is a ~1★, single-commit, solo-maintainer v1.0.0 SDK whose core —
-replay-by-substitution, SHA-256 seal, fork/diff — **all duplicate our moat** (Mechanism A replay,
-`packages/core` `verifyChain`, `recovery/backtrack`) and is an *in-process* library that would not
-compose with our HTTP-proxy architecture. A second implementation of our correctness-critical replay +
-hash chain would violate one-real-implementation discipline. What we take is **three pure design/frame
-ideas, re-derived in our own code**: the record-time redaction API shape, the typed divergence-report
-taxonomy, and the EU AI Act Art. 12 framing for our existing chain. (Apache-2.0, so even studying it is
-obligation-free once we write our own implementation.)
+On 2026-09-09 the user explicitly requested incorporating Bifrost, Headroom and
+agenticstash. Selective source reuse and optional integrations are authorized;
+competitive overlap is not a reason to reject useful OSS. The current authority
+is the [OSS integration roadmap](plans/2026-09-09-002-research-driven-efficiency-roadmap.md).
+Pinned review snapshots and attribution are in `third_party/`.
+
+Preserve Rewind's authoritative exact replay, encrypted storage and effect chain.
+Use agenticstash at an additive exchange/diff/checksum boundary: its per-key
+ordering and partial seal do not satisfy those stronger Rewind contracts. Retain
+upstream licenses/notices and distinguish downloaded source from a tested runtime
+integration. Historical no-import statements in older plans are superseded by
+this explicit user direction; those plans remain historical records.
+
+The remaining August inventory below records its original findings and should
+not be treated as a current shipped-state audit. See the September research report
+and execution log for current evidence.
 
 ## Build now — correctness + the gainshare funnel
 
@@ -55,7 +62,7 @@ obligation-free once we write our own implementation.)
 
 ## Hard skips (don't do these)
 
-- agenticstash **replay-by-substitution engine**, **SHA-256 seal code**, **fork-with-override code**, **runtime dependency**, **edge-runtime target** — all duplicate our moat or add competitor supply-chain risk for no gain.
+- Replacing Rewind's authoritative replay/effect chain with agenticstash semantics. Additive licensed reuse and compatibility exports are permitted under the September roadmap.
 - Cline **stash-into-user-repo** backend — our separate side git-dir works in *any* workspace; keep that advantage.
 - nOps **percent-of-spend floor** as default; **charging a % of total LLM spend**; **crediting counterfactual saved calls the agent never re-issued** — each forfeits the alignment or the defensibility that is the whole point.
 - HumanLayer **auto-approve / skip-permissions policy state inside the core** — session state, not replayable input; leaking it into the replay/barrier path breaks exact-replay.

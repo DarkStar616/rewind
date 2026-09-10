@@ -1,6 +1,6 @@
 {
   "name": "agent-rewind",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Whole-workspace checkpoint/rewind plus a refuse-and-record effect barrier for coding agents. Tier 0 is reversibility, not isolation or security.",
   "author": { "name": "Agent Rewind" },
   "license": "FSL-1.1-ALv2",

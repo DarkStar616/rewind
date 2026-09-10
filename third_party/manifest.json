@@ -1,0 +1,367 @@
+{
+  "schema": "rewind.oss-import/v1",
+  "status": "pinned reference snapshots; selective runtime adaptations listed per project",
+  "projects": [
+    {
+      "name": "bifrost",
+      "repository": "https://github.com/maximhq/bifrost.git",
+      "revision": "1d89501c733e94feeadce1b1ec9f0b76ec0a670f",
+      "license": "Apache-2.0",
+      "modifications": "none; selected files copied verbatim",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "9108c6efb701f19614cf2ac8d644f1459b7d67bc570ffa15547e4dc2e734b4d1"
+        },
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "sha256": "821392e8e8c2e823bf6a529981894c3f62f5a00e48b72764cea42b92c57f2181"
+        },
+        {
+          "path": "plugins/semanticcache/changelog.md",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "plugins/semanticcache/config_unmarshal_test.go",
+          "sha256": "6848516cf498712e81518d84d4a3a9591f3478d670c7769d587f9ba8258ab15c"
+        },
+        {
+          "path": "plugins/semanticcache/go.mod",
+          "sha256": "93031c0dccaf6d80154496be4ebbfe5586a147f554b7d5ee6dc3b491d21b728e"
+        },
+        {
+          "path": "plugins/semanticcache/go.sum",
+          "sha256": "c06163f31a15137c58fbf5c0247884329f81c6db91307a14663f6b7f43fef71b"
+        },
+        {
+          "path": "plugins/semanticcache/main.go",
+          "sha256": "ededa3b342bae19c79a144d58cb32e09951eead8d0bb4d20023dd8cf8ec45f91"
+        },
+        {
+          "path": "plugins/semanticcache/main_test.go",
+          "sha256": "ee15527bec46f58893458dfcb5c7bb891d73159be8b1a0125aa24a4a4ebc619d"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_api_test.go",
+          "sha256": "57ff220cfea7dd53fcc4bf63b3584c4375220bff32c3b1a83410b9d56c785559"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_cache_type_test.go",
+          "sha256": "d71748ef739ef03f7684e4dcfd88dc790874b6a2fc9d7c14069ef1528d442067"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_conversation_config_test.go",
+          "sha256": "1bbc9b27782ad8cf282921a200ac0d44d06d8a3e0f314f57edb8a608d5b6fd5a"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_core_test.go",
+          "sha256": "5784be1224bd847c30dbafa30b43babbf32ce3cdaff2df27f6c413413c1f4976"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_cross_cache_test.go",
+          "sha256": "ecf4a265f2b98a9e44c2fbff84d03117e70fbe39cec40041cfe3d033a8cbee44"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_default_cache_key_test.go",
+          "sha256": "a8d4a1fab7f671a8657cc2be67b99bddd0cebcc8127aa9aa7b8d3134b1136460"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_edge_cases_test.go",
+          "sha256": "e2e3c195186b7e3f6e6dba85affa1f602d4e4fcba0a5d17029ad75049e781e47"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_embedding_test.go",
+          "sha256": "07547044d67549758c9e0f2b7ab4357e01f169a9a6bfd4316dfe2d7939437222"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_image_generation_test.go",
+          "sha256": "f1cd3e41c115b0850dea00868ed38df08487dfdaefe6d4c51b7882b3ea95c63d"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_integration_test.go",
+          "sha256": "542c71b011602bf816c880b830dfe5b39e8d470934b52d86738b3801d8f5a8e6"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_nil_content_test.go",
+          "sha256": "278fe1cd619f0a786da406f47a3227bb75f0070aa91edc68137b81b1c40762ef"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_no_mutation_test.go",
+          "sha256": "f46209e8ad5cb2b47095425e3664ff403f97a2bd678065ad761fda6f76be5484"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_no_store_test.go",
+          "sha256": "dea8dbd290019c21d98aa331edd003ee37bbc0825f767e7b320b059d243d2d9f"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_normalization_test.go",
+          "sha256": "b5942f19136319ac68aa6726819726c6b5092c09201882141a92d59d3d059732"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_paths_test.go",
+          "sha256": "1998665d98927aefe6f4d1e30eddaa90678790d7589c0afb417e6e6411d0ba09"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_responses_test.go",
+          "sha256": "d11a4bc449c26b00589c915aba5ad74b5d63f0afa5b160512a272bb3d762bebc"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_streaming_test.go",
+          "sha256": "8c57b1e58c4d209ac7639c4a23c4691f6213d9cc1e512196bec22319f27c70af"
+        },
+        {
+          "path": "plugins/semanticcache/plugin_vectorstore_test.go",
+          "sha256": "ad742ae95046c8510037ffb707407b04fba8bbecb5bd052ddb1a4a34a982c2dc"
+        },
+        {
+          "path": "plugins/semanticcache/search.go",
+          "sha256": "4d194ee782c64c37c3a661d056e61d911341be6f6db9c3361a2d39044f6b42fa"
+        },
+        {
+          "path": "plugins/semanticcache/state.go",
+          "sha256": "cb0684b021230739c9f72f9dd7fa1e095ba41e02077ecc7dede2d2a4e84d3e2d"
+        },
+        {
+          "path": "plugins/semanticcache/stream.go",
+          "sha256": "b8499495ac84cfdd61b7544932d1f32453fdf402318a7be836da8b1276b5bd40"
+        },
+        {
+          "path": "plugins/semanticcache/test_utils.go",
+          "sha256": "3f76806519ad387381e0885d3832f66c25a190f85072e69eaa56cd9d7b458c28"
+        },
+        {
+          "path": "plugins/semanticcache/utils.go",
+          "sha256": "470a415ef22b9ccfe8971c384a1b3c315eefefe7b663e8ff9c1e22d02b458130"
+        },
+        {
+          "path": "plugins/semanticcache/version",
+          "sha256": "a2d5e268fe70979caccd895156b3d33bd61a3cc7e660ab7a5b07066849b3e248"
+        }
+      ],
+      "archive": "sources.tar.gz",
+      "archiveSha256": "e6120bb340ad0f6eee5d43d54771021e04dc76ce824f84e210ce5c9cea6c7256"
+    },
+    {
+      "name": "headroom",
+      "repository": "https://github.com/headroomlabs-ai/headroom.git",
+      "revision": "7bd4dbaf8f40d00f579f1cfca4bc56716f508d85",
+      "license": "Apache-2.0",
+      "modifications": "none; selected files copied verbatim",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "f14dd440c8e3152b4d4d324615de8251ddb011dc81f484daad0b6902093539cc"
+        },
+        {
+          "path": "NOTICE",
+          "sha256": "54134ada2d53b593077422f69031f0ca161a7710b8e2687d777fe6f1690f71f4"
+        },
+        {
+          "path": "headroom/cache/backends/base.py",
+          "sha256": "72e4fadbc5c45087d2d46926fd3f87588dc557bddb4f72d5322592ba1871ac7d"
+        },
+        {
+          "path": "headroom/cache/prefix_tracker.py",
+          "sha256": "6ffca9b3da0a6a58ce769ac9dd3c5d65dbca289af579e41f186d1753dddf4783"
+        },
+        {
+          "path": "headroom/ccr/tool_calls.py",
+          "sha256": "4165d885647b56395ff90121420b189b283de0518df6d7e62bde9ddac5b0e14e"
+        },
+        {
+          "path": "headroom/ccr/tool_injection.py",
+          "sha256": "708427ed7dbd6e488ee54eb21f47e1edc165d1a5458836a003b7c2056e20b492"
+        },
+        {
+          "path": "headroom/relevance/base.py",
+          "sha256": "65034cfd0ae37f81fdaeddf18b20782c4ca27ace851a650d77a57126b81f9400"
+        },
+        {
+          "path": "headroom/relevance/bm25.py",
+          "sha256": "66453d89d2da070563651545dd19ff714360895d84dc3691852a4f08df0a7e53"
+        },
+        {
+          "path": "headroom/transforms/cache_aligner.py",
+          "sha256": "97eeaef410ed1c9ef803344ff77e582b3a022eb271f7a3d608b052e18ed80807"
+        }
+      ],
+      "archive": "sources.tar.gz",
+      "archiveSha256": "d4f750cca5d0ad224347d55ddbe0b503e359bded68bd9009822b4567166c6f88",
+      "integrations": [
+        {
+          "source": "headroom/cache/prefix_tracker.py",
+          "target": "packages/mcp/src/prefix-compare.ts",
+          "mode": "modified TypeScript adaptation; advisory only",
+          "entrypoint": "agent-rewind cache-compare"
+        }
+      ]
+    },
+    {
+      "name": "agenticstash",
+      "repository": "https://github.com/davccavalcante/agenticstash.git",
+      "revision": "b73efb4378df37de893901b9016abf6498f2474f",
+      "license": "Apache-2.0",
+      "modifications": "none; selected files copied verbatim",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "e0136c66a8ad124a97e30e9adfca863cb72fbd1f2485eb7df4ffca548cf5768b"
+        },
+        {
+          "path": "NOTICE",
+          "sha256": "8bf907700d1314b9e0e81ed7b81e38b256c35f0784e4140ba4903355097434e6"
+        },
+        {
+          "path": "package.json",
+          "sha256": "4192899bfd419f7f8fd0f69418192ae8d87a80389b8f3f678384a3354ac8b4cf"
+        },
+        {
+          "path": "src/cli/args.ts",
+          "sha256": "828fdae0f31c23af04fc86b435220da8467c46b426380e51cc2e208c207ddb4a"
+        },
+        {
+          "path": "src/cli/commands.ts",
+          "sha256": "968aa16f0fbed26b973c61e012bf5ea3a6cc927fa616c6f4a1c50cd9ddeae0b5"
+        },
+        {
+          "path": "src/cli/index.ts",
+          "sha256": "18537fdeff9699895aef36c09f059699a9cf9d734e7efa2702e46f9cc220ea10"
+        },
+        {
+          "path": "src/diff/index.ts",
+          "sha256": "ff12fe22a6e9ba0c2bc3e76199518eff578ff47c2b4aa80348163ce8e0d8410e"
+        },
+        {
+          "path": "src/edge/index.ts",
+          "sha256": "2faa4f541b43fcd9058f9f9f0601c8df8e61df7bc465e2445c96c86b88720b2b"
+        },
+        {
+          "path": "src/errors.ts",
+          "sha256": "b7922627528df2b0b9274457aba24fc471314add6e6eff6b33b93dba78822396"
+        },
+        {
+          "path": "src/fork/index.ts",
+          "sha256": "c4a537036318cc6b92e415f0a10a6b12ed910fe0ee29df383327890327c154dc"
+        },
+        {
+          "path": "src/hash.ts",
+          "sha256": "c8568b73042baed147e0d56592330a71fb577d79342028cb987e4435fc3ec184"
+        },
+        {
+          "path": "src/index.ts",
+          "sha256": "fd1a784edf93ae25aa1f36b886df411f5e53f05b99c2b9e150313042d9199cc3"
+        },
+        {
+          "path": "src/interceptors/index.ts",
+          "sha256": "8367c0d10fe9c2c3aaf7712c9b693059b35dbbfe7ce7f25b37e505590259be50"
+        },
+        {
+          "path": "src/mcp/index.ts",
+          "sha256": "93dc93a566dbba5bff5012da5490e662ad3e030735a568db59417bf48daba93d"
+        },
+        {
+          "path": "src/record/index.ts",
+          "sha256": "ff536e3d3ea9f92efc83345f91ac6f9e8539e6d3c6e4a8537ee447d7afd35e69"
+        },
+        {
+          "path": "src/replay/index.ts",
+          "sha256": "30a969bdb76d146c5a48ff3f3336a36e9f1e2260d459fa13aa506a72ed01f442"
+        },
+        {
+          "path": "src/seal/index.ts",
+          "sha256": "b6908d23033eaca63988f9c4c68132437e1e8cea7ba9173cf483726cd8a192a7"
+        },
+        {
+          "path": "src/storage/index.ts",
+          "sha256": "9714c19f267c04854b93208f656f774370c9037381b08b73affbf0c2d5944768"
+        },
+        {
+          "path": "src/types.ts",
+          "sha256": "eca54f0ee8e13e7ccd6a505228763db7f14e469f582b4c6622b0d15ae7e63c9e"
+        },
+        {
+          "path": "src/wire.ts",
+          "sha256": "27e770fa3b752b695ce2eb4ca0c0c9a9f6708c868100787c6b789dc0bc9e0145"
+        },
+        {
+          "path": "tests/cli.test.ts",
+          "sha256": "9d821641ecf668069e757edc64c891953f88ceaef146b16a74b0a1bd566924a9"
+        },
+        {
+          "path": "tests/diff.test.ts",
+          "sha256": "3e47d20ef41b0cb77971ff4530208490b179a6c27dabcc7478f3c49d416a9e32"
+        },
+        {
+          "path": "tests/divergence.test.ts",
+          "sha256": "ffecd75811ed323641c8149012a382646166a87db082cedc0ac1a01312a4c227"
+        },
+        {
+          "path": "tests/errors.test.ts",
+          "sha256": "be3c7344b7883307d5aa54899a29faa32007a01bd9709a85dfbbad0285d4e573"
+        },
+        {
+          "path": "tests/fork.test.ts",
+          "sha256": "52e8082a0fdafa7d463525a34c6fd37d72717fbfe3ac3d8ed5510b5a8915a0bb"
+        },
+        {
+          "path": "tests/global-setup.ts",
+          "sha256": "dee9f09ddf0c5c8c04d169bceb97566d14e652392312fb287c0cc4ac9edbb806"
+        },
+        {
+          "path": "tests/hash.test.ts",
+          "sha256": "72cf104b372a21a1caa1d7830d1a8f5cea5c077e054a5d7065998d14434ae9ec"
+        },
+        {
+          "path": "tests/helpers.ts",
+          "sha256": "05163e1317e3aee7f273bac41b7f0a49c86e6245087a965012dc554a2b4a3dd6"
+        },
+        {
+          "path": "tests/interceptors.test.ts",
+          "sha256": "1a149a1cf22f08205cd5db07960fd1431944dd9cdd7ff509e40ac440a1e3360b"
+        },
+        {
+          "path": "tests/mcp.test.ts",
+          "sha256": "1f455f432bef78ce2bcc93726e7296a9a2759f37647416b77b0e7ecdec32ce6c"
+        },
+        {
+          "path": "tests/record.test.ts",
+          "sha256": "1f764ca8f5b03d0432d2c71cc93a5a95d360e6f45aa70e3f12081cf571ce737b"
+        },
+        {
+          "path": "tests/redaction.test.ts",
+          "sha256": "a8930113360e0c07e9b69c1727578131803f4dadd7ef74e3b54494ae3f8552ab"
+        },
+        {
+          "path": "tests/replay.test.ts",
+          "sha256": "99741cf432a563e1ff09615c62d27b26f3d649ef3456ae071811a2a06e0d1b29"
+        },
+        {
+          "path": "tests/seal.test.ts",
+          "sha256": "e1fe95f7bc317d26b11d0e852cbceb255140bbd25ad53405d2cbd8b24816011d"
+        },
+        {
+          "path": "tests/stash.test.ts",
+          "sha256": "62e1cdd5ed0836bd1f9392ba5eab6f6dab4c13f741790f27768bbe2361523650"
+        },
+        {
+          "path": "tests/storage.test.ts",
+          "sha256": "a4a7565e06e3a435f6a27e83cd3e44a0301d6622475088e60c26aa7584d9e5b3"
+        },
+        {
+          "path": "tsconfig.json",
+          "sha256": "126fe096d0f035ef1f738cddec2cc461dea8ad5dd268b7718061de02b2653227"
+        },
+        {
+          "path": "tsup.config.ts",
+          "sha256": "932fdde6d57c8e41fa1aeac787920f1f9428353d286d703eb805deed03e09f4d"
+        },
+        {
+          "path": "vitest.config.ts",
+          "sha256": "5049ec342e388451de3d220824c40cdc998c1a4df94a06ca7326b5023d9c8749"
+        }
+      ],
+      "archive": "sources.tar.gz",
+      "archiveSha256": "55ccd151e992244df95f24e6960d9029fcbc5cc2dfb0c083a5a644d7d80e65ad"
+    }
+  ]
+}

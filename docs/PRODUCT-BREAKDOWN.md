@@ -102,8 +102,7 @@ floored so they never over-count:
    turn. Saving = (input rate − cache-read rate) × cached tokens.
 3. **Deterministic pruning.** Collapses duplicate tool-output blocks losslessly — fewer tokens sent.
 
-*(The math and price table are in §6; the savings curve — 9.1% early → **41.2%** late failure,
-[SYNTHETIC] — is in §8.)*
+*(The math and price table are in §6; the executable nine-call simulated benchmark is in §8.)*
 
 **Accuracy — the mechanism.** Agent Rewind makes *recovery* cheap and safe: instead of compounding a mistake,
 the agent rewinds to the last good checkpoint and tries again; a **failure-memory** model (the
@@ -334,17 +333,17 @@ Agent Rewind ships **deterministic accounting gates**, not performance benchmark
 upstream with an injected clock and synthetic token counts, and their job is to prove the savings math
 can **never over-credit**, not to report a speed:
 
-- **[SYNTHETIC] The headline savings — Benchmark B (120 trials, deterministic).** How much a rewind
-  recovers depends on **how late the run failed** — a *curve, not a constant*: **9.1%** (fail early,
-  step 2 of 10) → **25.6%** (mid, step 5) → **41.2%** (late, step 8). The defensible headline is
-  *"recover up to 41.2% of the tokens a **late-failing** run burned"* — the late-failure condition must
-  ride with the number; a bare "41.2%" overstates (the same benchmark is 9.1% early). The benchmark
-  itself declares its limits: single-interruption ceiling **50%**, and deterministic (temp 0) so it does
-  not capture real run-to-run variance.
-- **[SYNTHETIC]** An independent in-repo bench of the same replay mechanism corroborates the curve: on a
-  fixed 9-call trajectory (rewind from step 5) it reports **28.08% billable** saving, scaling to ~39% on
-  a deep rewind — billable = the measured OFF−ON difference, always ≤ the gross replay upper bound it
-  refuses to bill.
+- **[UNVERIFIED] Historical Benchmark B:** the previously quoted 120-trial early/mid/late savings
+  curve has no executable source in this repository. It is withdrawn as product evidence until its
+  runner, corpus and outputs can be reproduced.
+- **[SIMULATED] Executable nine-call trajectory:** the mock OFF/ON benchmark reports **28.08%**
+  avoided simulated cost for `[1,2,3,4,5,3,4,5,6]`. OFF makes nine calls; ON makes six. This is one
+  synthetic condition, not observed provider billing, a recovered-token percentage, or task-success
+  evidence. The unique-call negative reports zero savings. Run `npm run --silent bench:json` for the
+  versioned artifact, source hashes, denominators, simulated rate table and explicit limitations.
+- **[EXTERNAL SOURCE, NOT SAVINGS EVIDENCE]** A pinned Apache-2.0 ATIF transcript excerpt is included
+  for provenance development. It is not a complete provider request and cannot prove exact replay or
+  paired savings. Coding-agent trace coverage, task evaluation and real billed OFF/ON runs remain open.
 - **[PROVEN] anti-over-credit gates:** `"golden-negative: a trajectory with NO re-runs bills EXACTLY
   0"`; `"near-match MUST miss: a one-word-different prompt is never served the recorded answer"`;
   `"billable saving never exceeds the gross replay upper bound"`; `"fully deterministic: two runs
@@ -421,7 +420,7 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 | Never over-credits savings (floors, dedupes, counterfactuals impossible) | **[PROVEN]** — meter/billable/bench |
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |
 | Tamper-evident, fail-closed verification | **[PROVEN]** — evidence-ledger tests |
-| 41.2% recovered on a **late** failure (curve: 9.1% early → 41.2% late, Benchmark B) | **[SYNTHETIC]** — deterministic, condition-bound, not a live measurement |
+| Historical Benchmark B savings curve | **[UNVERIFIED / WITHDRAWN]** — no executable source located |
 | AgentRewind 43.9%→87.8%, prompt-cache 59–90%, etc. | **[RESEARCH]** — external papers, not Agent Rewind's results |
 | Live latency / throughput / real-dollar savings % | **[NOT YET MEASURED]** |
 

@@ -24,6 +24,7 @@
  * `canonicalize` for the deterministic, key-sorted serialization the hash is taken over.
  */
 import { createHash } from "node:crypto";
+import { validateHeaderName, validateHeaderValue } from "node:http";
 
 import { canonicalize } from "@agent-rewind/core";
 
@@ -31,7 +32,7 @@ import { canonicalize } from "@agent-rewind/core";
  * Top-level fields removed before hashing because they provably do not change the model's output:
  * transport/caching hints, and auth material (auth belongs in headers — stripped defensively in case a
  * caller misplaces it in the body, so a secret is never hashed and a rotated key never busts the key).
- * Compared case-insensitively. Adding to this list only widens reuse; it can never cause a false hit.
+ * Compared case-insensitively. Every addition needs evidence: excluding meaningful data can false-hit.
  */
 export const NOISE_FIELDS: ReadonlySet<string> = new Set([
   // NOTE: `stream` is deliberately NOT here. It does not change the model's TEXT, but the wire format
@@ -49,97 +50,81 @@ export const NOISE_FIELDS: ReadonlySet<string> = new Set([
   "authorization",
 ]);
 
-/**
- * The ONLY key deep-stripped from retained sub-structure: `cache_control` rides on individual system
- * blocks, tool definitions, and message content blocks. Removing the whole object also removes its
- * nested `ttl`, so `ttl` is NOT stripped by name — a stripped-by-name `ttl` would erase a legitimate
- * `ttl` field inside a tool's input schema or a tool result, colliding two materially different
- * requests onto one key (a false hit → wrong answer). Likewise `prompt_cache_key` is a TOP-LEVEL
- * noise field (in NOISE_FIELDS), never stripped from nested content it may legitimately name.
- *
- * But `cache_control` is stripped ONLY where its value is a RECOGNIZED Anthropic cache hint (see
- * isCacheHint). A tool's JSON Schema may legitimately DEFINE a property literally named `cache_control`
- * (e.g. an enum `on`/`off`); blindly stripping every `cache_control` key would erase that schema
- * difference, collide two different tool contracts onto one key, and let the second replay an answer
- * generated under the other contract. Recognizing the hint SHAPE strips the real (output-neutral) hint
- * while keeping a user schema property — and an unknown-shaped `cache_control` is KEPT, so it forces a
- * miss rather than a false hit (the module's standing asymmetry).
- */
-const DEEP_STRIPPED_KEYS: ReadonlySet<string> = new Set(["cache_control"]);
-
-/** The known Anthropic cache-control hint types (the value shape `{ type: "ephemeral" | "persistent", ttl? }`). */
-const CACHE_HINT_TYPES: ReadonlySet<string> = new Set(["ephemeral", "persistent"]);
-
-/**
- * Is this value a recognized Anthropic `cache_control` HINT (output-neutral, safe to strip), as opposed
- * to a user-defined tool-schema property that merely shares the name? A hint is an object whose `type`
- * is a known cache-control type. Anything else (a JSON Schema fragment like `{type:"string",enum:[…]}`,
- * a primitive, an array) is NOT a hint and is retained, so a genuine contract difference keeps its key.
- */
+/** Only understood hint shapes are noise; extensions stay in identity. */
 function isCacheHint(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const t = (value as Record<string, unknown>).type;
-  return typeof t === "string" && CACHE_HINT_TYPES.has(t);
+  const hint = value as Record<string, unknown>;
+  return (hint.type === "ephemeral" || hint.type === "persistent") &&
+    Object.keys(hint).every(key => key === "type" || key === "ttl") &&
+    (hint.ttl === undefined || hint.ttl === "5m" || hint.ttl === "1h");
 }
 
-function deepStrip(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(deepStrip);
-  }
-  if (value !== null && typeof value === "object") {
-    const source = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(source)) {
-      if (DEEP_STRIPPED_KEYS.has(key) && isCacheHint(source[key])) continue;
-      out[key] = deepStrip(source[key]);
-    }
-    return out;
-  }
-  return value;
+function isPlain(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === null || proto === Object.prototype;
 }
 
-/**
- * Project a request body to its key normal form: drop top-level noise, deep-strip nested cache hints,
- * and KEEP everything else (known or unknown) so an unrecognized field forces a miss, not a false hit.
- */
-function project(body: unknown): unknown {
-  if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    // Non-object bodies have no top-level fields to filter; still strip nested hints for stability.
-    return deepStrip(body);
-  }
-  const source = body as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(source)) {
-    if (NOISE_FIELDS.has(key.toLowerCase())) continue;
-    // A recognized cache HINT is noise wherever it sits — strip it at the top level too. A top-level
-    // `cache_control` that is NOT a hint shape is retained (it forces a miss, never a false hit).
-    if (DEEP_STRIPPED_KEYS.has(key) && isCacheHint(source[key])) continue;
-    if (source[key] === undefined) continue;
-    out[key] = deepStrip(source[key]);
+/** Strip at a provider envelope/block boundary, never inside arbitrary user data. */
+function stripBlockHint(value: unknown): unknown {
+  if (!isPlain(value)) return value;
+  const out: Record<string, unknown> = Object.create(null);
+  for (const key of Object.keys(value)) {
+    if (key === "cache_control" && isCacheHint(value[key])) continue;
+    out[key] = value[key];
   }
   return out;
 }
 
+function projectMessage(value: unknown): unknown {
+  const out = stripBlockHint(value);
+  if (isPlain(out) && Array.isArray(out.content)) out.content = out.content.map(stripBlockHint);
+  return out;
+}
+
 /**
- * Request headers that change the model's output/behaviour and therefore belong in the replay
- * identity. `anthropic-version` versions API behaviour; `anthropic-beta` gates features (e.g. the MCP
- * connector) that change what the model can do. Auth, content-*, host, user-agent, accept-* and the
- * scope header are transport/identity noise and are excluded. Two requests with the same body but a
- * different value (or presence) of these headers get DIFFERENT keys — no cross-semantics false hit.
+ * Hint removal is structural: request, system/tool blocks and message envelopes/
+ * content blocks. Tool arguments, schemas, results and unknown fields remain
+ * opaque even when user data looks exactly like a provider cache directive.
  */
+function project(body: unknown): unknown {
+  if (!isPlain(body)) return body;
+  const out: Record<string, unknown> = Object.create(null);
+  for (const key of Object.keys(body)) {
+    if (NOISE_FIELDS.has(key.toLowerCase())) continue;
+    if (key === "cache_control" && isCacheHint(body[key])) continue;
+    const value = body[key];
+    if ((key === "system" || key === "tools") && Array.isArray(value)) out[key] = value.map(stripBlockHint);
+    else if (key === "messages" && Array.isArray(value)) out[key] = value.map(projectMessage);
+    else out[key] = value;
+  }
+  return out;
+}
+
+/** Historically named examples; this is not an exhaustive header allowlist. */
 export const KEY_HEADERS: readonly string[] = ["anthropic-version", "anthropic-beta"];
 
-/** Pick the output-affecting headers, lowercased, dropping any that are absent. */
+// Only established auth/local/transport fields are omitted. Unknown provider
+// headers remain part of identity; a new feature flag must never silently vanish.
+const HEADER_NOISE = new Set([
+  "authorization", "x-api-key", "api-key", "proxy-authorization", "user-agent",
+  "host", "content-length", "accept-encoding", "connection",
+  "keep-alive", "proxy-authenticate", "te", "trailer", "transfer-encoding", "upgrade",
+]);
+
 function pickKeyHeaders(headers: Record<string, string | string[] | undefined> | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!headers) return out;
-  // Build a case-insensitive view once.
-  const lower: Record<string, string | string[] | undefined> = {};
-  for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v;
-  for (const name of KEY_HEADERS) {
-    const v = lower[name];
-    if (v === undefined) continue;
-    out[name] = Array.isArray(v) ? v.join(", ") : v;
+  const out: Record<string, string> = Object.create(null);
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    const name = key.toLowerCase();
+    if (value === undefined || HEADER_NOISE.has(name) || name.startsWith("x-rewind-")) continue;
+    if (Object.hasOwn(out, name)) throw new Error("ambiguous duplicate request header");
+    try {
+      validateHeaderName(name);
+      if (typeof value !== "string" && !(Array.isArray(value) && value.every(v => typeof v === "string"))) throw new Error();
+      const normalized = Array.isArray(value) ? value.join(", ") : value;
+      validateHeaderValue(name, normalized);
+      out[name] = normalized;
+    } catch { throw new Error("invalid request header"); }
   }
   return out;
 }
@@ -195,7 +180,7 @@ function keyTarget(url: string | undefined): { path: string; query: string[][] }
  * canonicalizeRequest — the replay key for a request body (and the output-affecting headers, if given).
  *
  * @returns a 64-char lowercase hex SHA-256 over the request's normal form. When `headers` is provided,
- * the output-affecting subset (see KEY_HEADERS) is folded in under a reserved slot, so the same body
+ * all headers except established auth/local/transport noise is folded in under a reserved slot, so the same body
  * with a different `anthropic-beta`/`anthropic-version` produces a different key. When `url` is
  * provided, its pathname AND its non-auth query params are folded the same way, so the same body sent to
  * a different endpoint/model target (two Gemini models named only in the URL) — or the same target with
@@ -210,11 +195,14 @@ export function canonicalizeRequest(
   const keyHeaders = pickKeyHeaders(headers);
   // The reserved key uses a ` ` prefix that no real top-level body field can collide with.
   const normal: Record<string, unknown> = { " headers": keyHeaders, body: project(body) };
-  // Only present when a url was supplied, so existing callers that pass none keep their exact keys.
+  // Only present when a url was supplied, so omitted URL remains distinct from an explicitly supplied target.
   if (url !== undefined) {
     const target = keyTarget(url);
     normal[" path"] = target.path;
     normal[" query"] = target.query;
   }
-  return createHash("sha256").update(canonicalize(normal)).digest("hex");
+  // Domain separation invalidates every pre-repair key, including ordinary bodies
+  // which could previously collide with requests carrying own __proto__ data.
+  // Old tape bytes remain intact; only new-generation keys are eligible for lookup.
+  return createHash("sha256").update("rewind.request/v2\0").update(canonicalize(normal)).digest("hex");
 }

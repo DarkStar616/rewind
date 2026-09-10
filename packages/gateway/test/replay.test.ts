@@ -36,6 +36,22 @@ function recordedCall(): RecordedCall {
   };
 }
 
+test("prepared replay has no accounting side effect until its idempotent commit", () => {
+  const store = createMemoryRecordStore();
+  const savings = createMemoryReplaySavings();
+  const body = requestBody();
+  store.put({ scope: "s", replayKey: canonicalizeRequest(body) }, recordedCall());
+  let writes = 0;
+  const replayer = createReplayer(store, { total: savings.total, record(s) { writes++; savings.record(s); } });
+  const prepared = replayer.prepare!("s", body);
+  assert.equal(prepared.served, "replay");
+  assert.equal(savings.total().tokens, 0);
+  prepared.commit?.();
+  prepared.commit?.();
+  assert.equal(writes, 1);
+  assert.equal(savings.total().tokens, 6500);
+});
+
 // A fixed price table (µUSD per 1e6 tokens) so the booked cost is hand-checkable and independent of
 // whatever the shipped DEFAULT table's list prices are on any given day.
 const TEST_PRICES = {

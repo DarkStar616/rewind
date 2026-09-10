@@ -37,7 +37,7 @@ export { anthropicAdapter } from "./providers/anthropic.ts";
 export { openaiAdapter } from "./providers/openai.ts";
 export { geminiAdapter } from "./providers/gemini.ts";
 export { startProxy } from "./proxy.ts";
-export type { ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
+export type { TapeProxyOptions, ProxyOptions, RunningProxy, RecordedHttpResponse } from "./proxy.ts";
 export { planCacheBreakpoints, meterCachePreservation, hasCacheControl } from "./cache-preserve.ts";
 export type { CachePlan, CachePreservationCredit } from "./cache-preserve.ts";
 export { analyzeCacheHygiene } from "./cache-hygiene.ts";
@@ -58,12 +58,22 @@ export type {
 } from "./reconcile.ts";
 export { divergeMessages } from "./diverge.ts";
 export type { DivergenceReport, Divergence, DivergenceKind } from "./diverge.ts";
-export { analyzeTraffic, attestAnalysis } from "./analysis.ts";
+export { analyzeTraffic, attestAnalysis, createTrafficAnalyzer } from "./analysis.ts";
 export type {
   AnalyzedCall,
   SavingsAnalysis,
   ScopeAnalysis,
   AnalysisTotals,
   AnalyzeOptions,
+  TrafficAnalyzer,
+  TrafficAnalyzerOptions,
   AttestedAnalysis,
 } from "./analysis.ts";
+export { createFixedTenantResolver, encodeTrustedScope } from "./trusted-scope.ts";
+export type { TrustedScope, ScopeRequest, ScopeResolver } from "./trusted-scope.ts";
+export { openSqliteStorage } from "./storage/sqlite-store.ts";
+export type { SqliteStorageOptions, StorageMutation, StorageValue, StorageCommit, SqliteStorage } from "./storage/sqlite-store.ts";
+export { createEncryptedStaging } from "./storage/encrypted-staging.ts";
+export type { StagingOptions, StagedObject, EncryptedStaging } from "./storage/encrypted-staging.ts";
+export { createSqliteRecordStoreV2 } from "./record-store-v2.ts";
+export type { HttpOccurrence, TapeEpoch, TapeCursor, ConsumedOccurrence, RecordStoreV2, RecordStoreV2Options } from "./record-store-v2.ts";

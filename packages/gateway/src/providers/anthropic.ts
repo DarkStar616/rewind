@@ -3,6 +3,8 @@
  * gateway's original behaviour, relocated here unchanged (proxy.ts re-exports `isRecordableSuccess`
  * for backward compatibility). Recordable endpoint: POST /v1/messages.
  */
+import { planCacheBreakpoints } from "../cache-preserve.ts";
+import { analyzeCacheHygiene } from "../cache-hygiene.ts";
 import type { ProviderAdapter } from "./provider-adapter.ts";
 import { extractUsage, type ExtractedUsage } from "../usage.ts";
 
@@ -36,6 +38,8 @@ export function isRecordableSuccess(body: Buffer, contentType: string): boolean 
 
 export const anthropicAdapter: ProviderAdapter = {
   id: "anthropic",
+  planCacheBreakpoints,
+  analyzeCacheHygiene,
   matchPath(method: string | undefined, url: string | undefined): boolean {
     return method === "POST" && (url ?? "").split("?")[0] === "/v1/messages";
   },

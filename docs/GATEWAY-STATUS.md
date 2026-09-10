@@ -11,19 +11,19 @@ a local, byte-transparent LLM proxy an agent points `ANTHROPIC_BASE_URL` at.
 | **G2** record-store + replay | Content-addressed, scope-isolated replay (Mechanism A); strict mode hard-fails on a miss; cross-scope never serves | replay + record-store tests |
 | **G3** meter | Per-component avoided-cost from the provider's OWN reported usage; dated/versioned price table; golden-negative; no local token estimation | 10 meter tests, hand-checked math |
 | **G4** proxy | Byte-transparent HTTP proxy; tees the SSE stream; records only 2xx; **fail-open** (never blocks a call, never fabricates a response) | proxy + usage tests |
-| **G5** mock + bench | Cache-faithful mock (injected clock) + deterministic OFF-vs-ON bench | **28% billable saving** (SYNTHETIC — deterministic mock, no key) |
+| **G5** mock + bench | Cache-faithful mock (injected clock) + deterministic OFF-vs-ON bench | **28.08% simulated cost saving**, nine calls → six; not actual billing |
 | **G6** biting gates | No false credit; **no stale serve** for a near-match; cache-hint-only still replays; divergence credits only the shared portion | bench-gates tests |
 | **G7** CLI + durable savings | `rewind gateway [--port N] [--upstream URL]`; savings persist to `.rewind/savings.json` and feed `rewind savings` across processes | durable-savings tests, CLI smoke-tested |
 | **G8** cache-preserve | Mechanism B: injects a breakpoint on the static prefix when the agent set none; credits only what it caused; **opt-in**, separate meter (never double-counts A) | cache-preserve tests |
 | **BP1** secrets excluded | A rewind can never revert a live `.env`/key (AgentRewind "excluded" class) | 7 secret-exclusion tests |
 
-Run `npm run check` for the current count (334 tests + `tsc --noEmit`, all green).
+Run `npm run check` for the current test/typecheck verdict; historical test counts are not release evidence.
 
 ## The two mechanisms, kept separate
 
 - **Mechanism A — replay (ours, billable):** a byte-equivalent request after a rewind is served from
   the record with zero upstream call. The billable number is the **measured** marginal saving over the
-  provider's own caching (the bench differences two real runs), never the inflated cold-price "gross".
+  provider's own caching (the benchmark compares two runs against a simulated provider), never the inflated cold-price "gross".
 - **Mechanism B — cache-preservation (opt-in, helps, not yet billed):** marks the static prefix so the
   provider caches it. Credited only when the gateway injected the breakpoint AND a warm read resulted.
 
@@ -31,7 +31,9 @@ Run `npm run check` for the current count (334 tests + `tsc --noEmit`, all green
 
 ```bash
 # Deterministic proof, no API key:
-node packages/gateway/bench/run.ts
+NODE_OPTIONS=--conditions=development node packages/gateway/bench/run.ts
+# Versioned JSON artifact (source hashes, denominators and evidence labels):
+npm run --silent bench:json > benchmark.json
 
 # Live:
 npx -y @agent-rewind/mcp gateway --port 8788                 # forwards to https://api.anthropic.com
@@ -39,6 +41,19 @@ export ANTHROPIC_BASE_URL=http://127.0.0.1:8788
 # …run your agent (rewind → re-run) …
 npx -y @agent-rewind/mcp savings --json                      # the tokens/cost actually avoided
 ```
+
+## Benchmark evidence limits
+
+The nine-call default and all-unique negative are simulated accounting fixtures. Mock token counts
+use UTF-8 bytes/4, not a provider tokenizer. `bench:json` separates replay-avoided tokens, live provider
+cache traffic, context removed, and Rewind control-plane traffic; cache traffic is never summed as
+eliminated tokens. Disabled mechanisms report zero; unavailable measurements report null.
+
+The artifact includes one attributed Apache-2.0 ATIF excerpt with a pinned source revision/hash. This
+business-tool transcript is nonreplayable and has no paired billing; it is provenance groundwork, not
+a coding-agent savings result. Real traces, distributional results, restart/concurrency fixtures and
+provider-billed task-success comparisons remain unfinished. Historical claims of a 120-trial early/
+mid/late Benchmark B curve are unverified and withdrawn until its executable source is recovered.
 
 ## Cross-vendor review (codex, unsteered) — run and addressed
 

@@ -144,7 +144,7 @@ export function createFileEvidenceLedger(opts: FileEvidenceLedgerOptions): Evide
   }
 
   function flush(chains: Map<string, AuditEntry[]>): void {
-    const shape: PersistShape = { version: 1, scopes: {} };
+    const shape: PersistShape = { version: 1, scopes: Object.create(null) };
     for (const [scope, entries] of chains) shape.scopes[scope] = entries;
     mkdirSync(dirname(path), { recursive: true });
     // Atomic replace: write a sibling temp then rename over the target so a reader never sees a

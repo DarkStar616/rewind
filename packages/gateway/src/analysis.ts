@@ -32,9 +32,9 @@ export interface AnalyzedCall {
   usage: ProviderUsage;
   model: string;
   /**
-   * The request's headers. The output-affecting subset (`anthropic-version`, `anthropic-beta` — see
-   * canonical-request.ts KEY_HEADERS) is folded into the replay key exactly as the live gateway does, so
-   * two calls with the same body but a different API version/beta are NOT counted as a replay.
+   * The request's headers, excluding established auth/local/transport noise, are folded into the
+   * replay key. Unknown provider headers and content type remain significant; callers must capture
+   * the same header view used by their live gateway, excluding any configured local scope header.
    *
    * Semantics of absence matter: OMITTING this field means the headers are UNKNOWN, and an
    * unknown-headers call is never counted as a replay (it might have differed in a header we cannot see —
@@ -131,75 +131,83 @@ function absoluteHref(url: string | undefined): string | undefined {
  * Deterministic and side-effect-free — no upstream calls are made; this only reads the supplied bodies.
  */
 export function analyzeTraffic(calls: readonly AnalyzedCall[], opts: AnalyzeOptions = {}): SavingsAnalysis {
+  const analyzer = createTrafficAnalyzer({ ...opts, sample: "full", maxKeys: Math.max(1, calls.length), maxScopes: Math.max(1, calls.length) });
+  for (const call of calls) analyzer.add(call);
+  return analyzer.result();
+}
+
+export interface TrafficAnalyzerOptions extends AnalyzeOptions {
+  /** No sample means no prompt clone/redaction work or retained prompt content. */
+  sample?: "none" | "full";
+  maxKeys?: number;
+  maxScopes?: number;
+}
+export interface TrafficAnalyzer { add(call: AnalyzedCall): void; result(): SavingsAnalysis }
+
+/** Incremental exact-key analysis. Only bounded key digests/counters survive each add. */
+export function createTrafficAnalyzer(opts: TrafficAnalyzerOptions = {}): TrafficAnalyzer {
   const table = opts.priceTable ?? DEFAULT_PRICE_TABLE;
-  const redact = opts.redact ?? DEFAULT_REDACTORS;
-
+  const sampleMode = opts.sample ?? "none";
+  const maxKeys = opts.maxKeys ?? 100_000, maxScopes = opts.maxScopes ?? 1_000;
+  for (const limit of [maxKeys, maxScopes]) if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("invalid analysis cardinality limit");
+  if (opts.sample !== undefined && opts.sample !== "none" && opts.sample !== "full") throw new Error("invalid analysis sample policy");
   const scopes = new Map<string, ScopeAnalysis>();
-  const order: string[] = [];
-  const seenByScope = new Map<string, Set<string>>();
-
-  let callIndex = -1;
-  for (const c of calls) {
-    callIndex += 1;
-    let scope = scopes.get(c.scope);
-    if (!scope) {
-      scope = emptyScope(c.scope);
-      scopes.set(c.scope, scope);
-      order.push(c.scope);
-      seenByScope.set(c.scope, new Set());
-    }
-    scope.calls += 1;
-
-    // A call whose headers OR upstream target are UNKNOWN cannot be PROVEN byte-replayable:
-    // two such calls may have differed in an output-affecting header (anthropic-version / anthropic-beta),
-    // in the endpoint/model target (Gemini names the model in the URL), OR — critically — in the upstream
-    // ORIGIN (two OpenAI-compatible vendors both speak `/v1/chat/completions`). The live gateway keys on
-    // the ABSOLUTE upstream href, so it namespaces by origin; a RELATIVE url loses the origin and can no
-    // longer prove a repeat targeted the same vendor. Give any such call a key that can never match
-    // another, so it is never counted as a replay — over-crediting is the one thing a savings report must
-    // never do. A call that DECLARES its headers (even `headers:{}` = "I checked, none output-affecting")
-    // AND an ABSOLUTE url is keyed EXACTLY as the live gateway keys it — over body + headers + origin +
-    // path + query. The `unknown-target:` key can never collide with a 64-hex canonical key.
-    const href = absoluteHref(c.url);
-    const key =
-      c.headers === undefined || href === undefined
-        ? `unknown-target:${callIndex}`
-        : canonicalizeRequest(c.body, c.headers, href);
-    const seen = seenByScope.get(c.scope)!;
-    if (seen.has(key)) {
-      // A byte-replayable repeat: the whole upstream call is avoidable on replay. A malformed call
-      // missing `usage` (untyped CLI/JSON input) is treated as zero usage — the honest under-count
-      // direction (avoids nothing) rather than a crash.
-      const usage = c.usage ?? {};
-      scope.replayableCalls += 1;
-      scope.avoidedTokens += totalUsageTokens(usage);
-      scope.avoidedCostMicros += avoidedCostMicros(usage, c.model ?? "", table);
-    } else {
-      seen.add(key); // first occurrence — must still be issued once, never counted as a saving
-    }
-
-    // Prune savings are an independent, per-call lever (dedupe within one body), summed across the scope.
-    scope.pruneCharsSaved += pruneToolOutputs(c.body).charsSaved;
-  }
-
-  const perScope = order.map((s) => scopes.get(s)!);
-  const total = perScope.reduce<AnalysisTotals>(
-    (acc, s) => ({
-      calls: acc.calls + s.calls,
-      replayableCalls: acc.replayableCalls + s.replayableCalls,
-      avoidedTokens: acc.avoidedTokens + s.avoidedTokens,
-      avoidedCostMicros: acc.avoidedCostMicros + s.avoidedCostMicros,
-      pruneCharsSaved: acc.pruneCharsSaved + s.pruneCharsSaved,
-    }),
-    { calls: 0, replayableCalls: 0, avoidedTokens: 0, avoidedCostMicros: 0, pruneCharsSaved: 0 },
-  );
-
-  const sample =
-    calls.length > 0
-      ? redactValue(safeClone(calls[0].body), redact, { path: "$", kind: "request" })
-      : undefined;
-
-  return { priceTableVersion: table.version, perScope, total, sample };
+  const seen = new Map<string, Set<string>>();
+  let keyCount = 0, sampled = false, sample: unknown;
+  let totals: AnalysisTotals = { calls: 0, replayableCalls: 0, avoidedTokens: 0, avoidedCostMicros: 0, pruneCharsSaved: 0 };
+  return {
+    add(c) {
+      if (!c || typeof c !== "object" || typeof c.scope !== "string") throw new Error("invalid analysis call/scope");
+      if (c.usage !== undefined && (!c.usage || typeof c.usage !== "object" || Array.isArray(c.usage))) throw new Error("invalid analysis usage");
+      for (const field of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] as const) {
+        const count = c.usage?.[field];
+        if (count !== undefined && (!Number.isSafeInteger(count) || count < 0)) throw new Error("invalid analysis usage");
+      }
+      if (!Number.isSafeInteger(totalUsageTokens(c.usage ?? {}))) throw new Error("invalid analysis usage");
+      if (c.headers !== undefined) {
+        if (!c.headers || typeof c.headers !== "object" || Array.isArray(c.headers) ||
+            ![Object.prototype, null].includes(Object.getPrototypeOf(c.headers)) ||
+            Object.values(c.headers).some((value) => value !== undefined && typeof value !== "string" &&
+              !(Array.isArray(value) && value.every((part) => typeof part === "string")))) {
+          throw new Error("invalid analysis headers");
+        }
+      }
+      const existing = scopes.get(c.scope);
+      if (!existing && scopes.size >= maxScopes) throw new Error("analysis scope cardinality limit exceeded");
+      const href = absoluteHref(c.url);
+      // Unknown headers/origin cannot prove equality and never occupy the digest index.
+      const key = c.headers === undefined || href === undefined ? undefined : canonicalizeRequest(c.body, c.headers, href);
+      const repeated = key !== undefined && seen.get(c.scope)?.has(key) === true;
+      if (key !== undefined && !repeated && keyCount >= maxKeys) throw new Error("analysis key cardinality limit exceeded");
+      const delta = {
+        calls: 1, replayableCalls: repeated ? 1 : 0,
+        avoidedTokens: repeated ? totalUsageTokens(c.usage ?? {}) : 0,
+        avoidedCostMicros: repeated ? avoidedCostMicros(c.usage ?? {}, c.model ?? "", table) : 0,
+        pruneCharsSaved: pruneToolOutputs(c.body).charsSaved,
+      };
+      const firstSample = !sampled && sampleMode !== "none"
+        ? redactValue(safeClone(c.body), opts.redact ?? DEFAULT_REDACTORS, { path: "$", kind: "request" }) : undefined;
+      const next = { ...(existing ?? emptyScope(c.scope)) };
+      const nextTotals = { ...totals };
+      for (const field of Object.keys(delta) as Array<keyof typeof delta>) {
+        if (!Number.isSafeInteger(delta[field]) || delta[field] < 0 || !Number.isSafeInteger(totals[field] + delta[field])) throw new Error("analysis counter limit exceeded");
+        next[field] += delta[field];
+        nextTotals[field] += delta[field];
+      }
+      scopes.set(c.scope, next);
+      totals = nextTotals;
+      if (key !== undefined && !repeated) {
+        if (!seen.has(c.scope)) seen.set(c.scope, new Set());
+        seen.get(c.scope)!.add(key); keyCount++;
+      }
+      if (!sampled) { sample = firstSample; sampled = true; }
+    },
+    result() {
+      const perScope = [...scopes.values()].map((scope) => ({ ...scope }));
+      const total = { ...totals };
+      return { priceTableVersion: table.version, perScope, total, sample: safeClone(sample) };
+    },
+  };
 }
 
 /** Deep-clone a JSON-ish value so redaction never touches the caller's input; non-JSON falls through. */

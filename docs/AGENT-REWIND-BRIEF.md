@@ -1,7 +1,7 @@
 # Agent Rewind — briefing (paste this into an AI to write a doc or an email)
 
-*Self-contained. Everything below is accurate as of launch; claims are marked where they're proven vs.
-where they're honest limits. Product name: **Agent Rewind**. It is **live and installable today**.*
+*Self-contained. Claims are marked where they are proven and where limits remain. Product name:
+**Agent Rewind**. v1.0.0 is live; v1.1.0 is the release candidate described below.*
 
 ---
 
@@ -31,18 +31,20 @@ Agent Rewind fixes exactly that gap, for **every** agent:
    agent retries that same effect *after a rewind*, it's **refused** — so a rewind can't cause a
    double-charge or a duplicate email.
 
-Everything runs **locally**. No account, no API key, no data leaves the machine.
+Rewind's checkpoints, evidence and replay store run **locally** with no Rewind account or API key.
+When the optional gateway makes a live model call, that request still goes to the configured provider;
+Rewind does not turn a hosted model into an offline one.
 
 ---
 
-## Status: LIVE ✅
+## Status: v1.1.0 release candidate
 
-Published on the public npm registry and **verified end-to-end from the registry** (installed fresh and
-run, not just "publish reported success"):
+The current public npm release is v1.0.0. The following v1.1.0 packages are prepared for publication
+and must be verified from the registry after they are published:
 
-- `@agent-rewind/core@1.0.0` — the reversible-execution engine + effect barrier + hash chain
-- `@agent-rewind/gateway@1.0.0` — the token-saving record/replay LLM proxy
-- `@agent-rewind/mcp@1.0.0` — the CLI + MCP server people install
+- `@agent-rewind/core@1.1.0` — the reversible-execution engine + effect barrier + hash chain
+- `@agent-rewind/gateway@1.1.0` — the token-saving record/replay LLM proxy
+- `@agent-rewind/mcp@1.1.0` — the CLI + MCP server people install
 
 **Source:** https://github.com/DarkStar616/rewind · **Licence:** FSL-1.1-ALv2 (source-available, becomes
 Apache-2.0 after 2 years).
@@ -189,11 +191,11 @@ published package was **installed from npm and run end-to-end**.
 
 ## Why it's differentiated (the wedge)
 
-- **No existing LLM proxy does byte-exact record/replay**, and **no agent-checkpoint tool ships the
-  refuse-and-record effect barrier.** Agent Rewind is the intersection, delivered locally.
-- It's **correctness-first**: it will never serve a stale/wrong cached answer (unlike "semantic" caches
-  that trade correctness for hit-rate).
-- It works with **every** coding agent (Claude Code, Cursor, Codex CLI, Cline, Windsurf), not one.
+- Rewind combines whole-workspace recovery, an effect barrier, exact ordered replay and conservative
+  savings evidence in one local stack. Neighboring tools overlap individual pieces.
+- It is **correctness-first**: replay requires exact identity, known hosted or remote-state inputs bypass
+  automatic reuse, and uncertain cases prefer a miss. Future provider fields still require maintenance.
+- It works with compatible MCP clients including Claude Code, Cursor, Codex CLI, Cline and Windsurf.
 
 ---
 
@@ -203,10 +205,10 @@ published package was **installed from npm and run end-to-end**.
 |---|---|
 | Name | Agent Rewind |
 | Install | `npx -y @agent-rewind/mcp mcp` (or `claude mcp add agent-rewind …`) |
-| Price | Free, local, open (FSL-1.1-ALv2). Planned paid layer: a share of *verified* token savings. |
+| Price | Free and local; source-available under FSL-1.1-ALv2. Planned paid layer: a share of *verified* token savings. |
 | Works with | Claude Code, Cursor, Codex CLI, Cline, Windsurf (any MCP client) |
 | Requires | Node ≥ 20. No account, no API key. |
-| npm | @agent-rewind/core, @agent-rewind/gateway, @agent-rewind/mcp (all 1.0.0) |
+| npm | Current public: all 1.0.0. Release candidate: all 1.1.0. |
 | Repo | https://github.com/DarkStar616/rewind |
 | One-line pitch | "An undo button for AI coding agents — that can't accidentally re-charge a card." |
 

@@ -49,16 +49,20 @@ function exportedNames(path: string): string[] {
 
 // The frozen surface — values + types. Keep sorted.
 const FROZEN = [
-  "ADAPTERS", "AnalysisTotals", "AnalyzeOptions", "AnalyzedCall", "AttestedAnalysis", "BillableSavings",
+  "ADAPTERS", "AnalysisTotals", "AnalyzeOptions", "TrafficAnalyzer", "TrafficAnalyzerOptions", "AnalyzedCall", "AttestedAnalysis", "BillableSavings",
   "CacheHygieneReport", "CachePlan", "CachePreservationCredit", "ComponentRates", "DEFAULT_PRICE_TABLE",
   "DEFAULT_REDACTORS", "DROP", "Divergence", "DivergenceKind", "DivergenceReport", "ExtractedUsage",
   "HygieneIssue", "HygieneReason", "MeteredAvoidance", "NOISE_FIELDS", "OpenAiUsageAggregate",
   "OpenAiUsageBucket", "OpenAiUsageResult", "PriceTable", "ProviderAdapter",
-  "ProviderUsage", "ProviderUsageFetcher", "ProxyOptions", "PruneOptions", "PruneResult",
+  "ProviderUsage", "ProviderUsageFetcher", "TapeProxyOptions", "ProxyOptions", "PruneOptions", "PruneResult",
   "ReconciliationReport", "RecordKey", "RecordStore", "RecordedCall", "RecordedHttpResponse",
   "RedactContext", "RedactFn", "ReplayOutcome", "ReplayOutcomeLive", "ReplayOutcomeReplay", "Replayer",
+  "HttpOccurrence", "TapeEpoch", "TapeCursor", "ConsumedOccurrence", "RecordStoreV2", "RecordStoreV2Options",
+  "TrustedScope", "ScopeRequest", "ScopeResolver",
+  "SqliteStorageOptions", "StorageMutation", "StorageValue", "StorageCommit", "SqliteStorage", "StagingOptions", "StagedObject", "EncryptedStaging",
   "ReplayerOptions", "RunningProxy", "SavingsAnalysis", "ScopeAnalysis", "StrictReplayMissError",
-  "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "analyzeCacheHygiene", "analyzeTraffic", "createTrafficAnalyzer", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "createFixedTenantResolver", "encodeTrustedScope", "openSqliteStorage", "createEncryptedStaging", "createSqliteRecordStoreV2",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
   "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage",
@@ -73,7 +77,8 @@ const FROZEN = [
 // importing the module — a type-only export never appears here.
 const FROZEN_VALUES = [
   "ADAPTERS", "DEFAULT_PRICE_TABLE", "DEFAULT_REDACTORS", "DROP", "NOISE_FIELDS", "StrictReplayMissError",
-  "analyzeCacheHygiene", "analyzeTraffic", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "analyzeCacheHygiene", "analyzeTraffic", "createTrafficAnalyzer", "anthropicAdapter", "attestAnalysis", "avoidedCostMicros",
+  "createFixedTenantResolver", "encodeTrustedScope", "openSqliteStorage", "createEncryptedStaging", "createSqliteRecordStoreV2",
   "billableSavedTokens", "canonicalizeRequest", "createMemoryRecordStore", "createReplayer",
   "divergeMessages", "extractUsage", "extractUsageFor", "geminiAdapter", "hasCacheControl",
   "isRecordableSuccessFor", "meterAvoidance", "meterCachePreservation", "normalizeUsage",

@@ -10,25 +10,31 @@
  *
  * The replay KEY is deliberately NOT here: it is a generic hash over the canonicalised request body,
  * identical for every provider. No adapter may make the key provider-specific or introduce a false
- * cache hit — adapters touch recording/metering/terminal-detection only.
+ * cache hit — adapters expose recording, metering, terminal detection and optional cache capabilities.
  */
+import type { CachePlan } from "../cache-preserve.ts";
+import type { CacheHygieneReport } from "../cache-hygiene.ts";
 import type { ExtractedUsage } from "../usage.ts";
 import { anthropicAdapter } from "./anthropic.ts";
 import { openaiAdapter } from "./openai.ts";
 import { geminiAdapter } from "./gemini.ts";
 
 export interface ProviderAdapter {
+  /** Optional output-neutral cache metadata planning; canonical replay identity stays in the gateway. */
+  planCacheBreakpoints?(body: Record<string, unknown>): CachePlan;
+  /** Optional provider-specific advisory analysis; must not mutate or block the request. */
+  analyzeCacheHygiene?(body: Record<string, unknown>): CacheHygieneReport;
   readonly id: "anthropic" | "openai" | "gemini";
   /** Is this a recordable model call for this provider?
    *  anthropic: POST /v1/messages
-   *  openai:    POST /v1/chat/completions (Responses API /v1/responses is deferred post-1.0)
+   *  openai:    POST /v1/chat/completions or /v1/responses
    *  gemini:    POST /v1beta/models/<model>:generateContent|:streamGenerateContent */
   matchPath(method: string | undefined, url: string | undefined): boolean;
   /** COMPLETE, non-error 2xx worth freezing? Per-provider terminal:
    *  anthropic: SSE has message_stop & no error / JSON type!=="error"
    *  openai:    SSE ends with `data: [DONE]`, ≥1 chunk, no error object / JSON has choices, no top-level error
    *  gemini:    a candidate with finishReason and no `error` field */
-  isRecordableSuccess(body: Buffer, contentType: string): boolean;
+  isRecordableSuccess(body: Buffer, contentType: string, url?: string): boolean;
   /** Provider-reported usage + model, JSON or streamed. Reuses meter/usage semantics. */
   extractUsage(raw: Buffer | string, contentType: string | undefined): ExtractedUsage;
 }

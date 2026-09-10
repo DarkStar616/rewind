@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { compareRequestFiles } from "./cache-compare.ts";
+import { analyzeInput } from "./analyze-input.ts";
+import { mcpProfile, parseMcpProfile } from "./mcp-profile.ts";
 /**
  * `rewind` — the universal terminal floor over the @agent-rewind/core engine.
  *
@@ -16,19 +19,20 @@
  * chain; a refusal exits 2 so a PreToolUse hook can BLOCK the offending tool call.
  */
 import { writeSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { argv, cwd, exit } from "node:process";
 import type { Engine, ExternalEffect } from "@agent-rewind/core";
 import {
+  createFixedTenantResolver,
   createMemoryRecordStore,
+  openSqliteStorage,
+  createSqliteRecordStoreV2,
   createReplayer,
   startProxy,
   analyzeCacheHygiene,
   pruneToolOutputs,
-  analyzeTraffic,
-  attestAnalysis,
-  type AnalyzedCall,
 } from "@agent-rewind/gateway";
+import { parseGatewayConfig, gatewayManifest } from "./gateway-config.ts";
 import { buildAdapterEngine } from "./build-engine.ts";
 import { createFileReplaySavings } from "./durable-savings.ts";
 import { runStdioServer } from "./server.ts";
@@ -36,11 +40,8 @@ import { buildSavingsReceipt, formatReceiptLine, upsellLine } from "./savings.ts
 
 const USAGE =
   "usage: agent-rewind <checkpoint [label] | list | rewind <id> | replay <id> | guard <json> | " +
-  "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | prune <json> | " +
-  "analyze <json> | gateway [--port <n>] [--upstream <url>] | mcp>";
-
-const DEFAULT_GATEWAY_PORT = 8788;
-const DEFAULT_UPSTREAM = "https://api.anthropic.com";
+  "savings [--scope <id>] [--since <window>] [--json] | cache-report <json> | cache-compare <previous.json> <current.json> | prune <json> | " +
+  "analyze (--file <path>|--stdin|<json>) [--ndjson] [--legacy-json] | gateway [--port <n>] [--upstream <url>] [--profile compat|lean] [--tenant <id>] [--storage memory|sqlite] [--epoch <id>] [--replay-cursor <id>|--record-only] [--storage-directory <path>] [--config <path>] [--preserve-cache|--no-preserve-cache] [--prune-context|--no-prune-context] | mcp [--profile lean|recovery|analytics|all]>";
 
 /** One line of JSON to stdout, written synchronously so `exit()` cannot truncate it. */
 function out(value: unknown): void {
@@ -67,20 +68,6 @@ function parseSavingsFlags(args: readonly string[]): { scope?: string; since?: s
     else if (scope === undefined && !a.startsWith("-")) scope = a; // tolerate a bare positional scope
   }
   return { scope, since, json };
-}
-
-/** Parse the `gateway` subcommand flags: `--port <n>`, `--upstream <url>` (order-free). */
-function parseGatewayFlags(args: readonly string[]): { port: number; upstream: string } {
-  let port = DEFAULT_GATEWAY_PORT;
-  let upstream = DEFAULT_UPSTREAM;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--port") port = Number(args[++i]);
-    else if (a.startsWith("--port=")) port = Number(a.slice("--port=".length));
-    else if (a === "--upstream") upstream = args[++i];
-    else if (a.startsWith("--upstream=")) upstream = a.slice("--upstream=".length);
-  }
-  return { port, upstream };
 }
 
 function buildEngine(workdir: string): Engine {
@@ -124,7 +111,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       try {
         effect = JSON.parse(rest[0]);
       } catch {
-        errline(`guard: the effect descriptor is not valid JSON: ${rest[0]}`);
+        errline(`guard: effect descriptor is not valid JSON; bytes=${Buffer.byteLength(rest[0])}`);
         return 1;
       }
       const outcome = await engine.guard(effect as ExternalEffect);
@@ -158,7 +145,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       try {
         body = JSON.parse(rest[0]);
       } catch {
-        errline(`cache-report: the request body is not valid JSON: ${rest[0]}`);
+        errline(`cache-report: request body is not valid JSON; bytes=${Buffer.byteLength(rest[0])}`);
         return 1;
       }
       const report = analyzeCacheHygiene(body);
@@ -177,7 +164,7 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       try {
         body = JSON.parse(rest[0]);
       } catch {
-        errline(`prune: the request body is not valid JSON: ${rest[0]}`);
+        errline(`prune: request body is not valid JSON; bytes=${Buffer.byteLength(rest[0])}`);
         return 1;
       }
       const r = pruneToolOutputs(body);
@@ -185,74 +172,54 @@ async function run(cmd: string | undefined, rest: readonly string[], engine: Eng
       return 0;
     }
     case "analyze": {
-      // Free Savings Analysis: read a JSON array of observed calls ({scope, body, usage, model, headers}),
-      // report how many were byte-replayable and what that would have cost, and attest the report on the
-      // hash chain so the reader can verify it. `headers` must be present ({} when there are none) for a
-      // call to be eligible as a replay — omitting it means UNKNOWN headers, conservatively never a
-      // replay. No upstream calls — this is a read-only shadow analysis. The surfaced sample is redacted
-      // by default, so the printed report is safe to share.
-      if (!rest[0]) {
-        errline(
-          "analyze requires a JSON array of calls: [{scope, body, usage, model, headers}, ...]. Include " +
-            "`headers` on each call (use {} when there are no anthropic-version/anthropic-beta headers) — a " +
-            "call that omits headers is treated as UNKNOWN and never counted as a replay, so duplicates " +
-            "would report zero savings.",
-        );
-        return 1;
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rest[0]);
-      } catch {
-        errline(`analyze: the input is not valid JSON: ${rest[0]}`);
-        return 1;
-      }
-      if (!Array.isArray(parsed)) {
-        errline("analyze: expected a JSON ARRAY of calls");
-        return 1;
-      }
-      const attested = attestAnalysis(analyzeTraffic(parsed as AnalyzedCall[]));
-      // Emit ONLY the evidence chain (plus its root hash), NOT a second top-level copy of the analysis.
-      // The single authoritative report is `chain[0].detail` — the exact bytes verifyChain re-hashes.
-      // A separate top-level `analysis` copy could be edited while the chain still verified, so it is
-      // deliberately omitted: the recipient runs verifyChain(chain) and reads chain[0].detail.
-      out({ chain: attested.chain, rootHash: attested.rootHash });
+      out(await analyzeInput(rest));
       return 0;
     }
     case "gateway": {
+      if (rest.length === 1 && (rest[0] === "--help" || rest[0] === "-h")) {
+        errline(USAGE);
+        return 0;
+      }
       // The token-saving proxy. Point your agent's ANTHROPIC_BASE_URL at it: a byte-equivalent
       // request after a rewind is served from the record with zero upstream call, and the avoided
       // cost is booked to the SAME durable savings file `rewind savings` reads. Records live in
       // memory for this gateway session; the savings number persists across processes.
-      const { port, upstream } = parseGatewayFlags(rest);
-      if (!Number.isInteger(port) || port < 0 || port > 65535) {
-        errline(`gateway: --port must be an integer 0-65535, got ${JSON.stringify(port)}`);
-        return 1;
-      }
+      const config = parseGatewayConfig(rest, process.env);
+      const { port, upstream, preserveCache, pruneContext } = config;
       const savings = createFileReplaySavings({ path: join(cwd(), ".rewind", "savings.json") });
       const store = createMemoryRecordStore();
       const replayer = createReplayer(store, savings);
-      const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, log: (m) => errline(m) });
-      errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
-      errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
-      errline("replays after a rewind cost 0 upstream tokens; run `rewind savings` to see the total. Ctrl-C to stop.");
-      // Stay alive serving requests until a termination signal; close the listener cleanly then exit.
-      await new Promise<void>((resolve) => {
-        const stop = () => {
-          errline("rewind gateway shutting down");
-          void proxy.close().then(resolve, resolve);
-        };
-        process.once("SIGINT", stop);
-        process.once("SIGTERM", stop);
-      });
+      let durable: Awaited<ReturnType<typeof openSqliteStorage>> | undefined;
+      try {
+        if (config.storage === "sqlite") {
+          const key = process.env.REWIND_STORAGE_KEY;
+          if (typeof key !== "string" || !/^[0-9a-fA-F]{64}$/.test(key)) throw new Error("gateway: sqlite requires REWIND_STORAGE_KEY containing exactly 32 bytes encoded as 64 hex characters");
+          durable = await openSqliteStorage({ directory: resolve(cwd(), config.storageDirectory ?? ".rewind/storage"), tenant: config.tenant!, wrappingKey: Buffer.from(key, "hex") });
+        }
+        const tape = durable ? { store: createSqliteRecordStoreV2(durable), epoch: config.epoch!, replayCursor: config.replayCursor } : undefined;
+        const proxy = await startProxy({ port, upstreamBase: upstream, replayer, store, tape, preserveCache, pruneContext, resolveScope: config.tenant === undefined ? undefined : createFixedTenantResolver(config.tenant), log: (m) => errline(m) });
+        errline(`gateway configuration ${JSON.stringify(gatewayManifest(config))}`);
+        errline(`rewind gateway listening on ${proxy.url} → ${upstream}`);
+        errline(`point your agent at it:  ANTHROPIC_BASE_URL=${proxy.url}`);
+        errline(durable ? "ordered tape enabled; savings receipt integration pending. Ctrl-C to stop." : "replays after a rewind cost 0 upstream tokens; run `agent-rewind savings` to see the total. Ctrl-C to stop.");
+        await new Promise<void>((resolveStop) => {
+          const stop = () => {
+            process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop);
+            errline("rewind gateway shutting down");
+            void proxy.close().then(resolveStop, resolveStop);
+          };
+          process.once("SIGINT", stop); process.once("SIGTERM", stop);
+        });
+      } finally { await durable?.close(); }
       return 0;
     }
     case "mcp": {
       // Launch the stdio MCP server over the same workspace. It owns its own engine (built from the
       // durable store), so the throwaway `engine` above is unused here. Resolves when the client
       // closes the pipe (stdin ends); until then the process stays alive serving JSON-RPC on stdout.
-      errline("starting the stdio MCP server (five tools: checkpoint, list, rewind, replay, guard_effect)");
-      await runStdioServer({ cwd: cwd(), log: (m) => errline(m) });
+      const profile = parseMcpProfile(rest, process.env);
+      errline(`MCP configuration ${JSON.stringify(mcpProfile(profile))}`);
+      await runStdioServer({ cwd: cwd(), profile, log: (m) => errline(m) });
       return 0;
     }
     default: {
@@ -268,6 +235,10 @@ async function main(): Promise<number> {
   if (!cmd || cmd === "-h" || cmd === "--help") {
     errline(USAGE);
     return cmd ? 0 : 1;
+  }
+  if (cmd === "cache-compare") {
+    out(await compareRequestFiles(rest));
+    return 0;
   }
   return run(cmd, rest, buildEngine(cwd()));
 }
