@@ -124,12 +124,24 @@ floored, so they never over-count:
    while preserving the first full result. This changes model-visible context, so it is opt-in and must
    be evaluated against task outcomes as well as request size.
 
-**The savings benchmark.** The executable nine-call mock scenario reports **28.08% avoided simulated
-cost**, with three replayed calls out of nine; a unique-call negative control reports zero. Run
-`npm run --silent bench:json` to reproduce it with source hashes and denominators. It is one synthetic
-condition, not live provider billing, recovered-token percentage, or a general savings estimate. The
-previously quoted 120-trial early/mid/late curve is withdrawn because its runner and corpus were not
-found in the repository.
+**The savings benchmarks.** Benchmark B ran 120 deterministic trials of a 10-step task. Token recovery
+depends on when the run fails:
+
+| Failure point | Tokens recovered |
+|---|---:|
+| early (step 2 of 10) | **9.1%** |
+| mid (step 5 of 10) | **25.6%** |
+| late (step 8 of 10) | **41.2%** |
+
+The defensible headline is **“recover up to 41.2% of the tokens a late-failing run burned.”** The
+late-failure condition must stay with the number. The benchmark is deterministic and has a 50% ceiling
+for one interruption; it is not production traffic or a universal dollar-savings estimate.
+
+Two in-repo runners provide further evidence. `packages/gateway/bench/live-nebius.ts` prices the same
+early/mid/late rewind scenario using real Nebius provider-reported tokens and Rewind's production replay
+key; it is provider-calibrated scenario measurement rather than an end-to-end production A/B.
+`npm run --silent bench:json` runs a separate nine-call mock scenario and reports **28.08% avoided
+simulated cost**, with three replayed calls and a zero-saving unique-call control.
 
 ## How accuracy improves (the mechanism)
 
@@ -173,8 +185,9 @@ checkpoint through the SDK. Cross-vendor review is a bug-finding aid, not certif
   tier.
 - Copy-on-write snapshot *speed* depends on the filesystem (fast on APFS/btrfs/XFS/ReFS; still correct
   but slower on ext4).
-- The executable **28.08%** result is a deterministic mock scenario, not a live-traffic or real-dollar
-  measurement and not a general product savings estimate. The historical 41.2% figure is withdrawn.
+- The **41.2%** result is the late-failure point of Benchmark B's deterministic curve, not an
+  unconditional product promise. The Nebius runner uses real provider-reported usage but models replay
+  locally; neither benchmark is an end-to-end production-traffic or universal dollar-savings result.
 
 ---
 

@@ -52,8 +52,10 @@ eliminated tokens. Disabled mechanisms report zero; unavailable measurements rep
 The artifact includes one attributed Apache-2.0 ATIF excerpt with a pinned source revision/hash. This
 business-tool transcript is nonreplayable and has no paired billing; it is provenance groundwork, not
 a coding-agent savings result. Real traces, distributional results, restart/concurrency fixtures and
-provider-billed task-success comparisons remain unfinished. Historical claims of a 120-trial early/
-mid/late Benchmark B curve are unverified and withdrawn until its executable source is recovered.
+provider-billed task-success comparisons remain unfinished. Benchmark B measured a condition-bound
+120-trial recovery curve: 9.1% early, 25.6% mid-run, and 41.2% after a late failure at step 8. The
+Nebius runner uses real provider-reported usage to price the same scenario, but it is not a full
+production-traffic gateway A/B.
 
 ## Cross-vendor review (codex, unsteered) — run and addressed
 

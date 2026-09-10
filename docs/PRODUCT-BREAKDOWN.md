@@ -317,9 +317,9 @@ the events," never "the metric is cryptographically unforgeable."
   concurrency, and tamper-evidence defects that were fixed and regression-tested. It remains a
   bug-finding aid rather than certification, and later findings supersede any earlier “clean” verdict.
 
-**What is NOT yet measured [NOT YET MEASURED]:** there is **no live-provider benchmark** — no measured
-latency, throughput, or real-dollar savings percentage from production traffic. The only savings figure
-Agent Rewind produces today is synthetic (below).
+**What is NOT yet measured [NOT YET MEASURED]:** there is no production-traffic, end-to-end gateway A/B
+for latency, throughput, task success, or universal real-dollar savings. The repository does include a
+Nebius provider-calibrated scenario that reads real provider usage, described below.
 
 ---
 
@@ -329,9 +329,13 @@ Agent Rewind ships **deterministic accounting gates**, not performance benchmark
 upstream with an injected clock and synthetic token counts, and their job is to prove the savings math
 can **never over-credit**, not to report a speed:
 
-- **[UNVERIFIED] Historical Benchmark B:** the previously quoted 120-trial early/mid/late savings
-  curve has no executable source in this repository. It is withdrawn as product evidence until its
-  runner, corpus and outputs can be reproduced.
+- **[MEASURED, DETERMINISTIC] Benchmark B:** across 120 trials of a 10-step task, recovered tokens vary
+  with the failure point: **9.1%** at step 2, **25.6%** at step 5, and **41.2%** at step 8. The headline
+  must remain condition-bound: *“recover up to 41.2% of the tokens a late-failing run burned.”* It is a
+  controlled scenario with a 50% single-interruption ceiling, not a universal or production result.
+- **[PROVIDER-CALIBRATED SCENARIO]** `packages/gateway/bench/live-nebius.ts` makes ten real Nebius calls,
+  reads the provider's token counts, applies Rewind's production replay key, and calculates the same
+  early/mid/late rewind curve. It is not an end-to-end gateway OFF/ON production-traffic experiment.
 - **[SIMULATED] Executable nine-call trajectory:** the mock OFF/ON benchmark reports **28.08%**
   avoided simulated cost for `[1,2,3,4,5,3,4,5,6]`. OFF makes nine calls; ON makes six. This is one
   synthetic condition, not observed provider billing, a recovered-token percentage, or task-success
@@ -417,7 +421,7 @@ workspace recovery, effect admission, conservative savings evidence, and local o
 | Never over-credits savings (floors, dedupes, counterfactuals impossible) | **[PROVEN]** — meter/billable/bench |
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |
 | Tamper-evident, fail-closed verification | **[PROVEN]** — evidence-ledger tests |
-| Historical Benchmark B savings curve | **[UNVERIFIED / WITHDRAWN]** — no executable source located |
+| Up to 41.2% recovered tokens after a late failure (Benchmark B: 120 deterministic trials) | **[MEASURED]** — condition-bound controlled scenario, not a universal result |
 | AgentRewind 43.9%→87.8%, prompt-cache 59–90%, etc. | **[RESEARCH]** — external papers, not Agent Rewind's results |
 | Live latency / throughput / real-dollar savings % | **[NOT YET MEASURED]** |
 

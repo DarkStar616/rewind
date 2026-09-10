@@ -141,8 +141,13 @@ authentication in request headers; upstream URLs must use a root path and cannot
 The executable nine-call mock benchmark reports **28.08% simulated cost savings**, with three
 replayed calls out of nine. Unique calls report zero. Run `npm run --silent bench:json` from a source
 checkout for a reproducible artifact with source hashes and denominators. These results are not real
-provider billing or a general product savings estimate. The historical 120-trial Benchmark B curve is
-unverified: its runner and corpus were not located, so those percentages are withdrawn.
+provider billing or a general product savings estimate.
+
+Benchmark B separately measured recovered tokens across 120 deterministic trials of a 10-step task:
+**9.1%** after an early failure, **25.6%** after a mid-run failure, and **41.2%** after a late failure at
+step 8. State the result as “up to 41.2% for a late-failing run,” never as an unconditional promise.
+The source checkout also includes `packages/gateway/bench/live-nebius.ts`, which prices the same curve
+from real provider-reported usage; it is a provider-calibrated scenario, not production traffic.
 
 
 ## Links
