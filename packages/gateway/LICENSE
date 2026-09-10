@@ -1,8 +1,6 @@
 # Functional Source License, Version 1.1, Apache 2.0 Future License
 
-<!-- NOTE: This is the canonical FSL-1.1-ALv2 template from https://fsl.software.
-     Before first publish: confirm the legal entity in "Notice"/"Licensor" and have
-     an IP lawyer review the "Competing Use" language (per docs/LICENCE-DECISION.md). -->
+<!-- This is the canonical FSL-1.1-ALv2 template from https://fsl.software. -->
 
 ## Abbreviation
 
@@ -10,7 +8,7 @@ FSL-1.1-ALv2
 
 ## Notice
 
-Copyright 2026 Rewind (legal entity to be confirmed)
+Copyright 2026 Reuben Burls
 
 ## Terms and Conditions
 
@@ -89,4 +87,4 @@ we make the Software available. On or after that date, you may use the Software 
 the Apache License, Version 2.0, in which case the following will apply:
 
 Insofar as you use the Software or any part of it under the future license, you agree
-that the "Licensor" is Rewind (legal entity to be confirmed), as identified above.
+that the "Licensor" is Reuben Burls, as identified above.
