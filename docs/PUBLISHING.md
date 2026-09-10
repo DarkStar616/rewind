@@ -1,8 +1,8 @@
 # Publishing Agent Rewind to npm
 
 The three packages (`@agent-rewind/core`, `@agent-rewind/gateway`, `@agent-rewind/mcp`) are packaged and
-ready. This is the exact sequence to publish them. **You run these** (publishing needs your npm login);
-everything else is already wired.
+ready. This is the exact sequence to publish them. Publication requires an authenticated npm account
+that belongs to the scope. Run every command from a clean release commit.
 
 ## 0. Prerequisite — the `@agent-rewind` org (already created ✅)
 
@@ -25,7 +25,7 @@ npm whoami         # confirm
 
 ```bash
 npm run build      # tsup → dist/ for all three packages (also runs automatically on publish)
-npm run check      # 334 tests + typecheck, all green
+npm run check      # typecheck + full native suite
 ```
 
 ## 3. Publish — in dependency order
@@ -45,8 +45,8 @@ If your account has 2FA on (recommended), npm will prompt for a one-time code ea
 ## 4. Verify it's live
 
 ```bash
-npm view @agent-rewind/mcp version                 # should print 1.0.0
-npx -y @agent-rewind/mcp@1.0.0 checkpoint --help   # runs the published CLI from a clean cache
+npm view @agent-rewind/mcp version                 # should print the release version
+npx -y @agent-rewind/mcp@1.1.0 --help              # runs the published CLI from a clean cache
 ```
 
 Then the real end-to-end: in any git repo, `npx -y @agent-rewind/mcp mcp` starts the MCP server, and the
@@ -55,8 +55,8 @@ Claude Code / Cursor / Codex snippets in `docs/install/README.md` wire it into y
 ## 5. Tag the release
 
 ```bash
-git tag v1.0.0
-git push rewind v1.0.0
+git tag v1.1.0
+git push rewind v1.1.0
 ```
 
 ## Publishing later versions
@@ -70,7 +70,8 @@ steps 2–5. A `changeset`-style tool can automate this later; it isn't needed f
 - `dist/` build (ESM + `.d.ts`) via tsup, with `.ts`-specifier rewriting — **[verified]** the built CLI
   runs end-to-end (`checkpoint`, `list`, `analyze`) resolving the built `dist` of all three packages.
 - `files` allow-lists (`dist`, plus the Claude Code plugin `dist-plugin/` for `@agent-rewind/mcp`, plus each
-  README) — **[verified]** via `npm pack --dry-run`: no `src`/tests leak into the tarball.
+  README and package license) — verify with `npm pack --workspaces --dry-run --json --ignore-scripts`:
+  no `src`/tests may leak into a tarball and every tarball must include `LICENSE`.
 - `exports` with a `development` condition so the test suite still runs against source (no build needed
   for `npm run check`), while published consumers get `dist`.
 - Per-package README (the npm landing page), keywords, repository, homepage, and `engines: ">=20"`.

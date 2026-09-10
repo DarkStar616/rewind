@@ -5,6 +5,53 @@ All notable changes to the `@agent-rewind/*` packages are recorded here. The thr
 together. This project follows [Semantic Versioning](https://semver.org/); the public-API contract
 each package guarantees under semver is documented in [`docs/STABILITY.md`](docs/STABILITY.md).
 
+## 1.1.0 — 2026-09-10
+
+Rewind can now run a durable, exact local replay gateway across Anthropic Messages, OpenAI Chat
+Completions and Responses, and Gemini-compatible requests, while keeping compact MCP profiles for
+normal agent use.
+
+### Added
+
+- Encrypted SQLite storage with transactional occurrence tapes, ordered cursor replay across process
+  restarts, trusted tenant scopes, bounded worker queues, and authenticated staging.
+- OpenAI Responses JSON and SSE support, provider-owned terminal validation, usage extraction, and a
+  runnable local demonstration covering live recording, restart, replay, and MCP checkpointing.
+- `compat` and `lean` gateway profiles with explicit cache-preservation and deterministic context-
+  pruning controls, plus compact MCP `lean`, `recovery`, `analytics`, and `all` profiles.
+- Provenance-bound benchmark artifacts, an immutable per-mechanism accounting model, bounded summary-
+  first traffic analysis, and Headroom-derived cache-prefix comparison.
+- Pinned, attributed reference snapshots from Bifrost, Headroom, and agenticstash for subsequent
+  compatible integrations.
+
+### Changed
+
+- Replay identity now has a versioned, domain-separated generation that includes provider origin,
+  endpoint, relevant headers, content type, and meaningful JSON fields while ignoring only validated
+  transport and cache-hint noise.
+- Durable history from the previous identity generation remains inspectable but cannot silently enter
+  new recording or replay epochs.
+- Gateway configuration rejects ambiguous or explicit-null modes, supports `--record-only`, and uses
+  the installed `agent-rewind` command consistently in help and documentation.
+
+### Fixed
+
+- Hosted tools, hosted prompts, remote media, reused containers, prior-response state, and unknown tool
+  kinds cannot be served from automatic replay or written to a replay tape.
+- Strict replay cannot fall through to a paid live request; custom replayers must explicitly authorize
+  live fallback.
+- Prototype-named JSON fields and tenant scopes remain distinct across canonicalization, persistence,
+  restart, and evidence-chain verification.
+- Malformed responses, invalid usage, incomplete streams, stale writers, queue overload, cancellation,
+  and corrupt encrypted records cannot create replay credit or silently weaken durable mode.
+
+### Release boundary
+
+This release is an incremental local/developer release. Transactional enterprise receipts, complete
+storage key/retention/deletion lifecycle, observation CAS and retrieval, Bifrost cache lifecycle,
+agenticstash exchange/fork/diff, Gemini explicit cache resources, and paid live-provider claims remain
+outside v1.1.0. The default tier remains reversibility rather than a security sandbox.
+
 ## 1.0.0 — 2026-08-19
 
 First stable release: provider-neutral, verified end-to-end, and API-frozen. Everything below shipped
