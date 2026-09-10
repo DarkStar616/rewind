@@ -17,7 +17,7 @@ have on its own:
 
 ## Quick start
 
-Live on npm — no account, no API key, Node ≥ 20:
+Public source and npm packages — no Rewind account or Rewind API key, Node ≥ 20:
 
 ```bash
 # Claude Code
@@ -71,13 +71,15 @@ default as a security boundary. Honesty about that line is part of the product.
 
 ## Status
 
-**Live on npm.** Three packages, verified installable and working end-to-end from the registry:
+**v1.1.0 release status.** The source release is public, and the core and MCP packages are live on
+npm. The gateway publication is staged by npm and remains on the registry's previous `1.0.0`
+metadata until replication completes; verify it before pinning the gateway in automation.
 
 - [`@agent-rewind/mcp`](https://www.npmjs.com/package/@agent-rewind/mcp) — the CLI + MCP server people install
 - [`@agent-rewind/core`](https://www.npmjs.com/package/@agent-rewind/core) — the reversible-execution engine, effect barrier, and hash chain
-- [`@agent-rewind/gateway`](https://www.npmjs.com/package/@agent-rewind/gateway) — the token-saving record/replay proxy
+- [`@agent-rewind/gateway`](https://www.npmjs.com/package/@agent-rewind/gateway) — the token-saving record/replay proxy (`1.1.0` source release; check registry metadata before installing)
 
-Backed by 334 tests (green, run repeatedly with zero flakiness) and repeated rounds of independent
+Backed by 443 tests (green in the release verification run) and repeated rounds of independent
 cross-vendor (codex) code review. See [`docs/AGENT-REWIND-BRIEF.md`](docs/AGENT-REWIND-BRIEF.md) for the full
 plain-English breakdown (how token savings and accuracy work, use cases, and honest limits),
 [`docs/PRODUCT-BREAKDOWN.md`](docs/PRODUCT-BREAKDOWN.md) for the evidence-tagged technical breakdown,

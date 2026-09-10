@@ -149,7 +149,7 @@ unverified: its runner and corpus were not located, so those percentages are wit
 
 - Full install guide, architecture, and the product breakdown: <https://github.com/DarkStar616/rewind>
 - Licence: **FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 future grant at 2 years).
-# MCP tool profiles (v1.1 development)
+# MCP tool profiles (v1.1.0)
 
 Use `rewind mcp --profile lean` or set `REWIND_MCP_PROFILE=lean`. The CLI flag takes precedence.
 Unknown profiles and options fail startup. The default remains `all`.
@@ -171,7 +171,7 @@ Checkpoint at meaningful risky boundaries and retain the returned id. The lean p
 id; switch to recovery for checkpoint discovery and failure memory. Tier 0 provides reversibility,
 not isolation or security. Text and structured result forms remain available for compatibility.
 
-### Explicit durable ordered tape (v1.1 development)
+### Explicit durable ordered tape (v1.1.0)
 
 Set `REWIND_STORAGE_KEY` securely in the process environment to exactly 64 hex
 characters (32 random bytes). Keep that key for reopening this tenant's store.
