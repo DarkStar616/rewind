@@ -97,10 +97,11 @@ floored so they never over-count:
    retry — is served from the local record with **zero** upstream call; the saving is that whole call.
    Correctness-safe by construction: only byte-for-byte-equivalent requests replay, so it can never
    serve a subtly-wrong answer (the key difference from "semantic" caches that guess).
-2. **Prompt-cache preservation.** Injects/keeps one `cache_control` breakpoint on the static prefix
-   (system prompt + tool defs) so it's re-read at ~1/10th the input price instead of full price each
-   turn. Saving = (input rate − cache-read rate) × cached tokens.
-3. **Deterministic pruning.** Collapses duplicate tool-output blocks losslessly — fewer tokens sent.
+2. **Prompt-cache preservation.** For Anthropic message requests, injects or keeps one `cache_control`
+   breakpoint on the static prefix when the client supplied none. Provider policy and usage determine
+   whether that produces a cache hit or a billed saving.
+3. **Deterministic pruning.** Collapses repeated Anthropic-format tool-result blocks while preserving
+   the first full result. It changes model-visible context, so it remains opt-in and needs outcome testing.
 
 *(The math and price table are in §6; the executable nine-call simulated benchmark is in §8.)*
 
@@ -304,22 +305,17 @@ the events," never "the metric is cryptographically unforgeable."
 
 ## 7. Testing & verification results (Agent Rewind's own numbers)
 
-- **334 automated tests, 100% passing; typecheck clean** **[PROVEN]** — `npm run check` → `tests 334,
-  pass 334, fail 0`. Split: core 103, gateway 184, mcp 47.
-- **Stability:** the full suite was run **10 times in a row on four separate occasions (40 runs) — every
-  run fully green, zero flakiness**, including the concurrency-sensitive git-backend tests.
+- **443 automated tests passing; typecheck clean** **[PROVEN]** in the v1.1.0 release verification run.
+  Run `npm run check` to reproduce the current result.
 - **Property-based tests** on the two most safety-critical functions: the replay key (200 randomized
   requests — determinism *and* "any output-affecting change always changes the key") and the meter (500
   usages — cost never exceeds the exact cost).
 - **End-to-end guarantee, three ways:** the full "checkpoint → guard admitted → bash edit → rewind →
   guard REFUSED across the rewind → chain verifies" flow is proven at the **engine**, **CLI**, and
   **MCP server** layers **[PROVEN]**.
-- **Adversarial cross-vendor review:** the codebase was put through **five rounds** of an independent
-  (different-vendor) automated code review; **11 distinct findings** were surfaced and fixed — over-credit
-  risks, a redaction leak, a cross-instance concurrency race, tamper-evidence gaps — and the final two
-  rounds **converged clean** (zero findings). Every correctness-critical fix is *gold-sanity-proven*: the
-  test is shown to go red on a deliberately broken implementation before the fix lands. *(A bug-finding
-  aid, not a certification — see limits.)*
+- **Cross-vendor review:** independent automated review has found concrete over-credit, redaction,
+  concurrency, and tamper-evidence defects that were fixed and regression-tested. It remains a
+  bug-finding aid rather than certification, and later findings supersede any earlier “clean” verdict.
 
 **What is NOT yet measured [NOT YET MEASURED]:** there is **no live-provider benchmark** — no measured
 latency, throughput, or real-dollar savings percentage from production traffic. The only savings figure
@@ -372,30 +368,31 @@ These are stated up front because overclaiming here is a product defect:
 - **The effect-barrier concept is not novel** (others are converging on it). The defensible claim is the
   *combination* — deterministic, filesystem-independent, and portable across backend tiers — not
   invention.
-- **In-memory record store today:** replay records live per gateway session; the *savings total* is
-  durable across processes. Durable multi-writer record storage is roadmap.
+- **Storage modes have different guarantees:** default compatibility mode keeps replay records in memory.
+  v1.1.0 also ships an opt-in encrypted SQLite ordered tape that survives restarts. It requires one writer
+  per tenant/epoch; broader migration, rotation, deletion, and multi-process certification remain future work.
 
 ---
 
 ## 10. Where Agent Rewind is differentiated (the white space)
 
-The competitive scan (`docs/deep-prospect-log.md`, `docs/POSITIONING.md`) found LLM gateways with
-caching, agent-checkpoint frameworks, and semantic caches — but **no existing proxy does byte-exact
-record/replay**, and no competing agent-checkpoint tool ships the **refuse-and-record effect barrier**.
-Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
+The competitive scan (`docs/deep-prospect-log.md`, `docs/POSITIONING.md`) found overlapping exact-cache,
+ordered-replay, context-reduction, and checkpoint products. Agent Rewind's wedge is the combination of
+workspace recovery, effect admission, conservative savings evidence, and local operation:
 
 1. **Byte-exact record/replay** — correctness-first (never a stale hit), where semantic caches trade
    correctness for hit-rate.
 2. **Refuse-and-record effect barrier on a tamper-evident chain** — the moat competitors don't ship.
-3. **Local-first, zero-config** — `npx -y @agent-rewind/mcp`, no account, no data leaves the machine.
+3. **Local-first, zero-config** — `npx -y @agent-rewind/mcp`, no Rewind account; Rewind state stays local.
+   Live gateway calls still go to the configured model provider.
 4. **Gainshare you can verify** — pay a share of savings *proven* on your own provider's bill.
 
 ---
 
 ## 11. Distribution & integration
 
-> **Availability: LIVE on npm.** `@agent-rewind/core`, `@agent-rewind/gateway`, `@agent-rewind/mcp` are
-> published (1.0.0) and **verified installable + runnable from the public registry**. The CLI ships
+> **Availability: v1.1.0 is live on npm.** `@agent-rewind/core`, `@agent-rewind/gateway`, and
+> `@agent-rewind/mcp` all report `1.1.0` as latest. The CLI ships
 > **scoped** (the unscoped `rewind` name is taken), so install is `npx -y @agent-rewind/mcp`, not a bare
 > `npx rewind`.
 
@@ -415,7 +412,7 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 | Claim | Status |
 |---|---|
-| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 334 tests |
+| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 443 tests in the v1.1.0 release verification run |
 | Never serves a stale/wrong answer on a near-match | **[PROVEN]** — deny-list + bench gate |
 | Never over-credits savings (floors, dedupes, counterfactuals impossible) | **[PROVEN]** — meter/billable/bench |
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |
@@ -426,6 +423,6 @@ Agent Rewind's wedge is the *intersection*, delivered locally and verifiably:
 
 ---
 
-*Generated from the `research-corrections` branch. Every quoted test title exists in `packages/*/test/`;
-every price and rate is from `packages/gateway/src/meter.ts`; the synthetic bench is
+*Every quoted test title exists in `packages/*/test/`; every price and rate is from
+`packages/gateway/src/meter.ts`; the synthetic bench is
 `packages/gateway/bench/`. If a number isn't tagged, it's an error — flag it.*
