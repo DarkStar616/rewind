@@ -40,18 +40,24 @@ replays locally after a rewind or retry. The server tells the agent this workflo
 deploy/migrate/pay/email (safe undo that can't double-fire) · cheaper repetitive runs (the optional
 record/replay + prompt-cache proxy) · safe experimentation (checkpoint, try, rewind).
 
-**Measured token recovery:** Benchmark B ran 120 deterministic trials of a 10-step task and measured a
-curve from **9.1%** recovered tokens after an early failure to **41.2%** after a late failure at step 8.
+## Savings evidence
+
+| Mechanism | Measured or guaranteed effect |
+|---|---|
+| Rewind + exact replay | Benchmark B: **9.1%** recovered tokens after an early failure, **25.6%** mid-run, and **41.2%** after a late failure at step 8/10 across 120 deterministic trials. |
+| Compact MCP profile | About **2,340 → 691 initialization tokens**, a **70.5% reduction**, using the documented characters/4 estimate. |
+| Eligible replay hit | **Zero upstream tokens for that repeated call**; total workload savings depend on how often requests repeat. |
+| Reproducible mock cost scenario | **28.08% avoided simulated cost** over nine calls with three replays; the unique-call control reports zero. |
+
 The condition matters: 41.2% is the late-failure result, not a universal savings promise. The repository
 also ships a Nebius runner that prices the same rewind/replay scenario from real provider-reported token
-usage. Neither result is a production-traffic or universal dollar-savings estimate. See the
-[benchmark evidence and claim rules](docs/BENCHMARKS.md).
+usage. These controlled results are not production-traffic or universal dollar-savings estimates. See
+the [benchmark evidence and claim rules](docs/BENCHMARKS.md).
 
 ## What shipped in v1.1.0
 
 - **Smaller MCP context:** `lean`, `recovery`, `analytics`, and `all` tool profiles let clients load
-  only the tools needed for a session. The measured `lean` definition set is about 691 tokens using
-  the documented characters/4 estimate; it is not a provider-billed token measurement.
+  only the tools needed for a session.
 - **OpenAI Responses support:** the gateway understands `/v1/responses`, validates completed JSON and
   SSE responses, and replays the exact recorded response bytes for eligible requests.
 - **Durable ordered replay:** an opt-in encrypted SQLite tape records distinct stochastic responses,
@@ -65,6 +71,10 @@ usage. Neither result is a production-traffic or universal dollar-savings estima
 The default remains the compatibility profile with in-memory replay. Durable storage and context
 pruning are opt-in. See the [v1.1.0 changelog](CHANGELOG.md#110--2026-09-10) and the
 [MCP/gateway reference](packages/mcp/README.md) for configuration and limits.
+
+**OSS boundary:** v1.1.0 selectively adapts Headroom's prefix comparison. The pinned Bifrost and
+agenticstash snapshots are attributed review material; their full lifecycle, exchange, fork, and diff
+features are not runtime capabilities in this release.
 
 ## Why this exists
 
