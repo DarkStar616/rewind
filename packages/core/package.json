@@ -1,6 +1,6 @@
 {
   "name": "@agent-rewind/core",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Reversible execution for AI agents: whole-workspace checkpoint/rewind, a refuse-and-record effect barrier, and a tamper-evident SHA-256 evidence chain — pure logic over logs and traces.",
   "type": "module",
   "license": "FSL-1.1-ALv2",

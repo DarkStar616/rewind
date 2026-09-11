@@ -46,7 +46,7 @@ If your account has 2FA on (recommended), npm will prompt for a one-time code ea
 
 ```bash
 npm view @agent-rewind/mcp version                 # should print the release version
-npx -y @agent-rewind/mcp@1.1.0 --help              # runs the published CLI from a clean cache
+npx -y @agent-rewind/mcp@1.1.1 --help              # runs the published CLI from a clean cache
 ```
 
 Then the real end-to-end: in any git repo, `npx -y @agent-rewind/mcp mcp` starts the MCP server, and the
@@ -55,8 +55,8 @@ Claude Code / Cursor / Codex snippets in `docs/install/README.md` wire it into y
 ## 5. Tag the release
 
 ```bash
-git tag v1.1.0
-git push rewind v1.1.0
+git tag v1.1.1
+git push rewind v1.1.1
 ```
 
 ## Publishing later versions

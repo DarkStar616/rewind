@@ -111,7 +111,7 @@ default as a security boundary. Honesty about that line is part of the product.
 
 ## Status
 
-**v1.1.0 is live.** The source repository is public and all three packages report `1.1.0` as their
+**v1.1.1 is live.** The source repository is public and all three packages report `1.1.1` as their
 latest npm release:
 
 - [`@agent-rewind/mcp`](https://www.npmjs.com/package/@agent-rewind/mcp) — the CLI + MCP server people install

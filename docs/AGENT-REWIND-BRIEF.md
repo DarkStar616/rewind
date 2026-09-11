@@ -1,7 +1,7 @@
 # Agent Rewind — briefing (paste this into an AI to write a doc or an email)
 
 *Self-contained. Claims are marked where they are proven and where limits remain. Product name:
-**Agent Rewind**. v1.1.0 is live on npm and in the public source repository.*
+**Agent Rewind**. v1.1.1 is live on npm and in the public source repository.*
 
 ---
 
@@ -37,13 +37,13 @@ Rewind does not turn a hosted model into an offline one.
 
 ---
 
-## Status: v1.1.0 is live
+## Status: v1.1.1 is live
 
-All three v1.1.0 packages are published and report `1.1.0` as their latest npm release:
+All three v1.1.1 packages are published and report `1.1.1` as their latest npm release:
 
-- `@agent-rewind/core@1.1.0` — the reversible-execution engine + effect barrier + hash chain
-- `@agent-rewind/gateway@1.1.0` — the token-saving record/replay LLM proxy
-- `@agent-rewind/mcp@1.1.0` — the CLI + MCP server people install
+- `@agent-rewind/core@1.1.1` — the reversible-execution engine + effect barrier + hash chain
+- `@agent-rewind/gateway@1.1.1` — the token-saving record/replay LLM proxy
+- `@agent-rewind/mcp@1.1.1` — the CLI + MCP server people install
 
 **Source:** https://github.com/DarkStar616/rewind · **Licence:** FSL-1.1-ALv2 (source-available, becomes
 Apache-2.0 after 2 years).
@@ -210,7 +210,7 @@ checkpoint through the SDK. Cross-vendor review is a bug-finding aid, not certif
 | Price | Free and local; source-available under FSL-1.1-ALv2. Planned paid layer: a share of *verified* token savings. |
 | Works with | Claude Code, Cursor, Codex CLI, Cline, Windsurf (any MCP client) |
 | Requires | Node ≥ 20. No account, no API key. |
-| npm | `@agent-rewind/core`, `@agent-rewind/gateway`, and `@agent-rewind/mcp`: latest is 1.1.0. |
+| npm | `@agent-rewind/core`, `@agent-rewind/gateway`, and `@agent-rewind/mcp`: latest is 1.1.1. |
 | Repo | https://github.com/DarkStar616/rewind |
 | One-line pitch | "An undo button for AI coding agents — that can't accidentally re-charge a card." |
 

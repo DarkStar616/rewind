@@ -1,6 +1,6 @@
 # API Stability — Agent Rewind 1.0
 
-This document is the public-API contract for the `@agent-rewind/*` packages as of **1.1.0**.
+This document is the public-API contract for the `@agent-rewind/*` packages as of **1.1.1**.
 It is enforced, not aspirational: the frozen export surfaces below are snapshotted by
 `packages/core/test/public-api.test.ts` and `packages/gateway/test/public-api.test.ts`,
 which derive the live export set from each package's `src/index.ts` on every run and fail

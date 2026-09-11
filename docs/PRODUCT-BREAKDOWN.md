@@ -305,7 +305,7 @@ the events," never "the metric is cryptographically unforgeable."
 
 ## 7. Testing & verification results (Agent Rewind's own numbers)
 
-- **443 automated tests passing; typecheck clean** **[PROVEN]** in the v1.1.0 release verification run.
+- **443 automated tests passing; typecheck clean** **[PROVEN]** in the v1.1.1 release verification run.
   Run `npm run check` to reproduce the current result.
 - **Property-based tests** on the two most safety-critical functions: the replay key (200 randomized
   requests — determinism *and* "any output-affecting change always changes the key") and the meter (500
@@ -395,8 +395,8 @@ workspace recovery, effect admission, conservative savings evidence, and local o
 
 ## 11. Distribution & integration
 
-> **Availability: v1.1.0 is live on npm.** `@agent-rewind/core`, `@agent-rewind/gateway`, and
-> `@agent-rewind/mcp` all report `1.1.0` as latest. The CLI ships
+> **Availability: v1.1.1 is live on npm.** `@agent-rewind/core`, `@agent-rewind/gateway`, and
+> `@agent-rewind/mcp` all report `1.1.1` as latest. The CLI ships
 > **scoped** (the unscoped `rewind` name is taken), so install is `npx -y @agent-rewind/mcp`, not a bare
 > `npx rewind`.
 
@@ -416,7 +416,7 @@ workspace recovery, effect admission, conservative savings evidence, and local o
 
 | Claim | Status |
 |---|---|
-| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 443 tests in the v1.1.0 release verification run |
+| Checkpoint/rewind, effect barrier, hash chain, exact replay, cache-preserve, prune all work as described | **[PROVEN]** — 443 tests in the v1.1.1 release verification run |
 | Never serves a stale/wrong answer on a near-match | **[PROVEN]** — deny-list + bench gate |
 | Never over-credits savings (floors, dedupes, counterfactuals impossible) | **[PROVEN]** — meter/billable/bench |
 | A rewind can't un-spend a real effect | **[PROVEN]** — engine/CLI/MCP e2e |
