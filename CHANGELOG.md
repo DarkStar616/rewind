@@ -5,6 +5,21 @@ All notable changes to the `@agent-rewind/*` packages are recorded here. The thr
 together. This project follows [Semantic Versioning](https://semver.org/); the public-API contract
 each package guarantees under semver is documented in [`docs/STABILITY.md`](docs/STABILITY.md).
 
+## 1.1.1 — 2026-09-11
+
+This patch republishes the v1.1 runtime with the corrected, release-quality npm documentation and a
+refreshed dependency lock. It does not change the public API or runtime behavior introduced in 1.1.0.
+
+### Changed
+
+- The npm landing page now carries the current token-savings evidence, including the measured,
+  condition-bound **41.2%** late-failure result, the **70.5%** compact MCP initialization reduction,
+  and a clear boundary between shipped runtime integrations and pinned OSS reference material.
+- Public status, package-version, publishing, and stability documentation now identifies 1.1.1 as
+  the current patch release while preserving the 1.1.0 feature-introduction history.
+- The repository lockfile resolves current safe transitive releases; the build-only esbuild dependency
+  is pinned to its patched line through the root override.
+
 ## 1.1.0 — 2026-09-10
 
 Rewind can now run a durable, exact local replay gateway across Anthropic Messages, OpenAI Chat

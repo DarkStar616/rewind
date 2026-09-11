@@ -1,6 +1,6 @@
 {
   "name": "@agent-rewind/gateway",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Local byte-exact record/replay LLM proxy for AI coding agents: zero-cost replay after a rewind, prompt-cache preservation, deterministic tool-output pruning, and verifiable token-savings accounting.",
   "type": "module",
   "license": "FSL-1.1-ALv2",
@@ -43,7 +43,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@agent-rewind/core": "^1.1.0"
+    "@agent-rewind/core": "^1.1.1"
   },
   "optionalDependencies": {
     "better-sqlite3": "12.11.1"
